@@ -1,4 +1,4 @@
-// Measure Anton's actual ACE-Step render with the renderer's own formulas,
+// Measure NovaFemme's actual ACE-Step render with the renderer's own formulas,
 // over the whole file. AnalyserNode can only be polled in real time (4:20 of
 // wall clock), so this reproduces what it does — Blackman window, 4096-point
 // FFT, smoothingTimeConstant EMA on the magnitude spectrum — and walks the
@@ -152,7 +152,7 @@ const out = await p.evaluate(async () => {
 });
 
 const f = (n, d = 2) => n.toFixed(d);
-console.log(`Anton's take — master_00018.mp3`);
+console.log(`NovaFemme's take — master_00018.mp3`);
 console.log(`  ${f(out.durationSec,1)} s · ${out.sampleRate} Hz · ${out.channels} ch · ${out.frames} analysed frames\n`);
 console.log("TIME DOMAIN (whole file)");
 console.log(`  peak            ${f(out.peakDb)} dBFS`);

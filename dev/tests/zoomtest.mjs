@@ -37,7 +37,7 @@ async function run(label, patched) {
     await p.waitForTimeout(120);
     const after = await p.evaluate(() => window.__isPlaying());
 
-    // Did the click seek instead? (the symptom Anton reported)
+    // Did the click seek instead? (the symptom NovaFemme reported)
     const seeked = await p.evaluate(() => window.__host.engine.sig.currentTime !== 60);
 
     const ok = before !== after;

@@ -110,7 +110,7 @@ const METRICS = [
     { key: "flux",     label: "FLUX",     unit: "",   min: 0,    max: 0.40,   dp: 3 },
     { key: "flatness", label: "FLATNESS", unit: "dB", min: -30,  max: 0,      dp: 1 },
     // Clipping spans an enormous range and the interesting end is the small
-    // one: Anton's take has 87 clipped samples in 25 million, which is 0.0003%
+    // one: NovaFemme's take has 87 clipped samples in 25 million, which is 0.0003%
     // — real, but invisible at 2 decimal places, where it printed a flat
     // "0.00 %" and looked like none at all. Log scale and 4 places, so a
     // handful of clipped samples is distinguishable from genuinely zero.

@@ -135,8 +135,9 @@ its settings-panel section all follow automatically.
 
 ## Credits
 
-Built by Anton de Lange, with engineering assistance from Claude (Anthropic).
+Built by ANovaFemme, with engineering assistance from Claude (Anthropic).
 
 ## Licence
 
-<!-- Add your licence here -->
+MIT © NovaFemme
+

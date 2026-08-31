@@ -1,6 +1,6 @@
 // Does a limiter ceiling BELOW full scale show up at all?
 // The APG CLIP metric only counts samples at the digital ceiling. If ACE-Step
-// output is limited or normalised below 0 dBFS — which Anton's bench node says
+// output is limited or normalised below 0 dBFS — which NovaFemme's bench node says
 // it is, peak -1.32 dBFS — then oversaturation never produces a digital clip
 // and the metric reads 0.00% no matter how hard the take is being squashed.
 const SR = 48000, N = 48000;
@@ -15,7 +15,7 @@ function make(kind) {
     if (kind === "clean") v *= 0.7;
     else if (kind === "digital") v = Math.max(-1, Math.min(1, v));
     else if (kind === "limited") {
-      const ceil = 0.859;                    // -1.32 dBFS, Anton's measured peak
+      const ceil = 0.859;                    // -1.32 dBFS, NovaFemme's measured peak
       v = Math.max(-ceil, Math.min(ceil, v));
     } else if (kind === "bass") {
       // A loud low sine: the case a naive flat-top detector calls a false
