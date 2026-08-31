@@ -135,7 +135,7 @@ its settings-panel section all follow automatically.
 
 ## Credits
 
-Built by ANovaFemme, with engineering assistance from Claude (Anthropic).
+Built by NovaFemme, with engineering assistance from Claude (Anthropic).
 
 ## Licence
 
