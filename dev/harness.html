@@ -1,0 +1,100 @@
+<!doctype html><meta charset="utf-8">
+<title>Nova harness</title>
+<style>
+  html,body{margin:0;background:#2b2b3a;font:12px system-ui}
+  #stage{position:relative;width:1040px;height:300px;margin:0}
+</style>
+<div id="stage"></div>
+<script type="module">
+import { config } from "/web/core/config.js";
+import { PlayerHost } from "/web/core/host.js";
+import { RENDERER_IDS } from "/web/renderers/registry.js";
+
+window.__log = [];
+const origErr = console.error, origWarn = console.warn;
+console.error = (...a) => { window.__log.push("ERROR " + a.join(" ")); origErr(...a); };
+console.warn  = (...a) => { window.__log.push("WARN  " + a.join(" ")); origWarn(...a); };
+
+await config.load();
+
+// synthetic peaks: an envelope with transients, 120 bars, stereo
+const N = 120;
+const ch0 = [], ch1 = [];
+for (let i = 0; i < N; i++) {
+  const env = 0.35 + 0.55 * Math.abs(Math.sin(i / 9)) * (1 - i / (N * 1.6));
+  ch0.push(Math.min(1, env * (1 + 0.35 * Math.sin(i * 1.7))));
+  ch1.push(Math.min(1, env * (1 + 0.35 * Math.cos(i * 1.3))));
+}
+
+const node = { id: 1, size: [1040, 300], properties: {}, graph: { _version: 0 },
+               setSize(s){ this.size = s; }, addDOMWidget(){ return {}; } };
+
+const host = new PlayerHost(node, {
+  filename: "test.wav", duration: 280, sample_rate: 48000,
+  stereo: true, lufs: -16.5, peaks: { ch0, ch1 },
+  filesize: 26_845_312,
+  // Shape and values taken from compute_bench() run over a real ACE-Step
+  // render, including its above-full-scale peak, so the bench strip is
+  // exercised against the case that actually warns rather than a tidy one.
+  bench: {
+    peak_db: 0.45, peak_linear: 1.053664, rms_db: -14.15, crest_db: 14.60,
+    dc_offset: 0.001046, over_fs: 87, clipped_samples: 174, clipped_pct: 0.0007,
+    lr_corr: 0.591, bands: { BASS: 67.12, MID: 22.80, PRES: 7.65, HF: 2.43 },
+    hf_outliers: 0, samples: 12480000, channels: 2,
+  },
+});
+document.getElementById("stage").appendChild(host.element);
+
+// Synthetic analyser output — the engine's real graph needs a decoded file.
+const BINS = 2048, FFT = 4096;
+const freq = new Uint8Array(BINS);
+// The engine also exposes TRUE per-bin dBFS (getFloatFrequencyData) for
+// renderers that do spectral arithmetic. The harness has to supply it too, or
+// those renderers see a signal bag the real engine would never hand them.
+const freqDb = new Float32Array(BINS);
+const timeL = new Float32Array(FFT), timeR = new Float32Array(FFT);
+const DB_MIN = -100, DB_MAX = -30;
+let t = 0;
+function fillSignal() {
+  t += 0.13;
+  for (let i = 0; i < BINS; i++) {
+    const f = i / BINS;
+    const tilt = Math.pow(1 - f, 1.9) * 235;
+    const formants = 55 * Math.exp(-Math.pow((f - 0.02) * 40, 2))
+                   + 40 * Math.exp(-Math.pow((f - 0.09) * 26, 2))
+                   + 26 * Math.exp(-Math.pow((f - 0.22) * 18, 2));
+    const shimmer = 16 * Math.sin(i * 0.35 + t * 3);
+    const raw = tilt + formants + shimmer + 12 * Math.random();
+    freq[i] = Math.max(0, Math.min(255, raw));
+    // Below the byte floor the real analyser still reports a true value while
+    // the byte reads 0. Extrapolating the same linear dB mapping past 0
+    // reproduces that, so the harness exercises the case the float path exists
+    // for instead of hiding it.
+    freqDb[i] = DB_MIN + (raw / 255) * (DB_MAX - DB_MIN);
+  }
+  for (let i = 0; i < FFT; i++) {
+    const p = i / FFT * Math.PI * 2;
+    const l = 0.55 * Math.sin(p * 7 + t) + 0.22 * Math.sin(p * 23 + t * 1.7) + 0.06 * (Math.random() - 0.5);
+    const r = 0.52 * Math.sin(p * 7 + t + 0.7) + 0.20 * Math.sin(p * 19 + t * 2.1) + 0.06 * (Math.random() - 0.5);
+    timeL[i] = l; timeR[i] = r;
+  }
+}
+fillSignal();
+
+const sig = {
+  ready: true, hasData: true, playing: true, frame: 0,
+  freq, freqDb, timeL, timeR,
+  levelL: 0.72, levelR: 0.66, peakHold: 0.84, clip: false,
+  corrRaw: 0.34,
+  sampleRate: 48000, binCount: BINS, fftSize: FFT,
+  currentTime: 100, progress: 100 / 280, duration: 280,
+};
+host.engine.update = () => { if (sig.playing) { fillSignal(); sig.frame++; } return sig; };
+Object.defineProperty(host.engine, "playing", { get: () => sig.playing });
+
+window.__host = host;
+window.__sig = sig;
+window.__setView = (v) => { host.state.viewMode = v; host.panel.rebuild(); host.markDirty(); };
+window.__modes = RENDERER_IDS;
+window.__ready = true;
+</script>
