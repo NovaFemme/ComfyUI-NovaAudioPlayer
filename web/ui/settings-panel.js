@@ -185,10 +185,21 @@ function ensureStylesheet() {
     font-size: calc(10px * var(--nova-text-scale)); letter-spacing: .13em; text-transform: uppercase;
     color: var(--nova-panel-dim); margin: 0; white-space: nowrap;
 }
+/* flex: 0 1 auto, not 0 0 auto. The theme block grows with every row added to
+   it, and at 0 0 it grew without bound: on a short node it pushed the section
+   accordion down behind the footer until the sections could not be clicked at
+   all. Capping it and letting it scroll keeps the sections reachable at any
+   node height, and means the next row added here cannot resurrect this. */
 .nova-panel__theme {
-    flex: 0 0 auto; padding: 8px 10px 9px 14px;
+    flex: 0 1 auto; padding: 8px 10px 9px 14px;
+    max-height: 46%;
+    overflow-y: auto; overflow-x: hidden;
     border-bottom: 1px solid var(--nova-panel-border);
     display: grid; gap: 6px;
+}
+.nova-panel__theme::-webkit-scrollbar { width: 8px; }
+.nova-panel__theme::-webkit-scrollbar-thumb {
+    background: var(--nova-panel-border); border-radius: 4px;
 }
 .nova-panel__themerow { display: grid; grid-template-columns: 1fr auto auto; gap: 5px; }
 
@@ -217,7 +228,10 @@ function ensureStylesheet() {
 }
 .nova-row--local > label { font-weight: 600; }
 
-.nova-panel__body { overflow-y: auto; overflow-x: hidden; flex: 1 1 auto; }
+/* min-height: 0 is load-bearing. A flex child will not shrink below its content
+   size without it, so the body would refuse to scroll and overflow the drawer
+   instead — the same failure the theme block above had. */
+.nova-panel__body { overflow-y: auto; overflow-x: hidden; flex: 1 1 auto; min-height: 0; }
 .nova-panel__body::-webkit-scrollbar { width: 8px; }
 .nova-panel__body::-webkit-scrollbar-thumb {
     background: var(--nova-panel-border); border-radius: 4px;
@@ -346,6 +360,7 @@ const fmtNum = v => (Number.isInteger(v) ? String(v) : Number(v).toFixed(2));
  *   previewTextScale(v)              (apply without persisting, for dragging)
  *   getBarRelief() / setBarRelief(v) -> Promise<{ok, message}>
  *   previewBarRelief(v)              (apply without persisting, for dragging)
+ *   getShowTooltips() / setShowTooltips(v) -> Promise<{ok, message}>
  *   getPanelWidth() / setPanelWidth(px)
  *   getOpenSection() / setOpenSection(id)
  */
@@ -505,7 +520,29 @@ export function createSettingsPanel(ctl) {
     reliefWide.appendChild(reliefSlider);
     reliefRow.append(reliefLabel, reliefValue, reliefWide);
 
-    themeBlock.append(select, themeRow, dialog, scopeRow, textRow, reliefRow, promote);
+    // Control hints. Same class of setting again: useful while the transport is
+    // unfamiliar, noise once it is not, and that is a property of the person
+    // rather than of the theme.
+    const tipRow = el("div", "nova-row");
+    const tipLabel = el("label", null, "Control hints");
+    tipLabel.title = "Show a hint when the pointer rests on a transport control. " +
+                     "Applies to all players, not just this one.";
+    const tipBox = el("input");
+    tipBox.type = "checkbox";
+    tipBox.onchange = async () => {
+        const res = await ctl.setShowTooltips(tipBox.checked);
+        if (!res.ok) {
+            // Never leave the box showing a state that was not stored.
+            tipBox.checked = ctl.getShowTooltips();
+            say(res.message, "error");
+        }
+    };
+    const tipWide = el("div", "nova-row__wide");
+    tipWide.appendChild(tipBox);
+    tipRow.append(tipLabel, tipWide);
+
+    themeBlock.append(select, themeRow, dialog, scopeRow, textRow, reliefRow,
+                      tipRow, promote);
     root.appendChild(themeBlock);
 
     let dialogAction = null;
@@ -757,6 +794,8 @@ export function createSettingsPanel(ctl) {
         const br = Number(ctl.getBarRelief());
         if (document.activeElement !== reliefSlider) reliefSlider.value = String(br);
         reliefValue.textContent = `${Math.round(br * 100)}%`;
+
+        if (document.activeElement !== tipBox) tipBox.checked = ctl.getShowTooltips();
 
         const scope = ctl.getScope();
         scopeNode.setAttribute("aria-pressed", String(scope === "node"));

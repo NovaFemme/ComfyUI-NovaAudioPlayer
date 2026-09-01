@@ -6,7 +6,7 @@ state of play, the open questions, and the context that otherwise only exists in
 conversation.
 
 **Repo:** https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer
-**Status:** pushed and live. 252 automated checks passing at time of writing.
+**Status:** pushed and live. 299 automated checks passing at time of writing.
 **Author:** NovaFemme.
 
 ---
@@ -51,8 +51,10 @@ tunable by number rather than by ear alone.
 - Theme system: 101 colour roles in the base theme, per-node vs per-theme scope
 - Text-size and bar-relief sliders (app-level display preferences)
 - Rounded bars with colour-derived 3D relief across every bar in the node
+- `panel_info` STRING output (json / text / csv_row) for logging a take
+- Control hints on the transport, toggleable in the settings drawer
 
-**Test suite:** `dev/tests/` — 14 JS suites plus one Python suite, 252 checks.
+**Test suite:** `dev/tests/` — 15 JS suites plus two Python suites, 299 checks.
 Playwright is resolved by `dev/tests/_pw.mjs`; it used to be imported by an
 absolute path that existed on exactly one machine, so the browser suites would
 not even load from a fresh clone.

@@ -152,6 +152,11 @@ DEFAULT_COLOR_CONFIG = {
                 "bench.value":           "#dfe4f5",
                 "bench.warn":            "#ff8a5c",
 
+                # -- control hints ---------------------------------------
+                "tooltip.bg":            "#0b0d18f5",
+                "tooltip.border":        "#ffffff26",
+                "tooltip.text":          "#e6e9f7",
+
                 # -- view-mode pill --------------------------------------
                 "mode.text":             "#ffffff",
                 "mode.border":           "#ffffff",
@@ -208,6 +213,9 @@ DEFAULT_COLOR_CONFIG = {
                 "btn.bg":                "#0d3b52",
                 "btn.active":            "#12586f",
                 "vol.track":             "#123444",
+                "tooltip.bg":            "#04141df5",
+                "tooltip.border":        "#38bdf83d",
+                "tooltip.text":          "#d8ecf6",
                 "gonio.border":          "#1d5f73",
                 "gauge.box.border":      "#1d5f73",
                 "mode.waveform":         "#0e5a72",
@@ -260,6 +268,10 @@ DEFAULT_SYSTEM_CONFIG = {
         # and shade are derived from each bar's own colour, so this works for
         # any theme and any colour the user picks.
         "bar_relief": 0.55,
+        # Hints on the transport controls after the pointer rests on one.
+        # A display preference, not theme content: once the controls are
+        # learned they are noise, and that is per-person rather than per-theme.
+        "show_tooltips": True,
     },
     "audio_engine": {
         "supported_formats": ["wav", "mp3", "flac", "ogg", "opus", "m4a", "webm"],

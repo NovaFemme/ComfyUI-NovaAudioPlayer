@@ -36,6 +36,7 @@ import * as chrome from "../ui/chrome.js";
 import { drawBenchButton, drawBenchPanel } from "../ui/bench-panel.js";
 import { createSettingsPanel } from "../ui/settings-panel.js";
 import { showDownloadMenu, closeDownloadMenu, isDownloadMenuOpen } from "../ui/download-menu.js";
+import { drawTooltip, tipFor, TOOLTIP_DELAY_MS } from "../ui/tooltips.js";
 
 export class PlayerHost {
     constructor(node, data) {
@@ -380,6 +381,21 @@ export class PlayerHost {
             viewPillW: pillW,
         });
 
+        // Absolutely last: a hint that the bench strip or the hover ring could
+        // paint over would be worse than no hint. Suppressed mid-drag, when the
+        // pointer is busy and the box would chase it across the node.
+        if (this._tipShown && this._hovered && !this._drag &&
+            config.appearance("show_tooltips", true) !== false) {
+            drawTooltip(ctx, L, palette, tipFor(this._hovered, {
+                playing: this.engine.playing,
+                looping: this.state.looping,
+                muted: this.state.muted,
+                volume: this.state.volume,
+                viewLabel: getRenderer(this.state.viewMode).label,
+                benchOpen: !!this.state.benchOpen,
+            }), this._ptr);
+        }
+
         ctx.restore();
     }
 
@@ -410,6 +426,7 @@ export class PlayerHost {
         c.addEventListener("pointerup", e => this._onPointerUp(e));
         c.addEventListener("pointercancel", e => this._onPointerUp(e));
         c.addEventListener("pointerleave", () => {
+            this._clearTooltip();
             if (this._hovered) { this._hovered = null; c.style.cursor = ""; this.markDirty(); }
         });
         c.addEventListener("dblclick", e => e.stopPropagation());
@@ -435,6 +452,10 @@ export class PlayerHost {
         // Stop LiteGraph from starting a node drag underneath us.
         e.stopPropagation();
         if (hit) e.preventDefault();
+
+        // Acting on a control answers the question the hint was there to
+        // answer, and a box left hanging over a drag is just in the way.
+        this._clearTooltip();
 
         switch (hit) {
             case "play":
@@ -574,6 +595,10 @@ export class PlayerHost {
             return;
         }
 
+        // Kept for tooltip placement. Updated even when the hovered control is
+        // unchanged, so the box tracks the pointer along a slider.
+        this._ptr = { x, y };
+
         const hit = chrome.hitTest(x, y, L);
         if (hit !== this._hovered) {
             this._hovered = hit;
@@ -582,8 +607,40 @@ export class PlayerHost {
                 : hit && hit !== "visualisation" ? "pointer"
                 : hit === "visualisation" ? "crosshair"
                 : "";
+            this._armTooltip(hit);
+            this.markDirty();
+        } else if (this._tipShown) {
+            // Following the pointer within one control: repaint so the box moves.
             this.markDirty();
         }
+    }
+
+    /**
+     * Show a hint once the pointer has rested.
+     *
+     * A timer rather than a per-frame deadline check, because the RAF loop
+     * returns early when nothing is animating and nothing is dirty — a deadline
+     * would simply never be reached on a paused node.
+     */
+    _armTooltip(hit) {
+        clearTimeout(this._tipTimer);
+        this._tipTimer = null;
+        this._tipShown = false;
+        if (!hit || !tipFor(hit)) return;
+        this._tipTimer = setTimeout(() => {
+            this._tipTimer = null;
+            // The pointer may have left, or a drag begun, while we waited.
+            if (this._destroyed || this._hovered !== hit || this._drag) return;
+            this._tipShown = true;
+            this.markDirty();
+        }, TOOLTIP_DELAY_MS);
+    }
+
+    /** Cancel any pending or visible hint. */
+    _clearTooltip() {
+        clearTimeout(this._tipTimer);
+        this._tipTimer = null;
+        this._tipShown = false;
     }
 
     _onPointerUp(e) {
@@ -867,6 +924,15 @@ export class PlayerHost {
                 return res;
             },
 
+            getShowTooltips: () => config.appearance("show_tooltips", true) !== false,
+
+            setShowTooltips: async v => {
+                const res = await config.saveAppearance({ show_tooltips: !!v });
+                if (!v) this._clearTooltip();
+                this.markDirty();
+                return res;
+            },
+
             getPanelWidth: () => self.state.panelWidth,
             setPanelWidth: (px) => { self.state.panelWidth = px; self._save(); },
 
@@ -1035,6 +1101,7 @@ export class PlayerHost {
         this._destroyed = true;
 
         if (this._raf) cancelAnimationFrame(this._raf);
+        this._clearTooltip();
         this._resizeObserver?.disconnect();
         document.removeEventListener("visibilitychange", this._onVisibility);
         this._unsubscribe?.();

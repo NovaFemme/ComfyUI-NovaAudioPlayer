@@ -376,6 +376,7 @@ class NovaConfigManager:
             "text_scale": (float, 0.6, 2.5),
             "bar_relief": (float, 0.0, 1.0),
             "color_mixing": (str, None, None),
+            "show_tooltips": (bool, None, None),
         }
         clean: Dict[str, Any] = {}
         for k, v in values.items():
@@ -383,9 +384,15 @@ class NovaConfigManager:
                 return False, f"Unknown appearance key '{k}'"
             kind, lo, hi = allowed[k]
             if kind is float:
+                # bool is a subclass of int in Python, so True would otherwise
+                # sail through as 1.0 and set a text scale.
                 if not isinstance(v, (int, float)) or isinstance(v, bool):
                     return False, f"'{k}' must be a number"
                 clean[k] = max(lo, min(hi, float(v)))
+            elif kind is bool:
+                if not isinstance(v, bool):
+                    return False, f"'{k}' must be true or false"
+                clean[k] = v
             else:
                 if not isinstance(v, str):
                     return False, f"'{k}' must be a string"
