@@ -109,9 +109,9 @@ still needs, on the human side:
 The workflow fires on any push to `main` that touches `pyproject.toml`, so bump
 `version` there to cut a release. Until the secret exists it skips cleanly and
 logs why, rather than failing red — the first push touching `pyproject.toml`
-necessarily happens before a publisher account can exist. `version` currently reads `2.1.4`, matching the
-last build; nothing is published until the secret exists, so it is free to change
-before the first run.
+necessarily happens before a publisher account can exist. `version` reads `2.2.0`: the 2.1.x numbers were local snapshot folders, never
+published releases. A registry version can never be reused, so bump before
+pushing, never after.
 
 ### 3. Repo housekeeping
 
