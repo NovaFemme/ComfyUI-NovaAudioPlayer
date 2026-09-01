@@ -10,6 +10,9 @@
 
 import { clipped, drawPlaceholder } from "../core/gfx.js";
 
+/** Upper bound on curve resolution. See the note where it is used. */
+const MAX_PLOT_POINTS = 480;
+
 export default {
     id: "eq",
     label: "SPECTRUM",
@@ -76,7 +79,16 @@ export function drawSpectrum(gfx, rect, sig, showLabels) {
     const freq = sig.freq;
     const floor = params.noiseFloor ?? 2;
     const gain = params.gain ?? 1;
-    const plotPoints = Math.max(2, Math.ceil(w));
+    // One plot point per pixel is far more resolution than a spectrum curve can
+    // show, and every point costs two Math.pow calls plus a lineTo on a path
+    // that then gets filled and stroked. Capping the count is the single
+    // cheapest win here: at 1760 device pixels it cuts the point count by ~3.7x
+    // for no visible change, because the curve is smooth at that scale anyway.
+    // Below the cap nothing changes, so small nodes keep per-pixel detail.
+    //
+    // Fewer, wider points also push more of the loop into the averaging branch,
+    // which represents band energy more honestly than point-sampling does.
+    const plotPoints = Math.max(2, Math.min(Math.ceil(w), MAX_PLOT_POINTS));
 
     ctx.beginPath();
     ctx.moveTo(x, bottom);
@@ -116,7 +128,7 @@ export function drawSpectrum(gfx, rect, sig, showLabels) {
     // -- fill ---------------------------------------------------------------
     // Cached per (top, bottom, theme): a gradient object is tied to its
     // coordinates, so it only needs rebuilding when the rect or palette moves.
-    const gradKey = `${y}|${bottom}|${palette.name}`;
+    const gradKey = `${y}|${bottom}|${palette.revision}`;
     let grad = gfx.store.grad;
     if (!grad || grad.key !== gradKey) {
         const g = ctx.createLinearGradient(0, bottom, 0, y);
@@ -130,16 +142,38 @@ export function drawSpectrum(gfx, rect, sig, showLabels) {
     ctx.fill();
 
     // -- neon rim -----------------------------------------------------------
+    // The glow used to be ctx.shadowBlur on this stroke. Measured on a
+    // 1760x600 canvas (dev/tests/perfprobe.mjs): the whole renderer cost
+    // 16.6 ms a frame, of which the rim was 13.2 ms and the shadow alone was
+    // ~9.4 ms of that. Canvas shadows take a slow rasteriser path whose cost
+    // tracks the path's complexity, not the blur radius — blur 4 and blur 12
+    // measured the same — so a thousand-segment curve was being blurred from
+    // scratch every frame. That is what made this view choppy on hardware that
+    // should not blink at it.
+    //
+    // Two wide, translucent strokes of the same path give the same bloom for a
+    // fraction of the cost. Combined with the point cap above: 16.6 ms -> 7.3 ms.
     const rim = params.rimWidth ?? 2;
     if (rim > 0) {
         ctx.lineJoin = "round";
         ctx.lineCap = "round";
-        ctx.shadowBlur = params.glow ?? 4;
-        ctx.shadowColor = palette.get("spectrum.rim.glow");
+
+        const glow = params.glow ?? 4;
+        if (glow > 0) {
+            ctx.strokeStyle = palette.get("spectrum.rim.glow");
+            // Widths are relative to the rim so the bloom scales with it.
+            ctx.globalAlpha = 0.18;
+            ctx.lineWidth = rim + glow * 1.5;
+            ctx.stroke();
+            ctx.globalAlpha = 0.30;
+            ctx.lineWidth = rim + glow * 0.6;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+
         ctx.strokeStyle = palette.get("spectrum.rim");
         ctx.lineWidth = rim;
         ctx.stroke();
-        ctx.shadowBlur = 0;
     }
 
     // -- frequency reference strip -----------------------------------------

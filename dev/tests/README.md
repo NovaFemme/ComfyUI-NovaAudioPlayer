@@ -43,6 +43,8 @@ that already holds that colour makes them fail for no reason:
 | `bartest.mjs` | The shared bar helper: rounding, derived relief, alpha, robustness |
 | `scaletest.mjs` | Text scale (font interception, clamps, persistence) and bench resize |
 | `zoomtest.mjs` | Pointer mapping under graph zoom |
+| `colorlive.mjs` | A colour edit reaches the very next frame, with no cache in the way |
+| `perfprobe.mjs` | Not a test — measures where the spectrum renderer's frame time goes |
 
 ## calibrate.mjs
 

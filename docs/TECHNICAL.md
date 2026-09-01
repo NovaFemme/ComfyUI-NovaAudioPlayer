@@ -452,3 +452,21 @@ synthetic extremes if you like, but calibrate against a real file.
 **A horizontal slice through a horizontally-drawn bar is uniform by
 construction.** More generally: when a pixel test says a visual effect is
 missing, check the axis you are sampling before you check the code.
+
+**`palette.name` is not a cache key.** It is the *theme's* name, and a per-node
+colour override does not change it — `setRole()` writes to
+`state.overrides.roles` and leaves the active theme alone. Three renderers keyed
+cached pixels on it (waveform's offscreen bar buffer, combined's, and spectrum's
+fill gradient), so an edited colour kept blitting the stale bitmap. It looked
+like the colour picker was broken *except* when the user also moved a renderer
+slider, because `setParam()` explicitly nulls the waveform cache. Key on
+**`palette.revision`**, which `resolvePalette()` bumps for every distinct
+palette it builds. `dev/tests/colorlive.mjs` pins this.
+
+**`ctx.shadowBlur` costs what the path costs, not what the radius costs.**
+Canvas shadows take a slow rasteriser path. On a 1760x600 canvas, blurring the
+spectrum's ~1760-segment curve cost ~9.4 ms per frame, and blur radius 12
+measured the same as radius 4 — so there is no "turn the glow down" fix, only a
+"stop using shadows on complex paths" one. Two wide translucent strokes of the
+same path give a comparable bloom for a fraction of the cost. Measure with
+`dev/tests/perfprobe.mjs` before and after touching anything in a frame loop.
