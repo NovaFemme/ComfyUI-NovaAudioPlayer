@@ -1,0 +1,28 @@
+[project]
+name = "comfyui-novaaudioplayer"
+description = "An audio player node for ComfyUI with twelve live visualisers, a whole-file measurement panel, and a theme system you can drive from inside the node."
+version = "2.1.4"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+
+# Deliberately empty. Every third-party import in this node is lazy and guarded:
+#   scipy      - only for the BS.1770 K-weighting filter in compute_lufs();
+#                without it the LUFS badge falls back to offset RMS.
+#   soundfile  - only for the non-WAV download paths in routes.py.
+# Both ship with a standard ComfyUI install. Listing them here would make the
+# registry install churn a working environment for features that already
+# degrade gracefully.
+dependencies = []
+
+classifiers = [
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Repository = "https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer"
+BugTracker = "https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer/issues"
+
+[tool.comfy]
+PublisherId = "novafemme"
+DisplayName = "Nova Audio Player"
+includes = []

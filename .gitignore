@@ -1,0 +1,12 @@
+# Generated on first run by manager.ensure_files_exist() — user state, not source.
+# The test suite also deletes these before paneltest/scopetest.
+config/*.json
+
+# Waveform peak sidecars written next to rendered audio.
+*.peaks.json
+
+__pycache__/
+*.py[cod]
+
+node_modules/
+.DS_Store
