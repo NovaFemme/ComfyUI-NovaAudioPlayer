@@ -1,6 +1,6 @@
 # Nova Audio Player
 
-An audio player node for ComfyUI with fourteen live visualisers, a whole-file
+An audio player node for ComfyUI with twelve live visualisers, a whole-file
 measurement panel, and a theme system you can drive from inside the node.
 
 Built for listening to what a generation actually produced — not just playing it
@@ -17,7 +17,7 @@ Clone into your ComfyUI custom nodes folder and restart:
 
 ```bash
 cd ComfyUI/custom_nodes
-git clone https://github.com/YOUR-USERNAME/ComfyUI-NovaAudioPlayer.git
+git clone https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer.git
 ```
 
 No dependencies beyond what ComfyUI already ships. `scipy` is used for accurate
@@ -29,7 +29,7 @@ Drop the **Nova Player ▶️** node into a workflow and connect any `AUDIO` out
 
 ## What you get
 
-### Fourteen views, one button
+### Twelve views, one button
 
 Cycle them with the pill in the transport row. Every view is a separate module
 and every one is themeable.

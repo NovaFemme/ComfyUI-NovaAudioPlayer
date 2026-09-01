@@ -1,5 +1,5 @@
 """
-ComfyUI-NovaAudioPlayer — an audio player node with five live visualisers.
+ComfyUI-NovaAudioPlayer — an audio player node with twelve live visualisers.
 
 WEB_DIRECTORY is declared here and nowhere else.  The previous layout had a
 second, unreachable copy of the front end under nova_player/npjs/ plus a no-op

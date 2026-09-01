@@ -1,7 +1,11 @@
 # ComfyUI-NovaAudioPlayer
 
-An audio player node with five live visualisers: waveform, spectrum, analyzer
-(goniometer + phase correlation), spectrogram, and a combined view.
+An audio player node with twelve live visualisers, a whole-file measurement
+strip computed in Python, and a theme system you can drive from inside the node.
+
+The views: waveform, spectrum/EQ, analyzer (goniometer + phase correlation),
+spectrogram, combined, peak/RMS, L/R correlation, frequency bands, combined
+suite, FFT analyzer, RTA analyzer, and the APG artifact meter.
 
 ## What lives where
 
@@ -12,7 +16,7 @@ config/
   system_config.json     engine defaults, UI defaults, renderer parameters
 nova_player/
   node.py                the node: render audio, compute peaks/LUFS, emit a payload
-  audio_io.py            save_wav, compute_lufs, build_peaks  (pure DSP)
+  audio_io.py            save_wav, compute_lufs, build_peaks, compute_bench
   peaks_cache.py         in-memory cache + .peaks.json sidecar
   config_manager.py      loads/validates/persists the JSON above
   routes.py              every HTTP endpoint
@@ -30,11 +34,14 @@ web/
   renderers/
     registry.js          the single list everything else is derived from
     waveform.js  spectrum.js  analyzer.js  spectrogram.js
-    combined.js          a composite: lays out rects, delegates to the others
+    peak_rms.js  lr_correlation.js  freq_percentages.js
+    fft_analyzer.js  rta_analyzer.js  projected_guidance.js
+    combined.js  combined_suite.js   composites: lay out rects, delegate
     _template.js         copy this to add a view mode (not imported)
   ui/
     chrome.js            transport, meter, scrub, pills, hover glow, hit testing
     settings-panel.js    the HTML settings drawer, generated from schemas
+    bench-panel.js       the whole-file measurement strip
     download-menu.js     the format picker
 dev/                     local harness; NOT served by ComfyUI
 ```
@@ -142,7 +149,7 @@ config endpoints from the real `NovaConfigManager`; `folder_paths` is stubbed in
 Open `http://127.0.0.1:8731/dev/harness.html`, or
 `dev/harness-zoom.html` to exercise the same player inside a CSS transform at
 several graph-zoom levels (`window.__setZoom(1.75)` in the console). The harness feeds every renderer
-a synthetic signal, so all five views and the settings drawer can be exercised
+a synthetic signal, so every view and the settings drawer can be exercised
 without ComfyUI or an audio file.
 
 Nothing under `dev/` is served by ComfyUI — only `web/` is (`WEB_DIRECTORY`).
