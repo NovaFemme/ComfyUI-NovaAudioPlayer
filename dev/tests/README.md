@@ -45,6 +45,8 @@ that already holds that colour makes them fail for no reason:
 | `zoomtest.mjs` | Pointer mapping under graph zoom |
 | `colorlive.mjs` | A colour edit reaches the very next frame, with no cache in the way |
 | `perfprobe.mjs` | Not a test — measures where the spectrum renderer's frame time goes |
+| `tooltiptest.mjs` | Control hints: wording, the rest delay, and that they never escape the node |
+| `test_panel_info.py` | The `panel_info` output mirrors the bench strip, in all three formats |
 
 ## calibrate.mjs
 

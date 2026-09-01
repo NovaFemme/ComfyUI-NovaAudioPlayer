@@ -18,6 +18,7 @@ behind individual decisions see [the design notes](design/).
 - [The settings drawer](#the-settings-drawer)
 - [Whole-file measurement](#whole-file-measurement)
   - [Two RMS conventions](#two-rms-conventions)
+  - [The panel_info output](#the-panel_info-output)
 - [Where settings are stored](#where-settings-are-stored)
 - [HTTP endpoints](#http-endpoints)
 - [Local development and tests](#local-development-and-tests)
@@ -337,6 +338,33 @@ re-measuring the audio.
 downmix per BS.1770 and applies the −0.691 offset; it will not match either RMS
 figure and is not meant to.
 
+### The panel_info output
+
+The node returns a single `STRING` named `panel_info`: the same figures the
+bench strip draws, rendered for another node to consume. `nova_player/
+panel_info.py` builds it from the identical payload the front end receives, so
+the two cannot drift.
+
+The `panel_format` widget selects the shape:
+
+| Value | Shape | For |
+|---|---|---|
+| `json` | nested object: `file`, `levels`, `clipping`, `bands_pct`, `warnings` | a database, or anything that parses |
+| `text` | the strip as it reads on screen, aligned | a display node |
+| `csv_row` | one row, `CSV_COLUMNS` order, properly quoted | appending to a log |
+
+Every value appears on the panel, formatted by the same rules — `fmtDb`, the
+`—` for a missing figure, `none` for no clipping, `mono` for a mono take. The
+one addition is `generated_at`, which a logged row needs and the panel does not.
+
+**If the panel and this output ever disagree, `panel_info.py` is wrong.** It
+carries a Python port of `fmtBytes`, deliberately including JS's
+round-half-up behaviour, because `round()` in Python rounds halves to even.
+`dev/tests/test_panel_info.py` pins the formatting rules.
+
+`CSV_COLUMNS` is append-only. Inserting a column silently shifts every column
+after it in a log the user has already been writing to.
+
 [Full notes →](design/09-bench-panel.md)
 
 ---
@@ -462,6 +490,13 @@ like the colour picker was broken *except* when the user also moved a renderer
 slider, because `setParam()` explicitly nulls the waveform cache. Key on
 **`palette.revision`**, which `resolvePalette()` bumps for every distinct
 palette it builds. `dev/tests/colorlive.mjs` pins this.
+
+**A flex child will not shrink below its content without `min-height: 0`.**
+`.nova-panel__theme` was `flex: 0 0 auto`, so it grew with every row added to it
+and, on a short node, pushed the section accordion down behind the footer until
+no section could be clicked. It is now `0 1 auto` with a `max-height` and its own
+scrollbar, and `.nova-panel__body` carries `min-height: 0`. Adding a row to the
+theme block is safe again; it was not.
 
 **`ctx.shadowBlur` costs what the path costs, not what the radius costs.**
 Canvas shadows take a slow rasteriser path. On a 1760x600 canvas, blurring the

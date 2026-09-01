@@ -7,6 +7,16 @@ The views: waveform, spectrum/EQ, analyzer (goniometer + phase correlation),
 spectrogram, combined, peak/RMS, L/R correlation, frequency bands, combined
 suite, FFT analyzer, RTA analyzer, and the APG artifact meter.
 
+## Output
+
+**`panel_info`** (STRING) — the bench strip's contents, for a display node or a
+database. `panel_format` selects `json`, `text` or `csv_row`.
+
+## Controls
+
+Rest the pointer on any transport control for a hint. Turn them off with
+**Control hints** in the settings drawer, next to Text size.
+
 ## What lives where
 
 ```

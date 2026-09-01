@@ -53,6 +53,14 @@ and every one is themeable.
 
 <!-- Add your own screenshots here — one per view you want to show off -->
 
+### An output you can log
+
+The node returns **`panel_info`** — everything in the bench strip as a string,
+ready for a display node or a database. The `panel_format` widget picks the
+shape: `json` for a parser, `text` for reading, `csv_row` for appending to a
+log. It is built from the same numbers the panel draws, so a logged take and
+the screen can never disagree.
+
 ### A bench panel that agrees with itself
 
 Click the bar-chart button next to the download arrow. Everything in the strip

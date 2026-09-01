@@ -18,6 +18,7 @@ import uuid
 import folder_paths
 
 from .audio_io import build_peaks, compute_bench, compute_lufs, save_wav
+from .panel_info import build_panel_info
 from .config_manager import manager
 from .peaks_cache import cache_peaks, write_peaks_sidecar
 
@@ -25,15 +26,37 @@ from .peaks_cache import cache_peaks, write_peaks_sidecar
 class NovaPlayerNode:
     CATEGORY = " 🎛️ Nova Audio"
     FUNCTION = "run"
-    RETURN_TYPES = ()
-    RETURN_NAMES = ()
+
+    # Still an OUTPUT_NODE — it draws the player whether or not panel_info is
+    # wired to anything — but it now also returns, so the bench figures can
+    # reach a display node or a database without being re-measured by a second
+    # node using different conventions. That divergence is the whole reason the
+    # bench panel exists; handing the numbers out keeps it from coming back.
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("panel_info",)
     OUTPUT_NODE = True
+
+    PANEL_FORMATS = ["json", "text", "csv_row"]
 
     @classmethod
     def INPUT_TYPES(cls):
-        return {"required": {"audio": ("AUDIO",)}}
+        return {
+            "required": {
+                "audio": ("AUDIO",),
+                "panel_format": (cls.PANEL_FORMATS, {
+                    "default": "json",
+                    "tooltip": "Shape of the panel_info output. "
+                               "json: structured, for a database or a parser. "
+                               "text: the bench strip as it reads on screen. "
+                               "csv_row: one comma-separated row, fixed column "
+                               "order, for appending to a log.",
+                }),
+            },
+        }
 
-    def run(self, audio):
+    # panel_format defaults here too, so a workflow saved before this widget
+    # existed still executes instead of raising on a missing argument.
+    def run(self, audio, panel_format="json"):
         waveform = audio["waveform"]
         sample_rate = int(audio["sample_rate"])
 
@@ -73,17 +96,24 @@ class NovaPlayerNode:
                   f"scale (peak {bench['peak_db']:+.2f} dBFS) and are clipped by "
                   f"the WAV write. Lower the level upstream to keep them.")
 
+        payload = {
+            "filename": filename,
+            "duration": duration,
+            "sample_rate": sample_rate,
+            "stereo": stereo,
+            "lufs": lufs,
+            "bench": bench,
+            "filesize": filesize,
+        }
+
+        # One payload, two consumers: the front end draws it and
+        # build_panel_info() renders the same numbers as a string. They cannot
+        # drift, because there is nothing for them to drift from.
+        panel_info = build_panel_info(payload, panel_format)
+
         return {
-            "ui": {"nova_player": [{
-                "filename": filename,
-                "duration": duration,
-                "sample_rate": sample_rate,
-                "stereo": stereo,
-                "lufs": lufs,
-                "bench": bench,
-                "filesize": filesize,
-            }]},
-            "result": (),
+            "ui": {"nova_player": [payload]},
+            "result": (panel_info,),
         }
 
 
