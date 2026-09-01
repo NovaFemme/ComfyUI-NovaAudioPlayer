@@ -106,7 +106,9 @@ still needs, on the human side:
 2. An API key from that account, stored as the repo secret
    `REGISTRY_ACCESS_TOKEN`.
 
-The workflow fires on any push to `main` that touches `pyproject.toml`, so bump
+The listing's name, description and icon all come from `pyproject.toml` and are
+overwritten on every publish — editing them in the registry's web form alone
+does not stick. The workflow fires on any push to `main` that touches `pyproject.toml`, so bump
 `version` there to cut a release. Until the secret exists it skips cleanly and
 logs why, rather than failing red — the first push touching `pyproject.toml`
 necessarily happens before a publisher account can exist. `version` reads `2.2.0`: the 2.1.x numbers were local snapshot folders, never

@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-novaaudioplayer"
-description = "An audio player node for ComfyUI with twelve live visualisers, a whole-file measurement panel, and a theme system you can drive from inside the node."
-version = "2.2.0"
+description = "An audio player node for ComfyUI with twelve live visualisers, a whole-file measurement panel, a theme system you can drive from inside the node, and a panel_info output for logging every take's metrics."
+version = "2.2.1"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 
@@ -25,4 +25,13 @@ BugTracker = "https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer/issues"
 [tool.comfy]
 PublisherId = "novafemme"
 DisplayName = "Nova Audio Player"
+
+# Must be a publicly reachable URL, not a repo-relative path — the registry
+# fetches it at publish time, so docs/images/icon.png has to be on main before
+# the push that publishes. It is a raw main URL: pinning to a commit SHA is not
+# possible here, because the SHA does not exist until this file is committed.
+# Consequence: replacing icon.png on main changes what a future publish fetches.
+# 400x400 square PNG — the registry's stated maximum.
+Icon = "https://raw.githubusercontent.com/NovaFemme/ComfyUI-NovaAudioPlayer/main/docs/images/icon.png"
+
 includes = []
