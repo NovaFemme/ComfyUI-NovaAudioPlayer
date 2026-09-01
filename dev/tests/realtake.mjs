@@ -3,7 +3,7 @@
 // wall clock), so this reproduces what it does — Blackman window, 4096-point
 // FFT, smoothingTimeConstant EMA on the magnitude spectrum — and walks the
 // file at the analyser's frame rate.
-import pw from "/home/claude/.npm-global/lib/node_modules/playwright/index.js";
+import pw from "./_pw.mjs";
 const b = await pw.chromium.launch({ args: ["--autoplay-policy=no-user-gesture-required", "--mute-audio"] });
 const p = await b.newPage();
 const errs = []; p.on("pageerror", e => errs.push(e.message));

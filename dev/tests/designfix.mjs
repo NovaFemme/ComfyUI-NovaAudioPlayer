@@ -4,7 +4,7 @@
 // This file used to also cover projected_guidance's zero-clamping integrator.
 // That renderer was rewritten as the APG artifact meter and has no integrator
 // any more; its coverage lives in /tmp/apgtest.mjs.
-import pw from "/home/claude/.npm-global/lib/node_modules/playwright/index.js";
+import pw from "./_pw.mjs";
 const b = await pw.chromium.launch();
 const p = await b.newPage({ viewport: { width: 1150, height: 460 } });
 const errs = []; p.on("pageerror", e => errs.push(e.message));

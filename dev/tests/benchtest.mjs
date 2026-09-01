@@ -1,6 +1,6 @@
 // The bench strip: geometry, toggle path, and the invariants that keep it from
 // colliding with the visualiser or the settings drawer.
-import pw from "/home/claude/.npm-global/lib/node_modules/playwright/index.js";
+import pw from "./_pw.mjs";
 const b = await pw.chromium.launch();
 const p = await b.newPage({ viewport: { width: 1260, height: 640 } });
 const errs = []; p.on("pageerror", e => errs.push(e.message));

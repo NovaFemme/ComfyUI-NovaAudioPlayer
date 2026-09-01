@@ -6,11 +6,14 @@ where it actually runs.
 
 ## Running
 
+    npm install -g playwright && npx playwright install chromium
     python3 dev/devserver.py --port 8731 &
     node dev/tests/apgtest.mjs
 
-The scripts import Playwright by absolute path. Edit the first line if yours is
-installed somewhere else.
+Every suite gets Playwright through `dev/tests/_pw.mjs`, which resolves it from a
+local install, then `$PLAYWRIGHT_PATH`, then the global npm root. Nothing here
+hard-codes a path any more — they used to, and the suite only loaded on the one
+machine that path existed on.
 
 **Reset the config before `paneltest` and `scopetest`.** Both assert that a
 colour *changes* to a particular value, so a leftover theme from an earlier run
@@ -34,7 +37,7 @@ that already holds that colour makes them fail for no reason:
 | `e2e.mjs` | The float FFT flows engine → host → renderer for real |
 | `calibrate.mjs` | Not a test — measures the APG bar ranges through a real `AnalyserNode` |
 | `benchtest.mjs` | Bench strip — geometry, clamping, toggle, no overlap with the transport |
-| `test_bench.py` | `compute_bench()` DSP: levels, correlation, contiguous bands, degenerate input |
+| `test_bench.py` | `compute_bench()` DSP: levels, both RMS conventions, correlation, contiguous bands, degenerate input |
 | `realtake.mjs` | Not a test — measures a whole audio file with the renderer's formulas |
 | `flatprobe.mjs` | Not a test — chooses the flat-top detector's epsilon and run length |
 | `bartest.mjs` | The shared bar helper: rounding, derived relief, alpha, robustness |
@@ -56,6 +59,10 @@ The only Python suite. Dependency-free — it fakes the small slice of the torch
 tensor API that `audio_io` uses, so the DSP is testable without torch or ComfyUI:
 
     python3 dev/tests/test_bench.py
+
+It also pins the relationship between the two RMS conventions — `rms_db` across
+both channels versus `rms_mono_db` on the downmix — which differ by exactly
+`10·log10((1+r)/2)` dB. See `docs/TECHNICAL.md § Two RMS conventions`.
 
 ## Reading zoomtest's output
 

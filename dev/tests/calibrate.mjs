@@ -1,7 +1,7 @@
 // Calibrate the APG bar ranges against material measured through a real
 // AnalyserNode, using the renderer's own formulas. Picking these by eye is how
 // you end up with a needle pinned at one end.
-import pw from "/home/claude/.npm-global/lib/node_modules/playwright/index.js";
+import pw from "./_pw.mjs";
 const b = await pw.chromium.launch({ args: ["--autoplay-policy=no-user-gesture-required", "--mute-audio"] });
 const p = await b.newPage();
 const errs = []; p.on("pageerror", e => errs.push(e.message));

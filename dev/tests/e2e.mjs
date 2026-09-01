@@ -1,4 +1,4 @@
-import pw from "/home/claude/.npm-global/lib/node_modules/playwright/index.js";
+import pw from "./_pw.mjs";
 const b = await pw.chromium.launch({ args: ["--autoplay-policy=no-user-gesture-required", "--mute-audio"] });
 const p = await b.newPage({ viewport: { width: 1260, height: 520 }, deviceScaleFactor: 2 });
 const errs = []; p.on("pageerror", e => errs.push(e.message));
