@@ -107,7 +107,9 @@ still needs, on the human side:
    `REGISTRY_ACCESS_TOKEN`.
 
 The workflow fires on any push to `main` that touches `pyproject.toml`, so bump
-`version` there to cut a release. `version` currently reads `2.1.4`, matching the
+`version` there to cut a release. Until the secret exists it skips cleanly and
+logs why, rather than failing red — the first push touching `pyproject.toml`
+necessarily happens before a publisher account can exist. `version` currently reads `2.1.4`, matching the
 last build; nothing is published until the secret exists, so it is free to change
 before the first run.
 
