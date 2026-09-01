@@ -141,6 +141,39 @@ d = tone(440, 0.3) + 0.25
 b = audio_io.compute_bench(stereo(d, d), SR)
 ck("DC offset is measured", abs(b["dc_offset"] - 0.25) < 1e-3, f"{b['dc_offset']}")
 
+# ---- the two RMS conventions ----------------------------------------------
+# A mono-summing meter and a both-channels meter disagree by a knowable amount.
+# This pins the relationship so the -14.15 / -15.14 style split can never be
+# mistaken for a bug again. See docs/TECHNICAL.md, "Two RMS conventions".
+rng = np.random.default_rng(20260901)
+
+
+def correlated_pair(r, n=SR * 2, amp=0.1):
+    """Two equal-power channels with L/R correlation r."""
+    a = rng.standard_normal(n)
+    b = rng.standard_normal(n)
+    left = a
+    right = r * a + np.sqrt(max(0.0, 1.0 - r * r)) * b
+    return (left * amp).astype(np.float32), (right * amp).astype(np.float32)
+
+
+for r_target in (1.0, 0.9, 0.591, 0.0):
+    L, R = correlated_pair(r_target)
+    b = audio_io.compute_bench(stereo(L, R), SR)
+    r = b["lr_corr"]
+    expected = 10.0 * np.log10((1.0 + r) / 2.0)
+    actual = b["rms_mono_db"] - b["rms_db"]
+    ck(f"at r={r:+.3f} the mono downmix reads 10*log10((1+r)/2) lower",
+       abs(actual - expected) < 0.03,
+       f"both {b['rms_db']:.2f} mono {b['rms_mono_db']:.2f} "
+       f"delta {actual:+.3f} expected {expected:+.3f}")
+
+# Fully correlated: the two conventions must agree exactly.
+b = audio_io.compute_bench(stereo(sig, sig), SR)
+ck("on a mono-identical signal both RMS conventions agree",
+   abs(b["rms_mono_db"] - b["rms_db"]) < 0.01,
+   f"{b['rms_db']} vs {b['rms_mono_db']}")
+
 # ---- degenerate input -----------------------------------------------------
 ck("empty input returns cleanly, no exception",
    audio_io.compute_bench(FakeTensor(np.zeros((2, 0), np.float32)), SR) == {})

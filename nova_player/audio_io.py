@@ -132,6 +132,20 @@ def compute_bench(waveform, sample_rate: int) -> dict:
         return floor if x <= 1e-12 else round(float(20.0 * np.log10(x)), 2)
 
     peak = float(np.abs(data).max())
+    # Two RMS conventions, both reported, because they legitimately disagree.
+    #
+    #   rms       - mean square across BOTH channels: sqrt((sum L^2 + sum R^2) / 2n).
+    #               The energy actually in the stereo file.
+    #   rms_mono  - mean square of the (L+R)/2 downmix. What a mono-summing
+    #               meter shows, and what most standalone "bench" nodes report.
+    #
+    # For channels of equal power they differ by exactly 10*log10((1 + r) / 2)
+    # dB, where r is the L/R correlation below. So they agree on a fully
+    # correlated signal (r = 1), the downmix reads 0.99 dB lower at r = 0.591,
+    # and 3.01 dB lower on uncorrelated channels (r = 0) because the downmix
+    # halves the amplitude while the sum of two independent signals only grows
+    # as sqrt(2). Neither number is wrong; they answer different questions.
+    # Verified numerically - see docs/TECHNICAL.md, "Two RMS conventions".
     rms = float(np.sqrt(np.mean(data.astype(np.float64) ** 2)))
 
     # Samples the WAV write will flatten against the ceiling.
@@ -148,12 +162,16 @@ def compute_bench(waveform, sample_rate: int) -> dict:
             corr = round(float((a * b).sum() / (sa * sb)), 3)
 
     mono = data.mean(axis=0).astype(np.float64)
+    rms_mono = float(np.sqrt(np.mean(mono ** 2)))
     bands, hf_outliers = _band_energy(mono, sample_rate)
 
     return {
         "peak_db": db(peak),
         "peak_linear": round(peak, 6),
         "rms_db": db(rms),
+        # Not displayed in the bench strip. Present so a logged take can be
+        # compared against a mono-summing meter without re-measuring the file.
+        "rms_mono_db": db(rms_mono),
         "crest_db": round(db(peak) - db(rms), 2) if rms > 1e-12 else None,
         "dc_offset": round(float(mono.mean()), 6),
         # over_fs is the number the model is responsible for; clipped_samples is

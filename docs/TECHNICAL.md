@@ -17,6 +17,7 @@ behind individual decisions see [the design notes](design/).
 - [Text scale](#text-scale)
 - [The settings drawer](#the-settings-drawer)
 - [Whole-file measurement](#whole-file-measurement)
+  - [Two RMS conventions](#two-rms-conventions)
 - [Where settings are stored](#where-settings-are-stored)
 - [HTTP endpoints](#http-endpoints)
 - [Local development and tests](#local-development-and-tests)
@@ -282,7 +283,8 @@ theme switch; "Reset node" is the explicit way to clear them.
 ## Whole-file measurement
 
 `compute_bench(waveform, sample_rate)` in `audio_io.py` runs once per execution,
-on the same tensor that produces the WAV. It returns peak, RMS, crest, DC offset,
+on the same tensor that produces the WAV. It returns peak, RMS (in two
+conventions — see below), crest, DC offset,
 L/R correlation, contiguous band shares, HF outliers, and two clipping counts:
 
 - `over_fs` — samples exceeding full scale, i.e. what `save_wav`'s clamp destroys
@@ -293,6 +295,47 @@ scale reports the peak it actually produced.
 
 Band energy uses a Welch-style average (8192-point Hann, 50% overlap) rather than
 one transform of the whole file: flat memory on a long take, steadier estimate.
+
+### Two RMS conventions
+
+A standalone bench node will usually disagree with this one about RMS, and the
+disagreement is arithmetic, not a bug. There are two defensible ways to reduce a
+stereo file to one level:
+
+| Key | Formula | What it answers |
+|---|---|---|
+| `rms_db` | `sqrt((ΣL² + ΣR²) / 2n)` | how much energy is in the stereo file |
+| `rms_mono_db` | `sqrt(Σ((L+R)/2)² / n)` | what a mono-summing meter reads |
+
+For channels of equal power the two differ by exactly
+
+```
+Δ dB = 10 · log10((1 + r) / 2)
+```
+
+where `r` is the L/R correlation `compute_bench` already reports. So:
+
+| `r` | mono downmix reads |
+|---|---|
+| 1.000 | the same |
+| 0.900 | −0.22 dB |
+| 0.591 | −0.99 dB |
+| 0.000 | −3.01 dB |
+
+This is the whole explanation for the −14.15 vs −15.14 dBFS split seen against
+the separate Bench Metrics node on a take with `lr_corr` 0.591 — that node
+downmixes to mono first (`y_mono = (L + R) / 2`) and this one does not. Both
+figures are correct answers to different questions; the downmix loses whatever
+the two channels do not have in common, which is exactly the point of a mono
+compatibility check and exactly the wrong thing for a level reading.
+
+The strip displays `rms_db`. `rms_mono_db` is returned but not displayed, so a
+logged take can be compared against a mono-summing meter after the fact without
+re-measuring the audio.
+
+**Note that neither of these is the LUFS badge.** `compute_lufs` K-weights a mono
+downmix per BS.1770 and applies the −0.691 offset; it will not match either RMS
+figure and is not meant to.
 
 [Full notes →](design/09-bench-panel.md)
 
