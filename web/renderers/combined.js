@@ -83,7 +83,7 @@ export default {
             // `L.totalW * 0.72 - 6`, which silently disagreed with the actual
             // panel width whenever the combined layout was retuned.
             const geom = waveform.geometry(child, p.waveform);
-            const key = `C|${p.waveform.w}|${p.waveform.h}|${Math.round(sig.progress * geom.nBars)}|${sig.playing ? 1 : 0}|${gfx.phase.toFixed(1)}|${palette.name}`;
+            const key = `C|${p.waveform.w}|${p.waveform.h}|${Math.round(sig.progress * geom.nBars)}|${sig.playing ? 1 : 0}|${gfx.phase.toFixed(1)}|${palette.revision}`;
 
             let cache = child.store.cache;
             if (!cache || cache.key !== key) {

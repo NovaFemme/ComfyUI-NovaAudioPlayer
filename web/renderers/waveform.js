@@ -150,7 +150,11 @@ export default {
         // Quantising progress to whole bars means the cache survives most
         // frames during playback instead of missing on every one.
         const snap = Math.round(progress * geom.nBars);
-        const key = `${rect.w}|${rect.h}|${snap}|${sig.playing ? 1 : 0}|${gfx.phase.toFixed(1)}|${palette.name}`;
+        // palette.revision, not palette.name: a per-node colour override leaves
+        // the theme name alone, so keying on the name meant an edited colour
+        // kept blitting the stale bitmap until something else happened to drop
+        // the cache — which is why moving a slider "fixed" it.
+        const key = `${rect.w}|${rect.h}|${snap}|${sig.playing ? 1 : 0}|${gfx.phase.toFixed(1)}|${palette.revision}`;
 
         let cache = gfx.store.cache;
         if (!cache || cache.key !== key) {

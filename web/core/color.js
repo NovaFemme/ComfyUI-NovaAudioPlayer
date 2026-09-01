@@ -269,6 +269,13 @@ export function makeGradientSteps(a, b, steps = 101, space = DEFAULT_MIX_SPACE) 
  * @param {object} overrides   optional { roles: {...}, ramps: {...} } from the node
  * @param {string} mixSpace    "srgb" (preserve the authored look) or "linear"
  */
+// Every resolvePalette() call gets a fresh id. A palette's *name* is the theme
+// it came from, which is identical before and after a per-node colour override —
+// so anything caching pixels keyed on the name never notices an edit. Key on
+// `revision` instead. config.palette() memoises, so a palette that has not
+// changed keeps its id and caches keep hitting.
+let _paletteRevision = 0;
+
 export function resolvePalette(themes, activeName, baseName = "nova-dark",
                                overrides = null, mixSpace = DEFAULT_MIX_SPACE) {
     const base = (themes && themes[baseName]) || { roles: {}, ramps: {} };
@@ -315,6 +322,7 @@ export function resolvePalette(themes, activeName, baseName = "nova-dark",
 
     const palette = {
         name: activeName,
+        revision: ++_paletteRevision,
         mixSpace,
         roles: Object.freeze(css),
         parsed: Object.freeze(parsed),
