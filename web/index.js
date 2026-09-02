@@ -25,6 +25,11 @@ import { config } from "./core/config.js";
 import { PlayerHost } from "./core/host.js";
 import { minimumNodeSize } from "./core/layout.js";
 
+// The pack's second node registers its own extension. Imported here because
+// ComfyUI loads exactly one entry point per WEB_DIRECTORY, so anything not
+// reachable from this file never runs.
+import "./madow/index.js";
+
 const NODE_TYPE = "NovaPlayerNode";
 const WIDGET_NAME = "nova_player_display";
 

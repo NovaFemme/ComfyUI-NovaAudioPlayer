@@ -141,6 +141,26 @@ its settings-panel section all follow automatically.
 
 ---
 
+## Madow Inputs 🎛️
+
+A second node in the pack: every ACE-Step generation parameter in one place,
+with named presets and a `context` output that carries the exact parameters
+into the player's `panel_info`.
+
+- **23 outputs**, namespaced so the two `cfg`-shaped parameters cannot collide
+  — `ksampler.cfg` is the sampler's, `text.cfg_scale` is the text encoder's.
+- **Presets** as one JSON file each under `presets/`, so they are shareable,
+  git-trackable and hand-editable. Loading one writes the real widgets; the
+  backend never substitutes values, or the saved workflow would record a preset
+  name without recording what actually ran.
+- **Cross-field validation**, warn-only. A caption saying `98 BPM` against a bpm
+  widget of 122 is a live conflict ACE-Step reads both sides of.
+- **`context`** carries both a seed-excluded and a seed-included hash: the first
+  groups runs that differ only by seed, which is the seed-noise-floor question.
+
+Wire `context` into the player's optional `context` input and every measured
+take records what produced it.
+
 ## Credits
 
 Built by NovaFemme, with engineering assistance from Claude (Anthropic).

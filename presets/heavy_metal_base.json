@@ -1,0 +1,28 @@
+{
+  "schema_ver": 1,
+  "name": "heavy_metal_base",
+  "created": "2026-09-02T00:00:00+00:00",
+  "note": "NovaFemme's observed ACE-Step 1.5 XL SFT settings. Starting point, not a recommendation - the APG values here are the ones the meter's thresholds were never validated against.",
+  "params": {
+    "apg.eta": 0.45,
+    "apg.norm_threshold": 4.0,
+    "apg.momentum": 0.2,
+    "sched.shift": 3.0,
+    "ksampler.steps": 80,
+    "ksampler.cfg": 2.8,
+    "ksampler.sampler_name": "er_sde",
+    "ksampler.scheduler": "linear_quadratic",
+    "ksampler.denoise": 1.0,
+    "text.cfg_scale": 2.0,
+    "lm.temperature": 0.72,
+    "lm.top_p": 0.9,
+    "lm.top_k": 0,
+    "lm.min_p": 0.0,
+    "lm.generate_audio_codes": true,
+    "music.bpm": 130,
+    "music.timesignature": 4,
+    "music.language": "english",
+    "music.keyscale": "D minor"
+  },
+  "excludes": ["ksampler.seed"]
+}
