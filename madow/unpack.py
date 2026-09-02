@@ -22,7 +22,7 @@ from .params import DEFAULTS, KEYS, OUTPUT_NAMES
 
 
 class MadowUnpack:
-    CATEGORY = " 🎛️ Nova Audio"
+    CATEGORY = "▶️ Nova Audio"
     FUNCTION = "run"
     DESCRIPTION = ("Fan a Madow Inputs bundle out into its typed outputs. "
                    "Place one beside each node you are feeding, or none at all.")
@@ -66,4 +66,4 @@ class MadowUnpack:
 
 
 NODE_CLASS_MAPPINGS = {"MadowUnpack": MadowUnpack}
-NODE_DISPLAY_NAME_MAPPINGS = {"MadowUnpack": "Madow Unpack 🔌"}
+NODE_DISPLAY_NAME_MAPPINGS = {"MadowUnpack": "Madow Unpack ⚪"}

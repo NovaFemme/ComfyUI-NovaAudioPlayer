@@ -35,7 +35,7 @@ from .validate import validate
 PACK_VERSION = "0.1.0"
 
 class MadowInputs:
-    CATEGORY = " 🎛️ Nova Audio"
+    CATEGORY = "▶️ Nova Audio"
     FUNCTION = "run"
     DESCRIPTION = ("Every ACE-Step generation parameter in one node, with "
                    "named presets, cross-field validation, and a `context` "
@@ -176,4 +176,4 @@ def _env():
 
 
 NODE_CLASS_MAPPINGS = {"MadowInputs": MadowInputs}
-NODE_DISPLAY_NAME_MAPPINGS = {"MadowInputs": "Madow Inputs 🎛️"}
+NODE_DISPLAY_NAME_MAPPINGS = {"MadowInputs": "Madow Inputs 🎚️"}

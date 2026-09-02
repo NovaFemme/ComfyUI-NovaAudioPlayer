@@ -24,7 +24,7 @@ from .peaks_cache import cache_peaks, write_peaks_sidecar
 
 
 class NovaPlayerNode:
-    CATEGORY = " 🎛️ Nova Audio"
+    CATEGORY = "▶️ Nova Audio"
     FUNCTION = "run"
 
     # Still an OUTPUT_NODE — it draws the player whether or not panel_info is
@@ -134,4 +134,4 @@ class NovaPlayerNode:
 
 
 NODE_CLASS_MAPPINGS = {"NovaPlayerNode": NovaPlayerNode}
-NODE_DISPLAY_NAME_MAPPINGS = {"NovaPlayerNode": "Nova Player ▶️"}
+NODE_DISPLAY_NAME_MAPPINGS = {"NovaPlayerNode": "Nova Player 🔊"}
