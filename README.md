@@ -166,6 +166,21 @@ into the player's `panel_info`.
   change the audio, and hashing it would split two identical renders into
   different groups.
 
+### Two nodes, on purpose
+
+**Madow Inputs** holds the widgets and emits four slots: `madow`, `file_path`,
+`context`, `validation`. **Madow Unpack 🔌** takes the `madow` bundle and fans it
+out into the 27 typed outputs.
+
+The split falls where the data stops being interdependent — the hashes,
+`preset_dirty`, validation and `context` all need every parameter at once, so
+they stay with the widgets that produce them and nothing has to be merged back.
+
+Two things it buys: the fan-out is optional, so wiring a couple of parameters
+by hand means not placing Unpack at all; and it is repeatable, so you can put
+one beside KSampler and another beside the text encoder rather than running
+twenty wires across the graph.
+
 Wire `context` into the player's optional `context` input and every measured
 take records what produced it.
 

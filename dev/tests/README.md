@@ -50,7 +50,7 @@ that already holds that colour makes them fail for no reason:
 | `doccheck.mjs` | Every documented visualiser count matches `registry.js` (no browser needed) |
 | `tiertest.mjs` | Hint precedence: a level fault suppresses generation-stage hypotheses |
 | `invariants.mjs` | Cross-path inequalities between the meter and the Python bench |
-| `test_madow.py` | Madow Inputs: parameter table, validation rules, canonical hashing, presets |
+| `test_madow.py` | Madow: parameter table, validation, hashing, presets, and the Inputs/Unpack split |
 
 ## calibrate.mjs
 

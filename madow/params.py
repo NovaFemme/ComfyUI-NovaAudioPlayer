@@ -109,6 +109,20 @@ NON_AUDIO_KEYS = frozenset({
     "file.prefix", "file.name", "file.folder", "file.separator",
 })
 
+# Free-text fields whose leading and trailing whitespace is stripped before
+# anything sees them — the emitted output as well as the hash, so the two can
+# never describe different strings.
+#
+# The reason is a stray Enter. A multiline widget keeps the newline, it is
+# invisible in the UI, and it lands inside params_sha256: the same caption
+# typed twice, once with an accidental return, hashes as two different
+# configurations and splits the log on whitespace nobody can see. Same class of
+# silent fragmentation as unrounded floats.
+#
+# INTERNAL newlines are untouched. Lyrics keep their line structure; only the
+# ends are trimmed.
+TRIMMED_KEYS = frozenset({"caption.prompt", "caption.lyrics"})
+
 # What a preset does not set unless told otherwise: loading one must never
 # clobber a seed the user is deliberately holding (spec 2).
 DEFAULT_EXCLUDES = [SEED_KEY]

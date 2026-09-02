@@ -35,6 +35,37 @@ context_mod = _load("madow_context", "madow/context.py")
 presets_mod = _load("madow_presets", "madow/presets.py")
 naming_mod = _load("madow_naming", "madow/naming.py")
 
+
+def _load_pkg():
+    """Import the madow package properly, with comfy stubbed.
+
+    The two nodes are loaded through the real import path rather than by file,
+    so the relative imports and the shared comfy_types resolution are exercised
+    exactly as ComfyUI would exercise them.
+    """
+    import types
+    cs = types.ModuleType("comfy.samplers")
+
+    class _KS:
+        SAMPLERS = ["euler", "er_sde"]
+        SCHEDULERS = ["normal", "linear_quadratic"]
+
+    cs.KSampler = _KS
+    comfy = types.ModuleType("comfy")
+    comfy.samplers = cs
+    sys.modules.setdefault("comfy", comfy)
+    sys.modules.setdefault("comfy.samplers", cs)
+
+    root = os.path.abspath(_PKG)
+    spec = importlib.util.spec_from_file_location(
+        "madow", os.path.join(root, "madow", "__init__.py"),
+        submodule_search_locations=[os.path.join(root, "madow")])
+    pkg = importlib.util.module_from_spec(spec)
+    sys.modules["madow"] = pkg
+    spec.loader.exec_module(pkg)
+    return (importlib.import_module("madow.node"),
+            importlib.import_module("madow.unpack"))
+
 PASS = FAIL = 0
 
 
@@ -298,6 +329,110 @@ try:
     ck("deleting twice reports not-found", P.delete("round_trip")[0] is False)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
+
+# ---- the two-node split ---------------------------------------------------
+# Madow Inputs owns the values; Madow Unpack owns the fan-out. The split falls
+# where the data stops being interdependent: everything needing all the
+# parameters at once stays with the widgets that produce them.
+node_mod, unpack_mod = _load_pkg()
+Inputs, Unpack = node_mod.MadowInputs, unpack_mod.MadowUnpack
+
+ck("Madow Inputs emits four slots, not thirty",
+   Inputs.RETURN_NAMES == ("madow", "file_path", "context", "validation"),
+   str(Inputs.RETURN_NAMES))
+ck("Unpack emits every parameter plus file_path",
+   len(Unpack.RETURN_NAMES) == len(K.KEYS) + 1, str(len(Unpack.RETURN_NAMES)))
+ck("Unpack's output names match the table exactly",
+   Unpack.RETURN_NAMES[:-1] == K.OUTPUT_NAMES)
+ck("Unpack takes the bundle type, which cannot be wired to a FLOAT",
+   list(Unpack.INPUT_TYPES()["required"]) == ["madow"] and
+   Unpack.INPUT_TYPES()["required"]["madow"][0] == "MADOW")
+
+# The combo lists must be the real ones on the node that emits them, and there
+# must be only one copy of that resolution.
+ck("Unpack types sampler_name as the real combo list",
+   isinstance(Unpack.RETURN_TYPES[K.KEYS.index("ksampler.sampler_name")], list))
+ck("Unpack types scheduler as the real combo list",
+   isinstance(Unpack.RETURN_TYPES[K.KEYS.index("ksampler.scheduler")], list))
+
+kw = {K.ARG[k]: K.DEFAULTS[k] for k in K.KEYS}
+kw[K.ARG["file.prefix"]] = "NOVA"
+kw[K.ARG["file.name"]] = "take01"
+kw[K.ARG["file.folder"]] = "ace_step"
+bundle, fp, ctx_json, val = Inputs().run(preset_name="", latent_seconds=0.0, **kw)
+
+ck("the bundle is versioned", bundle["schema_ver"] == 1)
+ck("the bundle carries every parameter",
+   set(bundle["params"]) == set(K.KEYS))
+ck("the bundle carries the assembled file_path, so it is not recomputed",
+   bundle["file_path"] == "ace_step/NOVA_take01", bundle["file_path"])
+ck("file_path is on BOTH nodes — one string, saves a wire",
+   fp == bundle["file_path"])
+
+out = Unpack().run(madow=bundle)
+ck("every value round-trips through the bundle unchanged",
+   all(out[i] == bundle["params"][k] for i, k in enumerate(K.KEYS)))
+ck("Unpack carries file_path rather than reassembling it",
+   out[-1] == "ace_step/NOVA_take01", out[-1])
+
+# A malformed bundle must not take the queue down. This node decides nothing,
+# so a fallback is visible immediately downstream; a hard failure costs a run.
+for bad, label in ((None, "nothing wired"), ({}, "an empty dict"),
+                   ("nonsense", "a string"), ({"params": None}, "a null params"),
+                   ({"params": []}, "a list where a dict belongs")):
+    o = Unpack().run(madow=bad)
+    ck(f"{label} falls back to defaults rather than raising",
+       len(o) == len(K.KEYS) + 1 and o[K.KEYS.index("apg.eta")] == K.DEFAULTS["apg.eta"])
+
+partial = Unpack().run(madow={"params": {"apg.eta": 0.9}})
+ck("a bundle from a different pack version keeps what it knows",
+   partial[K.KEYS.index("apg.eta")] == 0.9)
+ck("...and defaults what it does not",
+   partial[K.KEYS.index("ksampler.steps")] == K.DEFAULTS["ksampler.steps"])
+
+# ---- a stray Enter must not split the log ---------------------------------
+# Reported from a real run: the prompt read "prompt value\n" because Enter was
+# pressed while typing. That newline is invisible in the UI and lands inside
+# params_sha256, so the same caption typed twice hashes as two configurations.
+def _run(**over):
+    k = {K.ARG[x]: K.DEFAULTS[x] for x in K.KEYS}
+    k[K.ARG["caption.prompt"]] = over.get("prompt", "a riff")
+    k[K.ARG["caption.lyrics"]] = over.get("lyrics", "")
+    return Inputs().run(preset_name="", latent_seconds=0.0, **k)
+
+clean = _run(prompt="prompt value")
+stray = _run(prompt="prompt value\n")
+lead = _run(prompt="  prompt value  ")
+
+ck("a trailing newline is trimmed from the emitted value, not just the hash",
+   stray[0]["params"]["caption.prompt"] == "prompt value",
+   repr(stray[0]["params"]["caption.prompt"]))
+ck("a stray Enter no longer changes params_sha256",
+   json.loads(clean[2])["params_sha256"] == json.loads(stray[2])["params_sha256"])
+ck("surrounding spaces do not change it either",
+   json.loads(clean[2])["params_sha256"] == json.loads(lead[2])["params_sha256"])
+ck("what is hashed is what is emitted — one string, not two code paths",
+   json.loads(stray[2])["params"]["caption.prompt"]
+   == stray[0]["params"]["caption.prompt"])
+
+# Internal structure must survive: lyrics are lines.
+multi = _run(lyrics="line one\nline two\n")
+ck("internal newlines are preserved — lyrics keep their line structure",
+   multi[0]["params"]["caption.lyrics"] == "line one\nline two",
+   repr(multi[0]["params"]["caption.lyrics"]))
+
+# A REAL change must still register, or the trim would be hiding content.
+ck("a genuinely different caption still changes the hash",
+   json.loads(clean[2])["params_sha256"]
+   != json.loads(_run(prompt="a different riff")[2])["params_sha256"])
+
+ck("only the free-text fields are trimmed",
+   K.TRIMMED_KEYS == {"caption.prompt", "caption.lyrics"}, str(sorted(K.TRIMMED_KEYS)))
+ck("the file separator is NOT trimmed — a space is a legitimate separator",
+   "file.separator" not in K.TRIMMED_KEYS)
+
+ck("context is still emitted by the node that has every parameter",
+   json.loads(ctx_json)["params"].keys() == bundle["params"].keys())
 
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)

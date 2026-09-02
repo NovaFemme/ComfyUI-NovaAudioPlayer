@@ -24,37 +24,15 @@ WHAT THIS NODE DOES NOT DO — and both are deliberate:
 
 import os
 
+from .comfy_types import BUNDLE_SCHEMA_VER, BUNDLE_TYPE, kind_for
 from .context import build_json
 from .naming import build_file_path
-from .params import (ARG, DEFAULTS, KEYS, KIND, NON_AUDIO_KEYS, OUTPUT_NAMES,
-                     PARAMS, SEED_KEY)
+from .params import (ARG, DEFAULTS, KEYS, NON_AUDIO_KEYS, PARAMS, SEED_KEY,
+                     TRIMMED_KEYS)
 from . import presets as preset_store
 from .validate import validate
 
 PACK_VERSION = "0.1.0"
-
-# The sampler and scheduler lists must be the REAL combo lists or ComfyUI's
-# type checker refuses the connection into KSampler. Guarded because the
-# package has to stay importable outside a ComfyUI process — the tests rely on
-# that, and so does anyone reading the code without a GPU to hand.
-try:
-    import comfy.samplers
-    SAMPLERS = comfy.samplers.KSampler.SAMPLERS
-    SCHEDULERS = comfy.samplers.KSampler.SCHEDULERS
-except Exception:                                             # noqa: BLE001
-    SAMPLERS = ["euler"]
-    SCHEDULERS = ["normal"]
-
-
-def _kind(k):
-    """ComfyUI type for a parameter key."""
-    kind = KIND[k]
-    if kind == "SAMPLERS":
-        return SAMPLERS
-    if kind == "SCHEDULERS":
-        return SCHEDULERS
-    return kind
-
 
 class MadowInputs:
     CATEGORY = " 🎛️ Nova Audio"
@@ -63,11 +41,15 @@ class MadowInputs:
                    "named presets, cross-field validation, and a `context` "
                    "blob that carries the exact parameters into panel_info.")
 
-    # file_path is derived rather than a widget, so it is appended here and
-    # has no entry in the parameter table — the parts and the whole cannot
-    # disagree if only the parts are stored.
-    RETURN_TYPES = tuple(_kind(k) for k in KEYS) + ("STRING", "STRING", "STRING")
-    RETURN_NAMES = OUTPUT_NAMES + ("file_path", "context", "validation")
+    # The 27 typed parameter outputs live on Madow Unpack, not here. This node
+    # emits the bundle instead: 4 slots rather than 30, which is half the
+    # node's height moved alongside instead of below.
+    #
+    # file_path stays on BOTH. It is one string, it saves a wire when Unpack is
+    # not placed, and it is carried rather than recomputed so there is only one
+    # implementation of the assembly.
+    RETURN_TYPES = (BUNDLE_TYPE, "STRING", "STRING", "STRING")
+    RETURN_NAMES = ("madow", "file_path", "context", "validation")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -75,7 +57,7 @@ class MadowInputs:
         for key, _group, _out, _kind_name, default, spec in PARAMS:
             opts = dict(spec)
             opts["default"] = default
-            t = _kind(key)
+            t = kind_for(key)
             # A combo is passed as the list itself; everything else as a type
             # name plus its options dict.
             required[ARG[key]] = (t,) if isinstance(t, list) else (t, opts)
@@ -109,6 +91,16 @@ class MadowInputs:
         # what everything downstream uses.
         params = {k: kw.get(ARG[k], DEFAULTS[k]) for k in KEYS}
 
+        # Trim the free-text fields ONCE, here, before anything reads them.
+        # Everything downstream — the outputs, the bundle, the hashes, the
+        # preset comparison — takes the trimmed value, so what was sent to the
+        # model and what was hashed are the same string by construction rather
+        # than by agreement between two code paths.
+        for k in TRIMMED_KEYS:
+            v = params.get(k)
+            if isinstance(v, str):
+                params[k] = v.strip()
+
         # A latent of 0 means "not wired", not "zero seconds".
         latent = latent_seconds if latent_seconds else None
         warnings = validate(params, latent_seconds=latent)
@@ -139,7 +131,13 @@ class MadowInputs:
 
         validation = "\n".join(warnings) if warnings else "no conflicts found"
 
-        return tuple(params[k] for k in KEYS) + (file_path, context, validation)
+        bundle = {
+            "schema_ver": BUNDLE_SCHEMA_VER,
+            "params": params,
+            "file_path": file_path,
+        }
+
+        return (bundle, file_path, context, validation)
 
 
 def _env():
