@@ -535,6 +535,12 @@ derived from the meter's own rows: it measures the decoded WAV, which is already
 clamped, so the overshoot is gone by the time it looks. That is why `gfx.bench`
 exists.
 
+**`LiteGraph` is a global, not a named export of `app.js`.** Importing it as
+one is a load-time failure that takes the whole extension module with it — the
+preset bar included — which is far worse than the tall node the import was
+meant to fix. Read it from `globalThis` at call time, not at module scope: an
+extension can be evaluated before the global is assigned.
+
 **A flex child will not shrink below its content without `min-height: 0`.**
 `.nova-panel__theme` was `flex: 0 0 auto`, so it grew with every row added to it
 and, on a short node, pushed the section accordion down behind the footer until
