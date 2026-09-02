@@ -51,7 +51,6 @@ that already holds that colour makes them fail for no reason:
 | `tiertest.mjs` | Hint precedence: a level fault suppresses generation-stage hypotheses |
 | `invariants.mjs` | Cross-path inequalities between the meter and the Python bench |
 | `test_madow.py` | Madow Inputs: parameter table, validation rules, canonical hashing, presets |
-| `twocolumn.mjs` | Two-column output layout and its guard (no browser needed) |
 
 ## calibrate.mjs
 

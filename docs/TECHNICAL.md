@@ -535,6 +535,21 @@ derived from the meter's own rows: it measures the decoded WAV, which is already
 clamped, so the overshoot is gone by the time it looks. That is why `gfx.bench`
 exists.
 
+**ComfyUI frontend 1.45 replaced LiteGraph's slot layout.** `getConnectionPos`
+still exists and still returns whatever you make it return, but it drives
+neither layout nor drawing: nodes now carry `arrange()`, `_measureSlots()`,
+`drawSlots()` and `_arrangeWidgets()`, and every slot has its own
+`boundingRect` and `pos`. An override there is inert, and can disagree with the
+renderer about where a link attaches. Measured on a live node — the override
+was installed and returning two-column coordinates while the node drew one
+column.
+
+**That frontend also gives every widget its own inline input slot.** A node with
+28 widgets and one real input reports **29 inputs**. Any height arithmetic based
+on `max(inputs, outputs)` is wrong by that much: halving 30 outputs on Madow
+saves one row, not fifteen. Count `inputs.filter(i => !i.widget)` for real
+input rows.
+
 **`LiteGraph` is a global, not a named export of `app.js`.** Importing it as
 one is a load-time failure that takes the whole extension module with it — the
 preset bar included — which is far worse than the tall node the import was

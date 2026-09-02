@@ -10,3 +10,6 @@ __pycache__/
 
 node_modules/
 .DS_Store
+
+# Scratch for code moved aside; the sandbox cannot delete, so it lands here.
+.trash/

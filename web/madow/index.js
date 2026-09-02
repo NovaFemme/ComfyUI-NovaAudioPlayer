@@ -10,14 +10,6 @@
 
 import { app } from "/scripts/app.js";
 import { buildPresetBar } from "./preset-bar.js";
-import { applyTwoColumnOutputs, canApply } from "./two-column.js";
-
-// LiteGraph is a global, NOT a named export of app.js. Importing it as one
-// would be a load-time failure that takes this whole module — preset bar
-// included — down with it, which is a far worse outcome than a tall node.
-// Read at call time rather than at module scope: the extension may be
-// evaluated before the global is assigned.
-const liteGraph = () => globalThis.LiteGraph ?? null;
 
 const NODE_TYPE = "MadowInputs";
 const BAR_WIDGET = "madow_preset_bar";
@@ -53,61 +45,28 @@ app.registerExtension({
         // it just shows the error in the bar.
         bar.refresh().catch(() => {});
 
-        // -- two-column outputs --------------------------------------
-        // 30 outputs against one input means LiteGraph sizes the slot region
-        // at 30 rows, 29 of them with an empty left column. Two columns
-        // reclaim ~300px.
+        // NO CUSTOM SLOT LAYOUT HERE, and the reason is worth keeping.
         //
-        // Stored as a node property so the choice travels with the workflow,
-        // and defaults on. If a frontend update ever moves getConnectionPos,
-        // canApply() returns false and the node renders normally instead of
-        // half-patched.
-        node.properties = node.properties || {};
-        if (node.properties.twoColumnOutputs === undefined) {
-            node.properties.twoColumnOutputs = true;
-        }
-
-        let restore = null;
-        const lg = liteGraph();
-
-        const sync = () => {
-            const want = node.properties.twoColumnOutputs !== false;
-            if (want && !restore) {
-                restore = applyTwoColumnOutputs(node, lg);
-                if (!restore) {
-                    // Said once, and only when it was actually asked for.
-                    console.info("[MadowInputs] two-column outputs unavailable "
-                               + "on this frontend — using the default layout");
-                    node.properties.twoColumnOutputs = false;
-                }
-            } else if (!want && restore) {
-                restore();
-                restore = null;
-            }
-            node.setSize(node.computeSize());
-            node.setDirtyCanvas(true, true);
-        };
-
-        node.__madowToggleColumns = () => {
-            node.properties.twoColumnOutputs = !node.properties.twoColumnOutputs;
-            sync();
-        };
-
-        // A user who hits a rendering bug can turn this off without editing
-        // files or losing the workflow.
-        const origMenu = node.getExtraMenuOptions;
-        node.getExtraMenuOptions = function (canvas, options) {
-            origMenu?.apply(this, arguments);
-            if (!canApply(this, lg) && this.properties.twoColumnOutputs === false) return;
-            options.push({
-                content: this.properties.twoColumnOutputs !== false
-                    ? "Outputs: single column"
-                    : "Outputs: two columns",
-                callback: () => this.__madowToggleColumns(),
-            });
-        };
-
-        sync();
+        // 30 outputs make this node tall, so an attempt was made to lay them
+        // in two columns by overriding `getConnectionPos` — the LiteGraph hook
+        // that historically decided where a slot sits. On ComfyUI frontend
+        // 1.45 it changes nothing: measured on a live node, the override was
+        // installed and returned two-column coordinates while the node still
+        // drew a single column.
+        //
+        // That frontend replaced the whole mechanism. Nodes now carry
+        // `arrange()`, `_measureSlots()`, `drawSlots()` and `_arrangeWidgets()`,
+        // and every slot has its own `boundingRect` and `pos`.
+        // `getConnectionPos` survives as legacy and drives neither layout nor
+        // drawing. An override there is inert at best, and at worst disagrees
+        // with the renderer about where a link attaches.
+        //
+        // The height is also not where it looked. This frontend gives every
+        // widget its own inline input slot, so the node reports 29 inputs
+        // against 30 outputs: halving the outputs saves ONE row, not fifteen.
+        //
+        // Anything attempted here must hook the new API and be measured on a
+        // real node, not reasoned about from the older LiteGraph.
 
         const minW = 420;
         if (node.size[0] < minW) node.setSize([minW, node.size[1]]);
