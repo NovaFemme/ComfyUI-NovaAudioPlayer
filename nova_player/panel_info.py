@@ -31,6 +31,11 @@ DB_FLOOR = -119.0
 # Band order as the strip draws it, left to right.
 BANDS = (("BASS", "0-250"), ("MID", "250-2k"), ("PRES", "2k-6k"), ("HF", "6k+"))
 
+# Mirrors audio_io.BAND_EDGES_HZ. Recorded in every row because the band shares
+# are only meaningful against the edges that produced them, and those edges have
+# changed once already.
+BAND_EDGES_HZ = (0.0, 250.0, 2000.0, 6000.0, float("inf"))
+
 # Column order for csv_row. Stable: appending to an existing log must not
 # silently shift columns, so new fields go on the END of this tuple.
 CSV_COLUMNS = (
@@ -40,6 +45,12 @@ CSV_COLUMNS = (
     "over_fs", "lr_corr", "dc_offset",
     "band_bass_pct", "band_mid_pct", "band_pres_pct", "band_hf_pct",
     "hf_outliers",
+    # Appended in 2.2.2. A logged row that does not carry the analyser
+    # configuration cannot be validated later: bin count shifts FLATNESS and
+    # CENTROID, and the smoothing constant shifts FLUX, with no change to the
+    # audio. Rows measured under different settings are not comparable and
+    # nothing in the numbers themselves reveals it.
+    "fft_size", "analyser_fps", "analyser_smoothing", "band_edges_hz",
 )
 
 
@@ -133,11 +144,33 @@ def _rows(data):
     return metrics, info
 
 
+def _analysis(data):
+    """The configuration the figures were produced under.
+
+    Read from the live config rather than hardcoded, so a user who changes
+    fft_size gets rows that say so instead of rows that quietly lie.
+    """
+    engine = {}
+    try:
+        from .config_manager import manager
+        engine = (manager.system_config or {}).get("audio_engine", {}) or {}
+    except Exception:                                         # noqa: BLE001
+        pass
+    return {
+        "fft_size": engine.get("fft_size", 4096),
+        "analyser_fps": engine.get("analyser_fps", 30),
+        "analyser_smoothing": engine.get("smoothing_time_constant", 0.6),
+        "band_edges_hz": "/".join(
+            "inf" if e == float("inf") else str(int(e)) for e in BAND_EDGES_HZ),
+    }
+
+
 def _flat(data, generated_at):
     """Raw values, one level deep, for csv_row. Keys match CSV_COLUMNS."""
     bench = data.get("bench") or {}
     bands = bench.get("bands") or {}
     return {
+        **_analysis(data),
         "generated_at": generated_at,
         "filename": data.get("filename"),
         "duration_s": data.get("duration"),
@@ -196,6 +229,14 @@ def build_panel_info(data, fmt="json"):
             lines += [f"  {k.ljust(width)}  {v}" for k, v in info]
             for w in _warnings(bench):
                 lines.append(f"  ! {w}")
+            a = _analysis(data)
+            lines += ["", "ANALYSIS"]
+            lines += [f"  {k.ljust(width)}  {v}" for k, v in [
+                ("FFT SIZE", a["fft_size"]),
+                ("ANALYSER FPS", a["analyser_fps"]),
+                ("SMOOTHING", a["analyser_smoothing"]),
+                ("BAND EDGES", a["band_edges_hz"] + " Hz"),
+            ]]
             lines += ["", f"generated_at  {generated_at}"]
             return "\n".join(lines)
 
@@ -227,6 +268,9 @@ def build_panel_info(data, fmt="json"):
             },
             "bands_pct": {k: bands.get(k) for k, _ in BANDS},
             "hf_outliers": bench.get("hf_outliers"),
+            # What the figures were produced under. Two rows are only
+            # comparable when these match.
+            "analysis": _analysis(data),
             "warnings": _warnings(bench),
         }, indent=2)
 

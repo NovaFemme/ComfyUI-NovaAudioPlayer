@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-novaaudioplayer"
 description = "An audio player node for ComfyUI with twelve live visualisers, a whole-file measurement panel, a theme system you can drive from inside the node, and a panel_info output for logging every take's metrics."
-version = "2.2.1"
+version = "2.2.2"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 

@@ -218,6 +218,19 @@ export function makeGfx(o) {
         registry: o.registry || null,
 
         /**
+         * Whole-file measurements from compute_bench, or null before a run.
+         *
+         * The APG meter needs these and cannot derive them. It measures the
+         * DECODED audio, which has already been clamped by save_wav, so a take
+         * that overshot full scale looks clean to it: the overshoot is gone and
+         * the peak reads 0 dBFS. `bench.peak_db` is measured BEFORE the clamp
+         * and is the only place the overshoot survives. Without it the meter
+         * cannot tell a level fault from a generation artifact, and will
+         * confidently blame cfg_scale for a gain problem.
+         */
+        bench: o.bench || null,
+
+        /**
          * Merged params for ANOTHER renderer, by id.
          * A composite needs its children's settings, not its own, and it must
          * not have to know how the config store is layered to get them.

@@ -491,6 +491,26 @@ slider, because `setParam()` explicitly nulls the waveform cache. Key on
 **`palette.revision`**, which `resolvePalette()` bumps for every distinct
 palette it builds. `dev/tests/colorlive.mjs` pins this.
 
+**A superset counter must never be added to the subset it contains.**
+`compute_bench` counted `over_fs` (`|x| > 1.0`) and `at_ceiling`
+(`|x| >= 32767/32768`) and reported `at_ceiling + over` as `clipped_samples`.
+Every over-full-scale sample is also above the ceiling, so the overshoot was
+counted twice and a take with 87 clamped samples reported 174 — always exactly
+double, which is how it was spotted. `clipped_samples` is now `at_ceiling`
+alone, and is a superset of `over_fs` by construction. Rows logged by
+`panel_info` before 2.2.2 carry the inflated figure.
+
+**A hypothesis must not outrank a measurement.** Clipping reduces crest, so a
+take with a gain fault reads as "low crest" and the hint line answered "lower
+cfg_scale" — sending the user to re-render for five minutes chasing a fault no
+value of cfg_scale could touch. `suggest()` is now tiered with hard precedence:
+level faults (from the pre-clamp Python bench) suppress master-stage hints,
+which suppress generation-stage hints. Not a ranked list — suppression, because
+a confident wrong hypothesis is worse than none. The level tier cannot be
+derived from the meter's own rows: it measures the decoded WAV, which is already
+clamped, so the overshoot is gone by the time it looks. That is why `gfx.bench`
+exists.
+
 **A flex child will not shrink below its content without `min-height: 0`.**
 `.nova-panel__theme` was `flex: 0 0 auto`, so it grew with every row added to it
 and, on a short node, pushed the section accordion down behind the footer until

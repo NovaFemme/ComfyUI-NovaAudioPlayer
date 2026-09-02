@@ -150,7 +150,8 @@ def compute_bench(waveform, sample_rate: int) -> dict:
 
     # Samples the WAV write will flatten against the ceiling.
     over = int(np.count_nonzero(np.abs(data) > 1.0))
-    # Samples already sitting at the ceiling before any clamping.
+    # Samples AT OR ABOVE the ceiling. This is a superset of `over`: anything
+    # above 1.0 is also above the ceiling, so the two must never be added.
     at_ceiling = int(np.count_nonzero(np.abs(data) >= 0.999969482421875))
 
     corr = None
@@ -174,12 +175,18 @@ def compute_bench(waveform, sample_rate: int) -> dict:
         "rms_mono_db": db(rms_mono),
         "crest_db": round(db(peak) - db(rms), 2) if rms > 1e-12 else None,
         "dc_offset": round(float(mono.mean()), 6),
-        # over_fs is the number the model is responsible for; clipped_samples is
-        # what ends up in the file after the clamp. They differ only when the
-        # generation overshoots.
+        # Two different questions, and the second is a SUPERSET of the first:
+        #   over_fs         samples ABOVE full scale — what the model produced
+        #                   and what save_wav's clamp destroys.
+        #   clipped_samples samples AT OR ABOVE the ceiling — what ends up
+        #                   flattened in the written file. Contains over_fs.
+        # So clipped_samples >= over_fs always, and the two are EQUAL when every
+        # sample at the ceiling got there by overshooting. Adding them, as this
+        # did until 2.2.2, double-counts the overshoot: a take with 87 over-full
+        # -scale samples reported 174 clipped.
         "over_fs": over,
-        "clipped_samples": at_ceiling + over,
-        "clipped_pct": round(100.0 * (at_ceiling + over) / (n * n_ch), 4),
+        "clipped_samples": at_ceiling,
+        "clipped_pct": round(100.0 * at_ceiling / (n * n_ch), 4),
         "lr_corr": corr,
         "bands": bands,
         "hf_outliers": hf_outliers,

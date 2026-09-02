@@ -141,6 +141,42 @@ d = tone(440, 0.3) + 0.25
 b = audio_io.compute_bench(stereo(d, d), SR)
 ck("DC offset is measured", abs(b["dc_offset"] - 0.25) < 1e-3, f"{b['dc_offset']}")
 
+# ---- clipped_samples must not double-count the overshoot ------------------
+# The bug: `at_ceiling` counts |x| >= 32767/32768 and `over` counts |x| > 1.0,
+# so every over-full-scale sample appears in BOTH. Summing them reported 174
+# clipped samples on a take that had 87, and 10 on a take that had 5 — always
+# exactly double, which is what made it visible in a screenshot.
+hot = tone(440, 1.2)
+b = audio_io.compute_bench(stereo(hot, hot), SR)
+true_over = int(np.count_nonzero(np.abs(np.stack([hot, hot])) > 1.0))
+true_at_ceiling = int(np.count_nonzero(
+    np.abs(np.stack([hot, hot])) >= 0.999969482421875))
+
+ck("over_fs counts samples ABOVE full scale",
+   b["over_fs"] == true_over, f"{b['over_fs']} vs {true_over}")
+ck("clipped_samples counts samples AT OR ABOVE the ceiling",
+   b["clipped_samples"] == true_at_ceiling,
+   f"{b['clipped_samples']} vs {true_at_ceiling}")
+ck("clipped_samples does not double-count: it is never 2x over_fs",
+   b["clipped_samples"] != 2 * b["over_fs"] or b["over_fs"] == 0,
+   f"clipped {b['clipped_samples']}, over {b['over_fs']}")
+ck("clipped_samples is a SUPERSET of over_fs, never smaller",
+   b["clipped_samples"] >= b["over_fs"],
+   f"{b['clipped_samples']} >= {b['over_fs']}")
+ck("on a pure overshoot the two are equal, not double",
+   b["clipped_samples"] == b["over_fs"],
+   f"clipped {b['clipped_samples']}, over {b['over_fs']}")
+ck("clipped_pct is derived from the same count",
+   abs(b["clipped_pct"] - 100.0 * b["clipped_samples"] / (len(hot) * 2)) < 1e-4,
+   f"{b['clipped_pct']}")
+
+# A take that reaches the ceiling WITHOUT overshooting: clipped > 0, over == 0.
+at_ceil_only = np.full(1000, 0.9999847, dtype=np.float32)   # >= ceiling, <= 1.0
+b2 = audio_io.compute_bench(stereo(at_ceil_only, at_ceil_only), SR)
+ck("a take at the ceiling but not over it reports clipping and no overshoot",
+   b2["clipped_samples"] == 2000 and b2["over_fs"] == 0,
+   f"clipped {b2['clipped_samples']}, over {b2['over_fs']}")
+
 # ---- the two RMS conventions ----------------------------------------------
 # A mono-summing meter and a both-channels meter disagree by a knowable amount.
 # This pins the relationship so the -14.15 / -15.14 style split can never be

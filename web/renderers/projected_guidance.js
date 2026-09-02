@@ -464,7 +464,7 @@ export default {
             );
 
             if (params.showHints !== false) {
-                const hint = suggest(integrated, ref);
+                const hint = suggest(integrated, ref, gfx.bench);
                 // Full alpha: guidance.over is a translucent fill role, and at
                 // its native alpha this line is barely legible on the HUD.
                 ctx.fillStyle = hint.strong
@@ -526,53 +526,120 @@ function signed(d, dp) {
     return (r > 0 ? "+" : "") + r.toFixed(dp);
 }
 
-export function suggest(m, ref) {
-    // With a reference frozen, the DELTA is the better signal. An absolute
-    // threshold has to guess where "too bright" starts for music in general; a
-    // delta only has to notice that this take moved, which is the question you
-    // are actually asking when you change one setting and render again.
+export function suggest(m, ref, bench = null) {
+    // THREE TIERS, WITH HARD PRECEDENCE — not a ranked list.
+    //
+    // A level fault suppresses every generation-stage hypothesis outright,
+    // rather than merely outranking it. The reason is asymmetric cost: a
+    // confident wrong hypothesis is worse than none, because it gets acted on.
+    // Clipping REDUCES crest, so a take with a gain problem reads as "low
+    // crest" and the old flat list answered "lower cfg_scale" — sending you to
+    // re-render for five minutes to chase a fault that lives in the output
+    // stage and would survive every value of cfg_scale you tried.
+    //
+    //   1. LEVEL   whole-file, pre-clamp, from compute_bench. Nothing else can
+    //              be read until these are clear.
+    //   2. MASTER  flat-topping and clipping in what was decoded.
+    //   3. GEN     crest / centroid / flatness / flux.
+    //
+    // Every line names the metric and the threshold it crossed, so a reading
+    // can be audited instead of taken on faith, and phrases itself as something
+    // to CHECK rather than something to change — see the header note on why
+    // this meter cannot attribute a measurement to a single setting.
+
+    const level = levelFault(bench);
+    if (level) return level;
+
+    // -- tier 2: what the master looks like ------------------------------
+    if (m.sat > 0.5) {
+        return { tier: 2, strong: true,
+                 text: `SAT ${m.sat.toFixed(2)}% (>0.50) — flat-topping, so a limiter is engaging somewhere. Check the master before the model.` };
+    }
+    if (m.clip > 0.02) {
+        return { tier: 2, strong: true,
+                 text: `CLIP ${m.clip.toFixed(4)}% (>0.0200) — audible clipping in the decoded audio. Fix level before reading the rows above.` };
+    }
+
+    // -- tier 3: generation stage ----------------------------------------
+    // With a reference frozen the DELTA is the better signal: an absolute
+    // threshold has to guess where "too bright" starts for music in general,
+    // while a delta only has to notice that THIS take moved — which is the
+    // question you are actually asking when you change one setting and
+    // re-render.
     if (ref) {
         const rel = relative(m, ref);
         if (rel) return rel;
     }
 
-    // Flat-topping first: it catches a take that was squashed into a limiter
-    // and then normalised BACK BELOW full scale, where the clip count stays a
-    // convincing zero. That is the case a peak reading alone cannot see.
-    if (m.sat > 0.5) {
-        return { strong: true, text: "flat-topped — hitting a limiter; lower cfg_scale" };
-    }
-    // A real take measured 0.0003% (87 samples in 25 million) — audible
-    // clipping is orders of magnitude above that, so the threshold sits well
-    // clear of incidental overshoot.
-    if (m.clip > 0.02) {
-        return { strong: true, text: "clipping — lower cfg_scale first" };
-    }
+    // Absolute fallbacks. Every threshold sits outside the range real music
+    // occupied when measured (centroid 1800-7100 Hz, flatness -15..-3 dB,
+    // flux 0.03-0.10), so a line fires only when something is off the scale.
     if (m.crest < 8 && m.centroid > 3500) {
-        return { strong: true, text: "flat + bright → over-guided; lower cfg_scale" };
+        return { tier: 3, strong: true,
+                 text: `CREST ${m.crest.toFixed(1)} dB (<8.0) with CENTROID ${m.centroid.toFixed(0)} Hz (>3500) — flat and bright. Try a lower cfg_scale and compare.` };
     }
     if (m.crest < 8) {
-        return { strong: true, text: "low crest → transients flattened; lower cfg_scale" };
+        return { tier: 3, strong: true,
+                 text: `CREST ${m.crest.toFixed(1)} dB (<8.0) — transients are flat. Rule out limiting or a level fault first, then try cfg_scale.` };
     }
-    // Every threshold below sits outside the range real music occupied when
-    // measured (centroid 1800-7100 Hz, flatness -15..-3 dB, flux 0.03-0.10), so
-    // a line only fires when something is genuinely off the end of the scale.
     if (m.centroid > 8500) {
-        return { strong: true, text: "very bright → lower cfg, or raise APG norm" };
+        return { tier: 3, strong: true,
+                 text: `CENTROID ${m.centroid.toFixed(0)} Hz (>8500) — very bright. Compare against a lower cfg_scale, or a higher APG norm.` };
     }
     if (m.flatness > -1.5) {
-        return { strong: true, text: "noise-like → lower temperature" };
+        return { tier: 3, strong: true,
+                 text: `FLATNESS ${m.flatness.toFixed(1)} dB (>-1.5) — approaching white noise. Try lowering temperature.` };
     }
     if (m.centroid < 1200 && m.flux < 0.04) {
-        return { strong: true, text: "dull + static → more steps, or adjust shift" };
+        return { tier: 3, strong: true,
+                 text: `CENTROID ${m.centroid.toFixed(0)} Hz (<1200) and FLUX ${m.flux.toFixed(3)} (<0.040) — dull and static. Try more steps, or adjust shift.` };
     }
     if (m.flatness < -20) {
-        return { strong: false, text: "very tonal → raise temperature or eta" };
+        return { tier: 3, strong: false,
+                 text: `FLATNESS ${m.flatness.toFixed(1)} dB (<-20) — very tonal. Try raising temperature or eta.` };
     }
-    if (ref) {
-        return { strong: false, text: "tracking REF — no meaningful drift yet" };
+
+    if (ref) return { tier: 3, strong: false, text: "tracking REF — no meaningful drift yet" };
+    return { tier: 3, strong: false, text: "no strong artifact signature" };
+}
+
+/**
+ * Tier 1 — level and format faults, from the whole-file Python measurement.
+ *
+ * These CANNOT come from the meter's own rows. The meter measures the decoded
+ * WAV, which save_wav already clamped, so a take that overshot full scale looks
+ * clean to it: the overshoot is gone and the peak reads 0 dBFS. `bench` is
+ * measured before the clamp and is the only place the overshoot survives.
+ *
+ * Returns null when there is no bench data — a fault that cannot be measured
+ * must not be guessed at.
+ */
+function levelFault(bench) {
+    if (!bench) return null;
+
+    const peak = bench.peak_db;
+    const over = bench.over_fs || 0;
+
+    if (typeof peak === "number" && peak > 0) {
+        const clamped = over ? `, ${over} samples clamped by the WAV write` : "";
+        return { tier: 1, strong: true,
+                 text: `PEAK ${peak > 0 ? "+" : ""}${peak.toFixed(2)} dBFS (>0.00)${clamped} — fix output gain before reading anything else on this panel.` };
     }
-    return { strong: false, text: "no strong artifact signature" };
+    if (over > 0) {
+        return { tier: 1, strong: true,
+                 text: `${over} samples above full scale, clamped by the WAV write — fix output gain before reading anything else on this panel.` };
+    }
+    if (typeof bench.dc_offset === "number" && Math.abs(bench.dc_offset) > 0.01) {
+        return { tier: 1, strong: true,
+                 text: `DC offset ${bench.dc_offset.toFixed(4)} (>0.0100) — a level fault, not a generation artifact.` };
+    }
+    // Null is mono, which is not a fault. Negative correlation is genuinely
+    // out of phase; a low positive value is merely wide, so the gate sits low.
+    if (typeof bench.lr_corr === "number" && bench.lr_corr < 0) {
+        return { tier: 1, strong: true,
+                 text: `L/R correlation ${bench.lr_corr.toFixed(3)} (<0) — channels out of phase. Fix this before reading the spectrum rows.` };
+    }
+    return null;
 }
 
 /**
@@ -588,33 +655,29 @@ export function suggest(m, ref) {
 function relative(m, ref) {
     const pct = (a, b) => (b !== 0 ? (a - b) / Math.abs(b) : 0);
 
+    // Clipping and flat-topping are NOT candidates here: they are tier 2 and
+    // are handled before this function is reached, so a level or master fault
+    // can never be outscored by a spectral wobble.
     const candidates = [
-        // Clipping appearing where there was none is the one unambiguous
-        // regression here, so it gets a large weight and always wins.
-        { on: m.sat > 0.5 && ref.sat <= 0.5, score: 100,
-          text: "flat-topping appeared vs REF — the limiter is engaging; lower cfg_scale" },
-        { on: m.clip > 0.02 && ref.clip <= 0.02, score: 99,
-          text: "clipping appeared vs REF — back cfg_scale off" },
-
         { on: m.crest - ref.crest < -1.5, score: Math.abs(m.crest - ref.crest) / 1.5,
-          text: () => `crest ${(m.crest - ref.crest).toFixed(1)} dB vs REF → transients flattening; lower cfg_scale` },
+          text: () => `CREST ${(m.crest - ref.crest).toFixed(1)} dB vs REF (>1.5) — transients flattening. Lower cfg_scale is the usual cause; verify before assuming.` },
         { on: m.crest - ref.crest > 1.5, score: Math.abs(m.crest - ref.crest) / 1.5,
-          text: () => `crest +${(m.crest - ref.crest).toFixed(1)} dB vs REF → transients sharper; this direction is working` },
+          text: () => `CREST +${(m.crest - ref.crest).toFixed(1)} dB vs REF (>1.5) — transients sharper. Whatever changed, this direction is working.` },
 
         { on: pct(m.centroid, ref.centroid) > 0.15, score: pct(m.centroid, ref.centroid) / 0.15,
-          text: () => `${(pct(m.centroid, ref.centroid) * 100).toFixed(0)}% brighter than REF → raising cfg does this; check it is not harsh` },
+          text: () => `CENTROID +${(pct(m.centroid, ref.centroid) * 100).toFixed(0)}% vs REF (>15%) — brighter. Listen for harshness before deciding it is an improvement.` },
         { on: pct(m.centroid, ref.centroid) < -0.15, score: -pct(m.centroid, ref.centroid) / 0.15,
-          text: () => `${(-pct(m.centroid, ref.centroid) * 100).toFixed(0)}% darker than REF → under-resolved? try more steps or shift` },
+          text: () => `CENTROID ${(pct(m.centroid, ref.centroid) * 100).toFixed(0)}% vs REF (>15%) — darker. Worth testing more steps, or shift.` },
 
         { on: m.flatness - ref.flatness > 2, score: (m.flatness - ref.flatness) / 2,
-          text: () => `+${(m.flatness - ref.flatness).toFixed(1)} dB flatness vs REF → noisier; lower temperature` },
+          text: () => `FLATNESS +${(m.flatness - ref.flatness).toFixed(1)} dB vs REF (>2.0) — noisier. Worth testing a lower temperature.` },
         { on: m.flatness - ref.flatness < -2, score: -(m.flatness - ref.flatness) / 2,
-          text: () => `${(m.flatness - ref.flatness).toFixed(1)} dB flatness vs REF → more tonal; raise temperature or eta` },
+          text: () => `FLATNESS ${(m.flatness - ref.flatness).toFixed(1)} dB vs REF (>2.0) — more tonal. Worth testing a higher temperature or eta.` },
 
         { on: pct(m.flux, ref.flux) < -0.2, score: -pct(m.flux, ref.flux) / 0.2,
-          text: () => `flux ${(pct(m.flux, ref.flux) * 100).toFixed(0)}% vs REF → more smeared; more steps, or lower cfg` },
+          text: () => `FLUX ${(pct(m.flux, ref.flux) * 100).toFixed(0)}% vs REF (>20%) — more smeared. Worth testing more steps, or a lower cfg.` },
         { on: pct(m.flux, ref.flux) > 0.2, score: pct(m.flux, ref.flux) / 0.2,
-          text: () => `flux +${(pct(m.flux, ref.flux) * 100).toFixed(0)}% vs REF → busier/noisier than the reference` },
+          text: () => `FLUX +${(pct(m.flux, ref.flux) * 100).toFixed(0)}% vs REF (>20%) — busier than the reference.` },
     ];
 
     let best = null;
@@ -623,7 +686,8 @@ function relative(m, ref) {
         if (!best || c.score > best.score) best = c;
     }
     if (!best) return null;
-    return { strong: true, text: typeof best.text === "function" ? best.text() : best.text };
+    return { tier: 3, strong: true,
+             text: typeof best.text === "function" ? best.text() : best.text };
 }
 
 // ---------------------------------------------------------------------------

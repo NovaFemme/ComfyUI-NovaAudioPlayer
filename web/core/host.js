@@ -256,6 +256,7 @@ export class PlayerHost {
             phase: this._phase,
             dpr: this._dpr || 1,
             now: this._frameNow || performance.now(),
+            bench: (this.data && this.data.bench) || null,
         });
     }
 

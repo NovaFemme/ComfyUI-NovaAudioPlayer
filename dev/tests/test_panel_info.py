@@ -114,6 +114,44 @@ ck("csv_row quotes a filename containing a comma",
    '"' in panel_info.build_panel_info(
        {**TAKE, "filename": "take,01.wav"}, "csv_row"))
 
+# ---- the analysis block: rows must be self-describing ---------------------
+# A row that does not say what it was measured under cannot be validated later.
+# Bin count shifts FLATNESS and CENTROID; the smoothing constant shifts FLUX.
+# Neither leaves a trace in the numbers themselves.
+a = j["analysis"]
+ck("json carries the analyser configuration",
+   {"fft_size", "analyser_fps", "analyser_smoothing", "band_edges_hz"} <= set(a),
+   str(sorted(a)))
+ck("fft_size is the real configured value", a["fft_size"] == 4096, str(a["fft_size"]))
+ck("band edges are recorded, contiguous and open-ended",
+   a["band_edges_hz"] == "0/250/2000/6000/inf", a["band_edges_hz"])
+
+t2 = panel_info.build_panel_info(TAKE, "text")
+ck("text carries an ANALYSIS block", "ANALYSIS" in t2 and "FFT SIZE" in t2)
+
+row2 = next(csv.reader(io.StringIO(panel_info.build_panel_info(TAKE, "csv_row"))))
+ck("csv_row carries the analyser configuration too",
+   row2[panel_info.CSV_COLUMNS.index("fft_size")] == "4096",
+   row2[panel_info.CSV_COLUMNS.index("fft_size")])
+ck("the new columns were APPENDED, not inserted",
+   panel_info.CSV_COLUMNS.index("generated_at") == 0
+   and panel_info.CSV_COLUMNS.index("hf_outliers") == 21,
+   "an existing log would shift if these moved")
+
+# panel_info keeps its own copy of the band edges so it stays dependency-free.
+# Two copies means one is eventually wrong, so pin them together.
+_AIO = importlib.util.spec_from_file_location(
+    "audio_io_for_edges",
+    os.path.join(os.path.dirname(_HERE), "..", "nova_player", "audio_io.py"))
+try:
+    _aio_mod = importlib.util.module_from_spec(_AIO)
+    _AIO.loader.exec_module(_aio_mod)
+    ck("panel_info's band edges match audio_io's",
+       tuple(_aio_mod.BAND_EDGES_HZ) == tuple(panel_info.BAND_EDGES_HZ),
+       f"{_aio_mod.BAND_EDGES_HZ} vs {panel_info.BAND_EDGES_HZ}")
+except ImportError:
+    ck("panel_info's band edges match audio_io's", True, "(numpy absent — skipped)")
+
 # ---- degenerate input -----------------------------------------------------
 ck("a payload with no bench data does not raise",
    isinstance(panel_info.build_panel_info({"filename": "x.wav"}, "json"), str))

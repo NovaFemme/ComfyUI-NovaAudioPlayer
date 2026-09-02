@@ -88,18 +88,33 @@ console.log("\nreference-relative hints");
 const h = out.hints;
 for (const [k, v] of Object.entries(h)) console.log(`  ${k.padEnd(12)} "${v}"`);
 console.log("");
-ck("a crest drop is read as flattening transients", /crest -\d.*flatten/.test(h.crestDrop));
-ck("a crest rise is read as an improvement", /crest \+.*sharper/.test(h.crestRise));
-ck("a brighter take is named as such", /brighter than REF/.test(h.brighter));
-ck("a darker take is named as such", /darker than REF/.test(h.darker));
+ck("a crest drop is read as flattening transients",
+   /^CREST -\d.*flattening/.test(h.crestDrop), h.crestDrop);
+ck("a crest rise is read as an improvement",
+   /^CREST \+.*sharper/.test(h.crestRise), h.crestRise);
+ck("a brighter take is named as such",
+   /^CENTROID \+\d+% vs REF.*brighter/.test(h.brighter), h.brighter);
+ck("a darker take is named as such",
+   /^CENTROID -\d+% vs REF.*darker/.test(h.darker), h.darker);
 ck("rising flatness reads as noisier", /noisier/.test(h.noisier));
 ck("falling flux reads as smeared", /smeared/.test(h.smeared));
-ck("clipping appearing always wins", /clipping appeared/.test(h.clipAppear));
+// Clipping is now TIER 2 and no longer a reference-relative candidate: it
+// short-circuits before relative() is reached, so it still wins over the
+// crest drop that accompanies it — by precedence rather than by score.
+ck("clipping still wins over the crest drop it causes",
+   /^CLIP /.test(h.clipAppear) && !/CREST/.test(h.clipAppear), h.clipAppear);
 ck("no drift says so rather than inventing a finding", /no meaningful drift/.test(h.quiet));
 ck("the largest move wins, not the first rule",
-   /brighter than REF/.test(h.biggestWins), `got "${h.biggestWins}"`);
+   /^CENTROID \+\d+% vs REF/.test(h.biggestWins), `got "${h.biggestWins}"`);
 ck("without a reference it falls back to absolute rules",
    !/REF/.test(h.noRef) && h.noRef.length > 0, `"${h.noRef}"`);
+
+// Auditability: a reading nobody can check is an oracle, not an instrument.
+const named = [h.crestDrop, h.crestRise, h.brighter, h.darker, h.noisier,
+               h.smeared, h.clipAppear, h.biggestWins];
+ck("every firing hint names the metric and its threshold",
+   named.every(t => /^(CREST|CENTROID|FLATNESS|FLUX|CLIP|SAT)\b/.test(t) && /[(<>]/.test(t)),
+   named.find(t => !/^(CREST|CENTROID|FLATNESS|FLUX|CLIP|SAT)\b/.test(t)) || "all named");
 
 console.log("\nerrors:", errs.length ? errs.join(" | ") : "none");
 if (errs.length) fail++;
