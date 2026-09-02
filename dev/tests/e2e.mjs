@@ -1,4 +1,5 @@
 import pw from "./_pw.mjs";
+import { snap } from "./_shots.mjs";
 const b = await pw.chromium.launch({ args: ["--autoplay-policy=no-user-gesture-required", "--mute-audio"] });
 const p = await b.newPage({ viewport: { width: 1260, height: 520 }, deviceScaleFactor: 2 });
 const errs = []; p.on("pageerror", e => errs.push(e.message));
@@ -46,7 +47,7 @@ console.log(`\n  measured: crest ${m.crest.toFixed(1)} dB | centroid ${m.centroi
 ck("centroid is musically plausible, not floor-dominated", m.centroid > 800 && m.centroid < 14000);
 ck("flatness inside the definition's range", m.flatness <= 0 && m.flatness > -40);
 
-await p.locator("#stage").screenshot({ path: "/home/claude/shots/apg-float.png" });
+await snap(p.locator("#stage"), "apg-float.png");
 console.log("\nerrors:", errs.length ? errs.join(" | ") : "none");
 if (errs.length) fail++;
 console.log(`\n${pass} passed, ${fail} failed`);

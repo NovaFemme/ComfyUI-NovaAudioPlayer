@@ -13,3 +13,6 @@ node_modules/
 
 # Scratch for code moved aside; the sandbox cannot delete, so it lands here.
 .trash/
+
+# Screenshots written by the browser suites.
+dev/tests/_shots/

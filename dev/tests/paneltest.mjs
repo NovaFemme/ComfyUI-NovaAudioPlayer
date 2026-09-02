@@ -1,4 +1,5 @@
 import pw from "./_pw.mjs";
+import { snap } from "./_shots.mjs";
 const b = await pw.chromium.launch();
 const p = await b.newPage({ viewport: { width: 1500, height: 800 } });
 const errs = []; p.on("pageerror", e => errs.push(e.message));
@@ -107,6 +108,6 @@ await p.waitForTimeout(300);
 const h2 = await p.evaluate(() => [...document.querySelectorAll(".nova-panel summary")].map(s=>s.textContent));
 console.log("   headings:", h2.join(" | "), h2.some(h=>/SPECTROGRAM/.test(h)) && !h2.some(h=>/ANALYZER/.test(h)) ? "PASS" : "FAIL");
 
-await p.locator("#stage").screenshot({ path: "/home/claude/shots/panel-v2.png" });
+await snap(p.locator("#stage"), "panel-v2.png");
 console.log("\nerrors:", errs.length ? errs.join(" | ") : "none");
 await b.close();

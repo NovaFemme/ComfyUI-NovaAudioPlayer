@@ -1,4 +1,5 @@
 import pw from "./_pw.mjs";
+import { snap } from "./_shots.mjs";
 const b = await pw.chromium.launch();
 const p = await b.newPage({ viewport: { width: 1500, height: 800 } });
 const errs = []; p.on("pageerror", e => errs.push(e.message));
@@ -92,6 +93,6 @@ console.log("   overrides:", await p.evaluate(() => JSON.stringify(window.__host
   await p.evaluate(() => Object.keys(window.__host.state.overrides.roles).length === 0) ? "PASS" : "FAIL");
 
 await p.evaluate(() => window.__host2 && window.__host2.destroy());
-await p.locator("#stage").screenshot({ path: "/home/claude/shots/panel-scope.png" });
+await snap(p.locator("#stage"), "panel-scope.png");
 console.log("\nerrors:", errs.length ? errs.join(" | ") : "none");
 await b.close();

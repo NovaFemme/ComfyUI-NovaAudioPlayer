@@ -1,4 +1,5 @@
 import pw from "./_pw.mjs";
+import { snap } from "./_shots.mjs";
 const b = await pw.chromium.launch();
 const p = await b.newPage({ viewport: { width: 1250, height: 500 }, deviceScaleFactor: 2 });
 const errs = []; p.on("pageerror", e => errs.push(e.message));
@@ -31,7 +32,7 @@ await p.evaluate(() => {
   window.__host.markDirty();
 });
 await p.waitForTimeout(900);
-await p.locator("#stage").screenshot({ path: "/home/claude/shots/clip-fixed.png" });
+await snap(p.locator("#stage"), "clip-fixed.png");
 
 // Confirm nothing is painted clip-red inside the renderer rect any more.
 const overlap = await p.evaluate(() => {

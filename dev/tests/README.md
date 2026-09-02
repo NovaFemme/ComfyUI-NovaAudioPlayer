@@ -15,6 +15,13 @@ local install, then `$PLAYWRIGHT_PATH`, then the global npm root. Nothing here
 hard-codes a path any more — they used to, and the suite only loaded on the one
 machine that path existed on.
 
+Screenshots go through `dev/tests/_shots.mjs`, into `dev/tests/_shots/` or
+`$NOVA_SHOTS`. Four suites used to write to an absolute path from the container
+they were written in and died with ENOENT on the last line, *after* printing
+every PASS — so the run looked like a crash when the checks had all passed.
+A screenshot is a debugging aid; `snap()` logs and carries on rather than
+ending a run over one.
+
 **Reset the config before `paneltest` and `scopetest`.** Both assert that a
 colour *changes* to a particular value, so a leftover theme from an earlier run
 that already holds that colour makes them fail for no reason:
