@@ -27,11 +27,15 @@ from .madow.unpack import (
 from .madow.routes import register_routes as register_madow_routes
 from .nova_player.config_manager import manager
 from .nova_player.routes import register_routes
+from .nova_player.web_cache import install as install_web_cache
 
 # Give the user real files to edit by hand on first run.
 manager.ensure_files_exist()
 register_routes()
 register_madow_routes()
+# Make the browser revalidate this pack's JS instead of guessing at its
+# freshness; see nova_player/web_cache.py for why that guess bites.
+install_web_cache()
 
 NODE_CLASS_MAPPINGS = {**NOVA_PLAYER_MAPPINGS, **MADOW_MAPPINGS,
                        **MADOW_UNPACK_MAPPINGS}

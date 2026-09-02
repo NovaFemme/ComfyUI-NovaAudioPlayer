@@ -57,12 +57,18 @@ class NovaPlayerNode:
                 # this node's signature stays decoupled from whatever generator
                 # feeds it — ACE-Step's parameter set will keep changing, and
                 # a typed input would have to change with it.
+                # NOT multiline. A multiline STRING renders as a ~300px
+                # textarea, and this one is normally fed by a wire from Madow
+                # Inputs rather than typed — so it swallowed a third of the
+                # node's height to display an empty box, squeezing the
+                # visualisation it sits above. A single-line widget still
+                # accepts a connection and costs one row.
                 "context": ("STRING", {
                     "default": "",
-                    "multiline": True,
-                    "tooltip": "Anything you want carried into panel_info "
-                               "alongside the measurements — seed, sampler "
-                               "settings, a run id. Copied verbatim.",
+                    "multiline": False,
+                    "tooltip": "Wire Madow Inputs' context here, or paste "
+                               "anything you want carried into panel_info "
+                               "alongside the measurements. Copied verbatim.",
                 }),
             },
         }
