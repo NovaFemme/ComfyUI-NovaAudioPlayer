@@ -338,6 +338,30 @@ re-measuring the audio.
 downmix per BS.1770 and applies the −0.691 offset; it will not match either RMS
 figure and is not meant to.
 
+### Integration coverage
+
+Every APG figure is conditional on the window it was integrated over, so that
+window is a value rather than an assumption. `acc.windowStart` / `windowEnd` are
+stamped from the same silence gate the sums use, and `coverage()` returns the
+fraction of the take they span.
+
+It is rendered above the rows — `INTEGRATED 0:00–1:40 · 45% of take` — because
+without it a partial reading looks like a whole-take one and appears to
+contradict the bench strip, which genuinely is whole-take. Neither is wrong;
+they answer different questions, and the panel previously never said which.
+
+An automatic restart (a backward seek past 2%) marks the header with `↺` and is
+counted. It used to happen silently, leaving the panel describing a short recent
+window under a label that implied the whole take.
+
+**Coverage gates two things.** Generation-stage hints are suppressed below 80% —
+a claim about the take cannot be made from part of it, while level faults still
+fire because they are whole-file. And a frozen reference stores the coverage it
+was taken at: if it differs from the current one by more than 5 points the delta
+column greys out and the footer says so, because comparing a reference frozen at
+45% against a take read at 85% compares unequal fractions of two different
+things. That comparison is the panel's whole purpose, and it was quietly broken.
+
 ### The panel_info output
 
 The node returns a single `STRING` named `panel_info`: the same figures the

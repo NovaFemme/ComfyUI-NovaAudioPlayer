@@ -58,7 +58,7 @@
  */
 
 import {
-    byteToNorm, clipped, drawPlaceholder, rr, smoothingAlpha, textScale,
+    byteToNorm, clipped, drawPlaceholder, rr, smoothingAlpha, textScale, fmtTime,
 } from "../core/gfx.js";
 // Same ceiling the engine uses for the clip LED, so the meter and the LED can
 // never disagree about what counts as clipped.
@@ -148,14 +148,44 @@ export default {
     },
 
     /** Start the integrated statistics over. */
-    reset(store) {
+    /**
+     * Start a fresh integration.
+     *
+     * @param {boolean} auto  true when this was an automatic restart (a
+     *   backward seek) rather than a new take. Automatic restarts are COUNTED,
+     *   because previously they were invisible: the panel silently began
+     *   describing a short recent window while still labelling its rows as the
+     *   take's figures, and nothing on screen said the ground had moved.
+     */
+    reset(store, auto = false) {
         store.acc = {
             peak: 0, sumSq: 0, samples: 0, clipped: 0, flat: 0,
             centroidSum: 0, fluxSum: 0, flatSum: 0, specFrames: 0,
+            // The integration WINDOW, in seconds. Every integrated figure is
+            // conditional on it, so it is tracked as a value rather than left
+            // implicit — see the coverage note where it is rendered.
+            windowStart: null, windowEnd: null,
         };
         store.live = null;
         store.liveRaw = null;
         store.fluxPrimed = false;
+        if (auto) store.autoResets = (store.autoResets || 0) + 1;
+    },
+
+    /**
+     * What fraction of the take the integrated figures actually cover.
+     *
+     * Returns null until there is something to report. This is the number that
+     * decides whether an integrated reading means anything: a CLIP of 0.0000%
+     * over 45% of a take is not evidence that the take does not clip, and a
+     * delta between a reference frozen at 45% and a take read at 85% compares
+     * unequal fractions of two different things.
+     */
+    coverage(store, duration) {
+        const a = store.acc;
+        if (!a || a.windowStart === null || !duration) return null;
+        const span = Math.max(0, (a.windowEnd ?? a.windowStart) - a.windowStart);
+        return Math.max(0, Math.min(1, span / duration));
     },
 
     frame(gfx, rect, sig) {
@@ -174,14 +204,17 @@ export default {
         // reference deliberately survives: comparing the new take against the
         // old one is the entire point.
         const src = store.sourceId || 0;
-        if (store.seenSource !== undefined && store.seenSource !== src) this.reset(store);
+        if (store.seenSource !== undefined && store.seenSource !== src) {
+            this.reset(store);
+            store.autoResets = 0;      // a new take starts the count over
+        }
         store.seenSource = src;
 
         // Seeking backwards makes the integrated figures meaningless too, but
         // that one is a judgement call, so it stays a setting.
         if (params.autoReset !== false && store.lastProgress !== undefined &&
             sig.progress < store.lastProgress - 0.02) {
-            this.reset(store);
+            this.reset(store, true);
         }
         store.lastProgress = sig.progress;
 
@@ -304,6 +337,12 @@ export default {
             // a sparse arrangement look duller than a dense one at the same
             // settings.
             if (frameRms > SILENCE_RMS) {
+                // The window is stamped from the SAME gate the sums use, so
+                // coverage describes what was actually integrated rather than
+                // how long the transport has been running.
+                const t = sig.currentTime ?? (sig.progress || 0) * (sig.duration || 0);
+                if (acc.windowStart === null) acc.windowStart = t;
+                acc.windowEnd = t;
                 if (peak > acc.peak) acc.peak = peak;
                 acc.sumSq += sumSq;
                 acc.samples += n * 2;
@@ -346,9 +385,30 @@ export default {
         // just clips its own hint line off the right edge.
         const S = textScale();
         const pad = 10 * S;
-        const rowH = Math.max(11 * S, Math.min(20 * S, (rect.h - pad * 2 - 34 * S) / METRICS.length));
+        // The coverage header is not optional chrome: every row beneath it is
+        // conditional on the window it names, so the two are sized together.
+        const headH = 13 * S;
+        const rowH = Math.max(11 * S, Math.min(20 * S,
+            (rect.h - pad * 2 - 34 * S - headH) / METRICS.length));
         const panelW = Math.min(rect.w - pad * 2, 366 * S);
-        const panelH = pad + METRICS.length * rowH + (params.showHints !== false ? 34 * S : 12 * S);
+
+        // Coverage and the hint are needed to SIZE the panel, so they are
+        // resolved before it is drawn rather than inside the paint pass.
+        const cov = this.coverage(store, sig.duration);
+        store.refCoverage = cov;          // what a freeze right now would capture
+
+        const hintLineH = 11 * S;
+        let hint = null, hintLines = [];
+        if (params.showHints !== false) {
+            hint = suggest(integrated, ref, gfx.bench, cov);
+            ctx.save();
+            ctx.font = "9px ui-monospace, monospace";
+            hintLines = wrapText(ctx, "HYP: " + hint.text, panelW - 16 * S, 3);
+            ctx.restore();
+        }
+
+        const panelH = pad + headH + METRICS.length * rowH +
+                       (hint ? 14 * S + hintLines.length * hintLineH : 12 * S);
 
         store.panelRect = { x: rect.x + pad, y: rect.y + pad, w: panelW, h: panelH };
 
@@ -383,8 +443,37 @@ export default {
             ctx.font = "10px ui-monospace, monospace";
             ctx.textBaseline = "middle";
 
+            // ---- coverage header -------------------------------------
+            // "INTEGRATED 0:00-1:40 - 45% of take". Without this the rows look
+            // like whole-take figures and disagree with the bench strip, which
+            // genuinely is whole-take. They are not wrong; they are answering a
+            // narrower question, and the panel never said so.
+            const restarts = store.autoResets || 0;
+            // A delta between unequal windows is not a measurement. Greyed and
+            // labelled rather than hidden: the numbers are still real, they
+            // just are not comparable yet, and saying so is more use than
+            // removing them.
+            const covMismatch = ref && ref.coverage != null && cov != null &&
+                                Math.abs(cov - ref.coverage) > 0.05;
+            ctx.font = "9px ui-monospace, monospace";
+            ctx.textAlign = "left";
+            ctx.fillStyle = palette.get(
+                cov !== null && cov < 0.8 ? "bench.warn" : "text.dim");
+            const headY = store.panelRect.y + 4 * S + headH / 2;
+            if (cov === null) {
+                ctx.fillText("INTEGRATED — nothing measured yet", labelX, headY);
+            } else {
+                const a = store.acc;
+                const mark = restarts > 0 ? "\u21ba " : "";
+                ctx.fillText(
+                    `${mark}INTEGRATED ${fmtTime(a.windowStart)}\u2013${fmtTime(a.windowEnd)}` +
+                    ` \u00b7 ${Math.round(cov * 100)}% of take`,
+                    labelX, headY);
+            }
+            ctx.font = "10px ui-monospace, monospace";
+
             METRICS.forEach((m, i) => {
-                const y = store.panelRect.y + 6 * S + i * rowH + rowH / 2;
+                const y = store.panelRect.y + 6 * S + headH + i * rowH + rowH / 2;
                 const live = store.live[m.key];
                 const integ = integrated[m.key];
 
@@ -428,7 +517,7 @@ export default {
 
                 if (ref) {
                     const d = integ - ref[m.key];
-                    const moved = Math.abs(d) > (m.max - m.min) * 0.01;
+                    const moved = !covMismatch && Math.abs(d) > (m.max - m.min) * 0.01;
 
                     // Direction is carried by an arrow, not by hue. Colouring
                     // "up" red and "down" green asserts that up is worse, which
@@ -441,7 +530,8 @@ export default {
                     // CLIP is the one exception: more clipping is unambiguously
                     // worse, so a rise there does get the warning role.
                     const worse = m.key === "clip" && d > 0 && moved;
-                    ctx.fillStyle = worse ? palette.alpha("guidance.over", 1)
+                    ctx.fillStyle = covMismatch ? palette.get("text.dim")
+                                  : worse ? palette.alpha("guidance.over", 1)
                                   : moved ? palette.get("text")
                                           : palette.get("text.dim");
                     const arrow = !moved ? " " : d > 0 ? "▲" : "▼";
@@ -453,24 +543,27 @@ export default {
             });
 
             // Footer: reference state and the hypothesis line.
-            const footY = store.panelRect.y + 6 * S + METRICS.length * rowH + 8 * S;
+            const footY = store.panelRect.y + 6 * S + headH + METRICS.length * rowH + 8 * S;
             ctx.textAlign = "left";
             ctx.font = "9px ui-monospace, monospace";
-            ctx.fillStyle = palette.get("text.dim");
+            ctx.fillStyle = covMismatch ? palette.get("bench.warn") : palette.get("text.dim");
             ctx.fillText(
-                ref ? "REF FROZEN — click panel to clear"
-                    : "click panel to freeze this take as reference",
+                covMismatch
+                    ? `REF ${Math.round(ref.coverage * 100)}% \u00b7 now ${Math.round(cov * 100)}% — deltas not comparable`
+                    : ref ? "REF FROZEN — click panel to clear"
+                          : "click panel to freeze this take as reference",
                 labelX, footY,
             );
 
-            if (params.showHints !== false) {
-                const hint = suggest(integrated, ref, gfx.bench);
+            if (hint) {
                 // Full alpha: guidance.over is a translucent fill role, and at
                 // its native alpha this line is barely legible on the HUD.
                 ctx.fillStyle = hint.strong
                     ? palette.alpha("guidance.over", 1)
                     : palette.get("text.dim");
-                ctx.fillText("HYP: " + hint.text, labelX, footY + 12 * S);
+                hintLines.forEach((ln, i) => {
+                    ctx.fillText(ln, labelX, footY + 12 * S + i * hintLineH);
+                });
             }
         });
     },
@@ -482,7 +575,13 @@ export default {
         if (pt.x < r.x || pt.x > r.x + r.w || pt.y < r.y || pt.y > r.y + r.h) return null;
 
         const store = gfx.store;
-        store.reference = store.reference ? null : { ...store.integrated };
+        // The coverage travels WITH the frozen figures. A reference taken over
+        // 45% of one take and compared against 85% of another is comparing
+        // unequal fractions of two different things, and the delta column — the
+        // entire point of this panel — was reporting that as a finding.
+        store.reference = store.reference
+            ? null
+            : { ...store.integrated, coverage: store.refCoverage ?? null };
         return { action: "consumed" };
     },
 
@@ -526,77 +625,75 @@ function signed(d, dp) {
     return (r > 0 ? "+" : "") + r.toFixed(dp);
 }
 
-export function suggest(m, ref, bench = null) {
-    // THREE TIERS, WITH HARD PRECEDENCE — not a ranked list.
+export function suggest(m, ref, bench = null, coverage = null) {
+    // THREE TIERS WITH HARD PRECEDENCE, and a coverage gate on the last one.
     //
-    // A level fault suppresses every generation-stage hypothesis outright,
-    // rather than merely outranking it. The reason is asymmetric cost: a
-    // confident wrong hypothesis is worse than none, because it gets acted on.
-    // Clipping REDUCES crest, so a take with a gain problem reads as "low
-    // crest" and the old flat list answered "lower cfg_scale" — sending you to
-    // re-render for five minutes to chase a fault that lives in the output
-    // stage and would survive every value of cfg_scale you tried.
+    // A tier SUPPRESSES the tiers below it rather than outranking them. The
+    // cost is asymmetric: a confident wrong hypothesis gets acted on. Clipping
+    // reduces crest, so a take with a gain fault reads as "low crest", and the
+    // old flat list answered "lower cfg_scale" — five minutes of re-render
+    // chasing a fault that lives in the output stage and would survive every
+    // value of cfg_scale tried.
     //
-    //   1. LEVEL   whole-file, pre-clamp, from compute_bench. Nothing else can
-    //              be read until these are clear.
-    //   2. MASTER  flat-topping and clipping in what was decoded.
-    //   3. GEN     crest / centroid / flatness / flux.
+    //   1 LEVEL   whole-file, pre-clamp, from compute_bench
+    //   2 MASTER  flat-topping in what was decoded
+    //   3 GEN     crest / centroid / flatness / flux — SUPPRESSED below 80%
+    //             coverage, because a partial window cannot support a claim
+    //             about the take
     //
-    // Every line names the metric and the threshold it crossed, so a reading
-    // can be audited instead of taken on faith, and phrases itself as something
-    // to CHECK rather than something to change — see the header note on why
-    // this meter cannot attribute a measurement to a single setting.
+    // No tier names a parameter to change. The meter measures output; it cannot
+    // attribute a measurement to one setting, and a line that says "lower
+    // cfg_scale" claims exactly that. Every line names the metric and threshold
+    // that fired it, so a reading can be audited rather than believed.
 
     const level = levelFault(bench);
     if (level) return level;
 
-    // -- tier 2: what the master looks like ------------------------------
-    if (m.sat > 0.5) {
+    // -- tier 2: the master ----------------------------------------------
+    if (m.sat > 1.0) {
         return { tier: 2, strong: true,
-                 text: `SAT ${m.sat.toFixed(2)}% (>0.50) — flat-topping, so a limiter is engaging somewhere. Check the master before the model.` };
+                 text: `SAT ${m.sat.toFixed(2)}% (>1.00) — flat-top saturation. Lossless source only; an MP3 reads 0 regardless.` };
     }
     if (m.clip > 0.02) {
         return { tier: 2, strong: true,
-                 text: `CLIP ${m.clip.toFixed(4)}% (>0.0200) — audible clipping in the decoded audio. Fix level before reading the rows above.` };
+                 text: `CLIP ${m.clip.toFixed(4)}% (>0.0200) — clipping in the decoded audio. Check the output stage before the rows above.` };
     }
 
-    // -- tier 3: generation stage ----------------------------------------
-    // With a reference frozen the DELTA is the better signal: an absolute
-    // threshold has to guess where "too bright" starts for music in general,
-    // while a delta only has to notice that THIS take moved — which is the
-    // question you are actually asking when you change one setting and
-    // re-render.
+    // -- tier 3: generation stage, only over enough of the take -----------
+    if (coverage !== null && coverage < 0.8) {
+        return { tier: 3, strong: false, partial: true,
+                 text: `${Math.round(coverage * 100)}% of take measured — play further before reading the rows as the take's figures.` };
+    }
+
+    const over = coverage === null ? "" : ` over ${Math.round(coverage * 100)}% of take`;
+
     if (ref) {
         const rel = relative(m, ref);
         if (rel) return rel;
     }
 
-    // Absolute fallbacks. Every threshold sits outside the range real music
-    // occupied when measured (centroid 1800-7100 Hz, flatness -15..-3 dB,
-    // flux 0.03-0.10), so a line fires only when something is off the scale.
-    if (m.crest < 8 && m.centroid > 3500) {
+    // Absolute fallbacks. Thresholds sit outside the range real music occupied
+    // when measured (centroid 1800-7100 Hz, flatness -15..-3 dB, flux
+    // 0.03-0.10), so a line fires only when something is off the scale.
+    if (m.crest < 6) {
         return { tier: 3, strong: true,
-                 text: `CREST ${m.crest.toFixed(1)} dB (<8.0) with CENTROID ${m.centroid.toFixed(0)} Hz (>3500) — flat and bright. Try a lower cfg_scale and compare.` };
-    }
-    if (m.crest < 8) {
-        return { tier: 3, strong: true,
-                 text: `CREST ${m.crest.toFixed(1)} dB (<8.0) — transients are flat. Rule out limiting or a level fault first, then try cfg_scale.` };
+                 text: `CREST ${m.crest.toFixed(1)} dB${over} (<6.0) — below the 7.7 dB p05 of the reference render. Compare against a frozen take before attributing it to a setting.` };
     }
     if (m.centroid > 8500) {
         return { tier: 3, strong: true,
-                 text: `CENTROID ${m.centroid.toFixed(0)} Hz (>8500) — very bright. Compare against a lower cfg_scale, or a higher APG norm.` };
+                 text: `CENTROID ${m.centroid.toFixed(0)} Hz${over} (>8500) — brighter than any measured material. Compare against a frozen take.` };
     }
     if (m.flatness > -1.5) {
         return { tier: 3, strong: true,
-                 text: `FLATNESS ${m.flatness.toFixed(1)} dB (>-1.5) — approaching white noise. Try lowering temperature.` };
+                 text: `FLATNESS ${m.flatness.toFixed(1)} dB${over} (>-1.5) — approaching white noise. Compare against a frozen take.` };
     }
     if (m.centroid < 1200 && m.flux < 0.04) {
         return { tier: 3, strong: true,
-                 text: `CENTROID ${m.centroid.toFixed(0)} Hz (<1200) and FLUX ${m.flux.toFixed(3)} (<0.040) — dull and static. Try more steps, or adjust shift.` };
+                 text: `CENTROID ${m.centroid.toFixed(0)} Hz (<1200) with FLUX ${m.flux.toFixed(3)} (<0.040)${over} — dull and static. Compare against a frozen take.` };
     }
     if (m.flatness < -20) {
         return { tier: 3, strong: false,
-                 text: `FLATNESS ${m.flatness.toFixed(1)} dB (<-20) — very tonal. Try raising temperature or eta.` };
+                 text: `FLATNESS ${m.flatness.toFixed(1)} dB${over} (<-20) — more tonal than any measured material.` };
     }
 
     if (ref) return { tier: 3, strong: false, text: "tracking REF — no meaningful drift yet" };
@@ -604,15 +701,58 @@ export function suggest(m, ref, bench = null) {
 }
 
 /**
+ * Word-wrap `text` to `maxW`, at most `maxLines` lines.
+ *
+ * The hint lines carry the metric and the threshold that fired them, which is
+ * what makes a reading auditable rather than oracular — and which also made
+ * them roughly three times longer than the one-clause hints they replaced.
+ * They overran the panel and overprinted themselves. Truncating would throw
+ * away the threshold, so they wrap instead and the panel grows to fit.
+ *
+ * Assumes ctx.font is already set: measurement depends on it, and the global
+ * font patch means "9px" is already the scaled size.
+ */
+function wrapText(ctx, text, maxW, maxLines = 3) {
+    const words = text.split(" ");
+    const lines = [];
+    let line = "";
+    for (const w of words) {
+        const next = line ? line + " " + w : w;
+        if (ctx.measureText(next).width <= maxW || !line) {
+            line = next;
+        } else {
+            lines.push(line);
+            line = w;
+            if (lines.length === maxLines) break;
+        }
+    }
+    if (lines.length < maxLines && line) lines.push(line);
+    // A dropped tail is worse than a visible ellipsis: the reader needs to know
+    // the line was cut rather than assume it ended there.
+    if (lines.length === maxLines) {
+        const last = lines[maxLines - 1];
+        const consumed = lines.join(" ");
+        if (consumed.length < text.length) {
+            let t = last;
+            while (t && ctx.measureText(t + " …").width > maxW) {
+                t = t.slice(0, -1);
+            }
+            lines[maxLines - 1] = t + " …";
+        }
+    }
+    return lines;
+}
+
+/**
  * Tier 1 — level and format faults, from the whole-file Python measurement.
  *
- * These CANNOT come from the meter's own rows. The meter measures the decoded
- * WAV, which save_wav already clamped, so a take that overshot full scale looks
+ * These CANNOT come from the meter's own rows. It measures the decoded WAV,
+ * which save_wav already clamped, so a take that overshot full scale looks
  * clean to it: the overshoot is gone and the peak reads 0 dBFS. `bench` is
  * measured before the clamp and is the only place the overshoot survives.
  *
- * Returns null when there is no bench data — a fault that cannot be measured
- * must not be guessed at.
+ * Returns null without bench data — a fault that cannot be measured must not
+ * be guessed at.
  */
 function levelFault(bench) {
     if (!bench) return null;
@@ -621,23 +761,22 @@ function levelFault(bench) {
     const over = bench.over_fs || 0;
 
     if (typeof peak === "number" && peak > 0) {
-        const clamped = over ? `, ${over} samples clamped by the WAV write` : "";
+        const clamped = over ? `, ${over} samples over scale` : "";
         return { tier: 1, strong: true,
-                 text: `PEAK ${peak > 0 ? "+" : ""}${peak.toFixed(2)} dBFS (>0.00)${clamped} — fix output gain before reading anything else on this panel.` };
+                 text: `PEAK ${peak > 0 ? "+" : ""}${peak.toFixed(2)} dBFS (>0.00)${clamped} — fix output gain before reading generation metrics.` };
     }
     if (over > 0) {
         return { tier: 1, strong: true,
-                 text: `${over} samples above full scale, clamped by the WAV write — fix output gain before reading anything else on this panel.` };
+                 text: `${over} samples over full scale, clamped by the WAV write — fix output gain before reading generation metrics.` };
     }
-    if (typeof bench.dc_offset === "number" && Math.abs(bench.dc_offset) > 0.01) {
+    if (typeof bench.dc_offset === "number" && Math.abs(bench.dc_offset) > 0.001) {
         return { tier: 1, strong: true,
-                 text: `DC offset ${bench.dc_offset.toFixed(4)} (>0.0100) — a level fault, not a generation artifact.` };
+                 text: `DC offset ${bench.dc_offset.toFixed(5)} (>0.00100) — check the decode path.` };
     }
-    // Null is mono, which is not a fault. Negative correlation is genuinely
-    // out of phase; a low positive value is merely wide, so the gate sits low.
-    if (typeof bench.lr_corr === "number" && bench.lr_corr < 0) {
+    // Null is mono, which is not a fault.
+    if (typeof bench.lr_corr === "number" && bench.lr_corr < 0.3) {
         return { tier: 1, strong: true,
-                 text: `L/R correlation ${bench.lr_corr.toFixed(3)} (<0) — channels out of phase. Fix this before reading the spectrum rows.` };
+                 text: `L/R correlation ${bench.lr_corr.toFixed(2)} (<0.30) — check mono compatibility.` };
     }
     return null;
 }

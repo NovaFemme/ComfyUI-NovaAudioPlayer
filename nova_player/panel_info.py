@@ -20,9 +20,14 @@ belong somewhere they can be read next to it.
 """
 
 import csv
+import hashlib
 import io
 import json
 from datetime import datetime, timezone
+
+# Bump when a field changes meaning, never when one is appended. A consumer
+# reading a mixed-version log needs to know which rows it can trust.
+SCHEMA_VER = 1
 
 # Matches DB_FLOOR in web/ui/bench-panel.js: values this low are "nothing"
 # rather than a real measurement, and read as a dash.
@@ -51,6 +56,11 @@ CSV_COLUMNS = (
     # audio. Rows measured under different settings are not comparable and
     # nothing in the numbers themselves reveals it.
     "fft_size", "analyser_fps", "analyser_smoothing", "band_edges_hz",
+    # audio_sha256 is the line that retires a whole class of ambiguity. Four
+    # different peak values were once on record for "the same take"; with a
+    # hash, two rows either describe the same bytes or they do not, and no
+    # amount of instrument disagreement can obscure which.
+    "schema_ver", "audio_sha256", "context",
 )
 
 
@@ -144,6 +154,23 @@ def _rows(data):
     return metrics, info
 
 
+def audio_sha256(path):
+    """SHA-256 of the rendered WAV, or None if it cannot be read.
+
+    Of the FILE, deliberately, not of the tensor: it identifies the exact bytes
+    every downstream instrument measured, which is the thing that was in doubt.
+    Streamed rather than slurped — a long take is hundreds of megabytes.
+    """
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
 def _analysis(data):
     """The configuration the figures were produced under.
 
@@ -171,6 +198,9 @@ def _flat(data, generated_at):
     bands = bench.get("bands") or {}
     return {
         **_analysis(data),
+        "schema_ver": SCHEMA_VER,
+        "audio_sha256": data.get("audio_sha256"),
+        "context": data.get("context"),
         "generated_at": generated_at,
         "filename": data.get("filename"),
         "duration_s": data.get("duration"),
@@ -236,6 +266,8 @@ def build_panel_info(data, fmt="json"):
                 ("ANALYSER FPS", a["analyser_fps"]),
                 ("SMOOTHING", a["analyser_smoothing"]),
                 ("BAND EDGES", a["band_edges_hz"] + " Hz"),
+                ("SHA256", (data.get("audio_sha256") or "—")[:16] + "…"
+                           if data.get("audio_sha256") else "—"),
             ]]
             lines += ["", f"generated_at  {generated_at}"]
             return "\n".join(lines)
@@ -243,7 +275,13 @@ def build_panel_info(data, fmt="json"):
         # json (the default, and the fallback for an unrecognised value)
         bands = bench.get("bands") or {}
         return json.dumps({
+            "schema_ver": SCHEMA_VER,
             "generated_at": generated_at,
+            "audio_sha256": data.get("audio_sha256"),
+            # Opaque passthrough: copied verbatim, never parsed. Keeps this
+            # node's signature decoupled from a generator's parameter set,
+            # which will keep changing.
+            "context": data.get("context"),
             "file": {
                 "filename": data.get("filename"),
                 "sample_rate": data.get("sample_rate"),

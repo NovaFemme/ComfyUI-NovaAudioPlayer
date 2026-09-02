@@ -86,8 +86,8 @@ ck("a clean bench lets the generation hint through again",
 ck("an overshoot fires even on otherwise healthy metrics",
    r.healthyFault.tier === 1, r.healthyFault.text);
 ck("DC offset is tier 1", r.dc.tier === 1 && /DC offset/.test(r.dc.text), r.dc.text);
-ck("negative L/R correlation is tier 1",
-   r.phase.tier === 1 && /out of phase/.test(r.phase.text), r.phase.text);
+ck("weak L/R correlation is tier 1",
+   r.phase.tier === 1 && /mono compatibility/.test(r.phase.text), r.phase.text);
 ck("mono is not a fault — null correlation must not fire",
    r.mono.tier !== 1, r.mono.text);
 
@@ -100,6 +100,35 @@ ck("a level fault outranks a reference-relative drift hint",
    r.refDrift.tier === 1, r.refDrift.text);
 ck("without the fault, the drift hint is what shows",
    r.refClean.tier === 3, r.refClean.text);
+
+// -- the coverage gate -------------------------------------------------------
+// A generation-stage claim about "the take" cannot be made from part of it.
+const gate = await p.evaluate(async () => {
+  const { suggest } = await import("/web/renderers/projected_guidance.js");
+  const flat = { crest: 5.9, centroid: 1894, flux: 0.084, flatness: -14.2, clip: 0, sat: 0 };
+  const clean = { peak_db: -1.32, over_fs: 0, dc_offset: 0, lr_corr: 0.803 };
+  const fault = { peak_db: 0.45, over_fs: 87, dc_offset: 0, lr_corr: 0.803 };
+  return {
+    low:   suggest(flat, null, clean, 0.45),
+    high:  suggest(flat, null, clean, 0.95),
+    exact: suggest(flat, null, clean, 0.80),
+    none:  suggest(flat, null, clean, null),
+    faultAtLowCoverage: suggest(flat, null, fault, 0.45),
+  };
+});
+
+ck("below 80% coverage a generation hint is withheld",
+   gate.low.partial === true && !/CREST/.test(gate.low.text), gate.low.text);
+ck("the withheld line says how much was measured",
+   /45% of take/.test(gate.low.text), gate.low.text);
+ck("at 80% the gate opens", !gate.exact.partial && /CREST/.test(gate.exact.text),
+   gate.exact.text);
+ck("above the gate the hint states its coverage",
+   /over 95% of take/.test(gate.high.text), gate.high.text);
+ck("unknown coverage does not block the hint",
+   /CREST/.test(gate.none.text), gate.none.text);
+ck("a LEVEL fault still fires at low coverage — it is whole-file, not windowed",
+   gate.faultAtLowCoverage.tier === 1, gate.faultAtLowCoverage.text);
 
 // -- auditability ------------------------------------------------------------
 const audited = [r.noBench, r.cleanBench, r.satFault, r.clipFault, r.refClean];

@@ -204,7 +204,12 @@ const out = await p.evaluate(async () => {
   return { takeARef, takeAFrames, takeB,
            res, fast, hitOutside, hitFreeze, frozen, cleared,
            seekBefore: before, seekAfter: after, toneRef, noiseNow, bad,
-           refKept: frozen && Object.keys(frozen).length === 6 };
+           // Every metric, plus the coverage the freeze was taken at.
+           // Asserting the KEYS rather than a count: the count changed when
+           // coverage was added and the test failed for the wrong reason.
+           refKept: !!frozen && ["crest", "centroid", "flux", "flatness",
+                                 "clip", "sat", "coverage"]
+                                .every(k => k in frozen) };
 });
 
 console.log("APG meter — metric behaviour on known material\n");

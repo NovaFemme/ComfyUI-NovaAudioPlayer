@@ -133,6 +133,38 @@ row2 = next(csv.reader(io.StringIO(panel_info.build_panel_info(TAKE, "csv_row"))
 ck("csv_row carries the analyser configuration too",
    row2[panel_info.CSV_COLUMNS.index("fft_size")] == "4096",
    row2[panel_info.CSV_COLUMNS.index("fft_size")])
+# ---- provenance -----------------------------------------------------------
+# Four different peak values were once on record for "the same take". A hash
+# ends that: two rows either describe the same bytes or they do not.
+WITH_ID = {**TAKE, "audio_sha256": "a" * 64, "context": '{"seed": 12345}'}
+jj = json.loads(panel_info.build_panel_info(WITH_ID, "json"))
+ck("json carries a schema version", jj["schema_ver"] == panel_info.SCHEMA_VER,
+   str(jj.get("schema_ver")))
+ck("json carries the audio hash", jj["audio_sha256"] == "a" * 64)
+ck("context is passed through verbatim, not parsed",
+   jj["context"] == '{"seed": 12345}', repr(jj["context"]))
+ck("a row without context carries null rather than an empty string",
+   json.loads(panel_info.build_panel_info(TAKE, "json"))["context"] is None)
+
+rowid = next(csv.reader(io.StringIO(panel_info.build_panel_info(WITH_ID, "csv_row"))))
+ck("csv_row carries the hash and context",
+   rowid[panel_info.CSV_COLUMNS.index("audio_sha256")] == "a" * 64
+   and rowid[panel_info.CSV_COLUMNS.index("context")] == '{"seed": 12345}')
+ck("a context containing a comma does not corrupt the row",
+   len(next(csv.reader(io.StringIO(panel_info.build_panel_info(
+       {**TAKE, "context": "seed=1,cfg=2.8"}, "csv_row"))))) == len(panel_info.CSV_COLUMNS))
+
+# audio_sha256() itself: of the FILE, streamed.
+import hashlib, tempfile
+with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tf:
+    tf.write(b"nova" * 5000)
+    tmp_name = tf.name
+ck("audio_sha256 hashes the file's actual bytes",
+   panel_info.audio_sha256(tmp_name) == hashlib.sha256(b"nova" * 5000).hexdigest())
+ck("a missing file yields None rather than raising",
+   panel_info.audio_sha256("/nonexistent/nope.wav") is None)
+os.unlink(tmp_name)
+
 ck("the new columns were APPENDED, not inserted",
    panel_info.CSV_COLUMNS.index("generated_at") == 0
    and panel_info.CSV_COLUMNS.index("hf_outliers") == 21,

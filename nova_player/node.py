@@ -18,7 +18,7 @@ import uuid
 import folder_paths
 
 from .audio_io import build_peaks, compute_bench, compute_lufs, save_wav
-from .panel_info import build_panel_info
+from .panel_info import audio_sha256, build_panel_info
 from .config_manager import manager
 from .peaks_cache import cache_peaks, write_peaks_sidecar
 
@@ -52,11 +52,24 @@ class NovaPlayerNode:
                                "order, for appending to a log.",
                 }),
             },
+            "optional": {
+                # Opaque. Copied into panel_info verbatim and never parsed, so
+                # this node's signature stays decoupled from whatever generator
+                # feeds it — ACE-Step's parameter set will keep changing, and
+                # a typed input would have to change with it.
+                "context": ("STRING", {
+                    "default": "",
+                    "multiline": True,
+                    "tooltip": "Anything you want carried into panel_info "
+                               "alongside the measurements — seed, sampler "
+                               "settings, a run id. Copied verbatim.",
+                }),
+            },
         }
 
     # panel_format defaults here too, so a workflow saved before this widget
     # existed still executes instead of raising on a missing argument.
-    def run(self, audio, panel_format="json"):
+    def run(self, audio, panel_format="json", context=""):
         waveform = audio["waveform"]
         sample_rate = int(audio["sample_rate"])
 
@@ -98,6 +111,9 @@ class NovaPlayerNode:
 
         payload = {
             "filename": filename,
+            # Identifies the exact bytes every downstream instrument measured.
+            "audio_sha256": audio_sha256(filepath),
+            "context": context or None,
             "duration": duration,
             "sample_rate": sample_rate,
             "stereo": stereo,
