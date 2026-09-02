@@ -27,8 +27,8 @@ import os
 from .comfy_types import BUNDLE_SCHEMA_VER, BUNDLE_TYPE, kind_for
 from .context import build_json
 from .naming import build_file_path
-from .params import (ARG, DEFAULTS, KEYS, NON_AUDIO_KEYS, PARAMS, SEED_KEY,
-                     TRIMMED_KEYS)
+from .params import (ARG, DEFAULTS, KEYS, KIND, NON_AUDIO_KEYS, PARAMS,
+                     SEED_KEY, TRIMMED_KEYS)
 from . import presets as preset_store
 from .validate import validate
 
@@ -122,6 +122,9 @@ class MadowInputs:
             env=_env(),
             non_audio=NON_AUDIO_KEYS,
             file_path=file_path,
+            # So a float written by the browser as `4` compares equal to the
+            # widget's 4.0 — see context._as_declared.
+            kinds=KIND,
         )
 
         # Printed as well as returned: a conflict the user does not notice on

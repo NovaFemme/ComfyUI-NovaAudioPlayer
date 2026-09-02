@@ -66,31 +66,64 @@ def hashes(params, seed_key, non_audio=()):
     return _sha(canonical(without_seed)), _sha(canonical(audio))
 
 
-def preset_dirty(params, preset_params, excludes):
+def _as_declared(value, kind):
+    """A value in the type its parameter declares.
+
+    THE BUG THIS FIXES. A preset is written by the browser, and
+    `JSON.stringify(4.0)` is `4` — JavaScript has one number type and drops a
+    trailing `.0`. Python then reads back the integer 4 where the widget holds
+    the float 4.0, and `canonical` renders those two differently on purpose:
+    "4.000000" against 4. So every preset containing a float parameter that
+    happens to sit on a whole number — cfg 4.00, denoise 1.00 — read as dirty
+    the instant it was saved, which made the flag worse than useless: it was
+    reliably wrong in the direction that hides real tweaks in the noise.
+
+    Hashing is left alone. It only ever sees values that came from ComfyUI, so
+    it is internally consistent; this crossing of the JS boundary is the one
+    place the type can change under a value.
+    """
+    try:
+        if kind == "FLOAT":
+            return float(value)
+        if kind == "INT":
+            return int(value)
+        if kind == "BOOLEAN":
+            return bool(value)
+    except (TypeError, ValueError):
+        return value
+    return value
+
+
+def preset_dirty(params, preset_params, excludes, kinds=None):
     """True when the current values differ from the loaded preset.
 
     Without this a preset run and a preset-then-tweaked run are
     indistinguishable in the log, and the tweak-chain analysis depends on
     exactly that distinction.
 
-    Compared through `canonical` so a float round-trip does not register as a
-    tweak — the same reason the hashes use it.
+    `kinds` maps key -> declared ComfyUI type. Passed in rather than imported
+    so this module stays loadable on its own. Without it the comparison is the
+    old one, which is right whenever both sides came from the same place.
     """
     if not preset_params:
         return False
     skip = set(excludes or ())
+    kinds = kinds or {}
     for k, v in preset_params.items():
         if k in skip:
             continue
         if k not in params:
             return True
-        if canonical({k: params[k]}) != canonical({k: v}):
+        kind = kinds.get(k)
+        a = canonical({k: _as_declared(params[k], kind)})
+        b = canonical({k: _as_declared(v, kind)})
+        if a != b:
             return True
     return False
 
 
 def build(params, validation, seed_key, preset_name=None, preset_params=None,
-          excludes=None, env=None, non_audio=(), file_path=None):
+          excludes=None, env=None, non_audio=(), file_path=None, kinds=None):
     """Assemble the context blob. Never raises — see build_json."""
     unseeded, seeded = hashes(params, seed_key, non_audio)
     return {
@@ -100,7 +133,7 @@ def build(params, validation, seed_key, preset_name=None, preset_params=None,
         "params_sha256": unseeded,
         "params_seeded_sha256": seeded,
         "preset_name": preset_name or None,
-        "preset_dirty": preset_dirty(params, preset_params, excludes),
+        "preset_dirty": preset_dirty(params, preset_params, excludes, kinds),
         "params": params,
         # The assembled output path, recorded so a logged row can be matched to
         # the file on disk without re-deriving it and risking a different

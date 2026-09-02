@@ -239,6 +239,20 @@ ck("preset_dirty is false for an untouched preset",
    C.preset_dirty(p1, p1, ["ksampler.seed"]) is False)
 ck("preset_dirty is true after one tweak",
    C.preset_dirty({**p1, "apg.eta": 0.5}, p1, ["ksampler.seed"]) is True)
+
+# THE BUG THIS PINS. The browser writes a preset, and JSON.stringify(4.0) is
+# `4`. Read back, the integer 4 met the widget's float 4.0 and canonical()
+# rendered them differently on purpose — so a preset with cfg 4.00 or denoise
+# 1.00 read as dirty the moment it was saved. NovaFemme's own preset did.
+js_written = {**p1, "ksampler.cfg": 4, "ksampler.denoise": 1}
+widgets    = {**p1, "ksampler.cfg": 4.0, "ksampler.denoise": 1.0}
+ck("a float the browser wrote as an integer is not a tweak",
+   C.preset_dirty(widgets, js_written, ["ksampler.seed"], K.KIND) is False)
+ck("and without the type map the old comparison still applies",
+   C.preset_dirty(widgets, js_written, ["ksampler.seed"]) is True)
+ck("a real change is still caught with the type map",
+   C.preset_dirty({**widgets, "ksampler.cfg": 4.5}, js_written,
+                  ["ksampler.seed"], K.KIND) is True)
 ck("a seed change alone does not mark a preset dirty",
    C.preset_dirty(p2, p1, ["ksampler.seed"]) is False)
 ck("no preset loaded is not 'dirty'",
