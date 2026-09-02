@@ -23,7 +23,7 @@ git clone https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer.git
 No dependencies beyond what ComfyUI already ships. `scipy` is used for accurate
 LUFS if present, and the node falls back to plain RMS if it is not.
 
-Drop the **Nova Player ▶️** node into a workflow and connect any `AUDIO` output.
+Drop the **Nova Player 🔊** node into a workflow and connect any `AUDIO` output.
 
 ---
 
@@ -141,13 +141,13 @@ its settings-panel section all follow automatically.
 
 ---
 
-## Madow Inputs 🎛️
+## Madow Inputs 🎚️
 
 A second node in the pack: every ACE-Step generation parameter in one place,
 with named presets and a `context` output that carries the exact parameters
 into the player's `panel_info`.
 
-- **23 outputs**, namespaced so the two `cfg`-shaped parameters cannot collide
+- **27 parameters**, namespaced so the two `cfg`-shaped parameters cannot collide
   — `ksampler.cfg` is the sampler's, `text.cfg_scale` is the text encoder's.
 - **Presets** as one JSON file each under `presets/`, so they are shareable,
   git-trackable and hand-editable. Loading one writes the real widgets; the
@@ -169,8 +169,8 @@ into the player's `panel_info`.
 ### Two nodes, on purpose
 
 **Madow Inputs** holds the widgets and emits four slots: `madow`, `file_path`,
-`context`, `validation`. **Madow Unpack 🔌** takes the `madow` bundle and fans it
-out into the 27 typed outputs.
+`context`, `validation`. **Madow Unpack ⚪** takes the `madow` bundle and fans it
+out into 28 typed outputs — the 27 parameters plus `file_path`.
 
 The split falls where the data stops being interdependent — the hashes,
 `preset_dirty`, validation and `context` all need every parameter at once, so

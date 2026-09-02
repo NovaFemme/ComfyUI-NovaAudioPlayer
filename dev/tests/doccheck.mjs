@@ -82,5 +82,52 @@ if (table) {
   ck("the README's view table was found", false, "table shape changed — update this check");
 }
 
+// -- Madow's parameter and output counts -------------------------------------
+// The README said "23 outputs" for a release after the four file.* fields
+// landed. The table in madow/params.py is the source of truth for both numbers.
+const paramsPy = read("madow/params.py");
+const KEY_COUNT = (paramsPy.match(/^\s*\("[a-z_]+\.[a-z_0-9]+",/gm) || []).length;
+if (KEY_COUNT > 0) {
+  console.log(`\nMadow counts (params.py declares ${KEY_COUNT})\n`);
+  const readmeText = read("README.md");
+  const params = [...readmeText.matchAll(/\*\*(\d+) parameters\*\*/g)].map(m => +m[1]);
+  const outs = [...readmeText.matchAll(/(\d+) typed outputs/g)].map(m => +m[1]);
+  // An empty match is reported as such rather than passing quietly: a check
+  // that goes green because the README stopped using the phrase is worse than
+  // no check, since it reads as verification.
+  ck("README's parameter count matches params.py",
+     params.every(v => v === KEY_COUNT),
+     params.length ? `README says ${params.join(", ")}` : "(no count stated — check is idle)");
+  // Unpack emits one output per parameter plus the derived file_path.
+  ck("README's output count is parameters + file_path",
+     outs.every(v => v === KEY_COUNT + 1),
+     outs.length ? `README says ${outs.join(", ")}` : "(no count stated — check is idle)");
+}
+
+// -- display names -----------------------------------------------------------
+// The node symbols were changed in the editor and the README kept the old ones
+// for a release and a half. A display name is a string in exactly one place in
+// Python and quoted verbatim in the docs, so drift between them is checkable.
+const NAME_RE = /NODE_DISPLAY_NAME_MAPPINGS\s*=\s*\{([^}]*)\}/s;
+const names = [];
+for (const f of ["nova_player/node.py", "madow/node.py", "madow/unpack.py"]) {
+  const m = read(f).match(NAME_RE);
+  if (!m) continue;
+  for (const nm of m[1].matchAll(/:\s*"([^"]+)"/g)) names.push([f, nm[1]]);
+}
+console.log("\ndisplay names vs the docs\n");
+for (const [f, name] of names) {
+  // The bare name without its symbol, to find the place the docs mention it.
+  const bare = name.replace(/[^\x20-\x7e]/g, "").trim();
+  const readmeText = read("README.md");
+  const mentions = readmeText.includes(bare);
+  if (!mentions) { ck(`README does not name "${bare}"`, true, "(nothing to drift)"); continue; }
+  // Every mention that carries a symbol must carry the CODE's symbol.
+  const re = new RegExp(bare.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*([^\\x00-\\x7f]+)", "g");
+  const wrong = [...readmeText.matchAll(re)].map(m => m[1].trim()).filter(sym => !name.includes(sym));
+  ck(`README's "${bare}" carries the code's symbol`, wrong.length === 0,
+     wrong.length ? `found ${wrong.map(w => `"${w}"`).join(", ")} — ${f} says "${name}"` : name);
+}
+
 console.log(`\n${PASS} passed, ${FAIL} failed`);
 process.exit(FAIL ? 1 : 0);
