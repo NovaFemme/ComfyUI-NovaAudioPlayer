@@ -55,6 +55,10 @@ const r = await p.evaluate(async () => {
     cleanBench: suggest(flatCrest, null, clean),
     healthyFault: suggest(healthy, null, overshoot),
     dc:         suggest(healthy, null, { peak_db: -3, over_fs: 0, dc_offset: 0.05, lr_corr: 0.8 }),
+    // 0.0027 is the WORST of 54 measured ACE-Step takes (median 0.0020). If
+    // this fires, the DC line is alarming on ordinary material and, being
+    // tier 1, is suppressing every generation hypothesis behind it.
+    dcTypical:  suggest(healthy, null, { peak_db: -3, over_fs: 0, dc_offset: 0.0027, lr_corr: 0.8 }),
     phase:      suggest(healthy, null, { peak_db: -3, over_fs: 0, dc_offset: 0, lr_corr: -0.2 }),
     mono:       suggest(healthy, null, { peak_db: -3, over_fs: 0, dc_offset: 0, lr_corr: null }),
     satFault:   suggest({ ...healthy, sat: 21.9 }, null, clean),
@@ -86,6 +90,8 @@ ck("a clean bench lets the generation hint through again",
 ck("an overshoot fires even on otherwise healthy metrics",
    r.healthyFault.tier === 1, r.healthyFault.text);
 ck("DC offset is tier 1", r.dc.tier === 1 && /DC offset/.test(r.dc.text), r.dc.text);
+ck("a decoder's ordinary DC does not fire",
+   !/DC offset/.test(r.dcTypical.text), r.dcTypical.text);
 ck("weak L/R correlation is tier 1",
    r.phase.tier === 1 && /mono compatibility/.test(r.phase.text), r.phase.text);
 ck("mono is not a fault — null correlation must not fire",

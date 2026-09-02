@@ -769,9 +769,23 @@ function levelFault(bench) {
         return { tier: 1, strong: true,
                  text: `${over} samples over full scale, clamped by the WAV write — fix output gain before reading generation metrics.` };
     }
-    if (typeof bench.dc_offset === "number" && Math.abs(bench.dc_offset) > 0.001) {
+    // 0.001 was a guess and it was wrong.  Measured across 54 ACE-Step FLACs
+    // from NovaFemme's own input folder: min 0.00014, median 0.00201, max
+    // 0.00265 -- 44 of 54 above 0.001 and none above 0.005.  A constant
+    // ~0.002 is what this decoder leaves behind, so a line at 0.001 fires on
+    // four takes in five and, being tier 1, blanks out every hypothesis below
+    // it.  An alarm that is always on is not an alarm.
+    //
+    // 0.01 (1% of full scale, about -40 dBFS) is where DC starts costing
+    // audible headroom and where a corpus that tops out at 0.0027 says
+    // something has genuinely changed.  At 0.002 the cost is ~0.001 dB of
+    // headroom and 0.02% of RMS power: real, measurable, and not worth
+    // suppressing the rest of the panel for.  The bench strip's DC row still
+    // shows the number on every take, which is the right place for something
+    // informational.
+    if (typeof bench.dc_offset === "number" && Math.abs(bench.dc_offset) > 0.01) {
         return { tier: 1, strong: true,
-                 text: `DC offset ${bench.dc_offset.toFixed(5)} (>0.00100) — check the decode path.` };
+                 text: `DC offset ${bench.dc_offset.toFixed(5)} (>0.01000) — check the decode path.` };
     }
     // Null is mono, which is not a fault.
     if (typeof bench.lr_corr === "number" && bench.lr_corr < 0.3) {
