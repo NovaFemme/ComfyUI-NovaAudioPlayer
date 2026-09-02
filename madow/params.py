@@ -43,8 +43,18 @@ PARAMS = [
      "linear_quadratic", {}),
     ("ksampler.denoise",     "Sampler", "denoise",              "FLOAT",
      1.00, {"min": 0.0, "max": 1.0, "step": 0.01}),
+    # control_after_generate gives the widget ComfyUI's own fixed / increment /
+    # decrement / randomize control, the same one KSampler and ACE-Step's text
+    # encoder carry. Left plain, a seed has to be typed by hand for every run,
+    # which is the difference between sweeping a setting and not bothering.
+    #
+    # It changes the WIDGET, never the value: the seed that reaches the bundle,
+    # the hashes and `context` is whatever the widget holds when the graph
+    # runs. That is the point -- a randomised seed is recorded as the number it
+    # actually was, so a take can be reproduced by setting the control to fixed
+    # and typing it back.
     ("ksampler.seed",        "Sampler", "seed",                 "INT",
-     0, {"min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
+     0, {"min": 0, "max": 0xFFFFFFFFFFFFFFFF, "control_after_generate": True}),
 
     # -- caption / musical -------------------------------------------------
     ("caption.prompt",       "Text",    "prompt",               "STRING",
