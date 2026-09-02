@@ -25,7 +25,9 @@ WHAT THIS NODE DOES NOT DO — and both are deliberate:
 import os
 
 from .context import build_json
-from .params import ARG, DEFAULTS, KEYS, KIND, OUTPUT_NAMES, PARAMS, SEED_KEY
+from .naming import build_file_path
+from .params import (ARG, DEFAULTS, KEYS, KIND, NON_AUDIO_KEYS, OUTPUT_NAMES,
+                     PARAMS, SEED_KEY)
 from . import presets as preset_store
 from .validate import validate
 
@@ -61,8 +63,11 @@ class MadowInputs:
                    "named presets, cross-field validation, and a `context` "
                    "blob that carries the exact parameters into panel_info.")
 
-    RETURN_TYPES = tuple(_kind(k) for k in KEYS) + ("STRING", "STRING")
-    RETURN_NAMES = OUTPUT_NAMES + ("context", "validation")
+    # file_path is derived rather than a widget, so it is appended here and
+    # has no entry in the parameter table — the parts and the whole cannot
+    # disagree if only the parts are stored.
+    RETURN_TYPES = tuple(_kind(k) for k in KEYS) + ("STRING", "STRING", "STRING")
+    RETURN_NAMES = OUTPUT_NAMES + ("file_path", "context", "validation")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -110,12 +115,21 @@ class MadowInputs:
 
         loaded = preset_store.load(preset_name) if preset_name else None
 
+        file_path = build_file_path(
+            prefix=params.get("file.prefix"),
+            name=params.get("file.name"),
+            folder=params.get("file.folder"),
+            separator=params.get("file.separator"),
+        )
+
         context = build_json(
             params, warnings, SEED_KEY,
             preset_name=preset_name or None,
             preset_params=(loaded or {}).get("params"),
             excludes=(loaded or {}).get("excludes"),
             env=_env(),
+            non_audio=NON_AUDIO_KEYS,
+            file_path=file_path,
         )
 
         # Printed as well as returned: a conflict the user does not notice on
@@ -125,7 +139,7 @@ class MadowInputs:
 
         validation = "\n".join(warnings) if warnings else "no conflicts found"
 
-        return tuple(params[k] for k in KEYS) + (context, validation) 
+        return tuple(params[k] for k in KEYS) + (file_path, context, validation)
 
 
 def _env():

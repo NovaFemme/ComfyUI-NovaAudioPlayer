@@ -76,11 +76,38 @@ PARAMS = [
      0.0, {"min": 0.0, "max": 1.0, "step": 0.01}),
     ("lm.generate_audio_codes", "Text", "generate_audio_codes", "BOOLEAN",
      True, {}),
+
+    # -- output naming -----------------------------------------------------
+    # Last, so they sit at the bottom of the widget stack immediately above the
+    # preset row. `file_path` is not here: it is DERIVED from these four (see
+    # naming.py), and storing a computed value beside its parts is how the two
+    # end up disagreeing.
+    ("file.prefix",          "File",    "file_prefix",          "STRING",
+     "", {}),
+    ("file.name",            "File",    "file_name",            "STRING",
+     "", {}),
+    ("file.folder",          "File",    "file_folder",          "STRING",
+     "", {}),
+    ("file.separator",       "File",    "file_separator",       "STRING",
+     "_", {}),
 ]
 
 # Excluded from `params_sha256` so runs differing only by seed group together —
 # that grouping IS the seed-noise-floor query (spec 4).
 SEED_KEY = "ksampler.seed"
+
+# Parameters that do not change the AUDIO, and so must not change either hash.
+#
+# Where a file lands has no effect on what was generated. Hashing it would make
+# two identical renders saved under different names look like different
+# parameter sets, which breaks the grouping the log exists to support — the
+# same failure the seed exclusion avoids, arriving from the other direction.
+#
+# They ARE carried in context.params and saved in presets: a preset can
+# reasonably own a naming scheme, and the log should record where the file went.
+NON_AUDIO_KEYS = frozenset({
+    "file.prefix", "file.name", "file.folder", "file.separator",
+})
 
 # What a preset does not set unless told otherwise: loading one must never
 # clobber a seed the user is deliberately holding (spec 2).

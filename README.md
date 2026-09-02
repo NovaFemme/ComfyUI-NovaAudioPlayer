@@ -158,6 +158,14 @@ into the player's `panel_info`.
 - **`context`** carries both a seed-excluded and a seed-included hash: the first
   groups runs that differ only by seed, which is the seed-noise-floor question.
 
+- **Output naming**: `file_prefix`, `file_name`, `file_folder` and
+  `file_separator` are outputs in their own right, plus a derived `file_path`
+  that assembles them as `folder/prefix<separator>name`. Empty fields collapse,
+  so nothing carries a dangling separator or a leading slash. The naming fields
+  are saved in presets but excluded from both hashes — renaming a file does not
+  change the audio, and hashing it would split two identical renders into
+  different groups.
+
 Wire `context` into the player's optional `context` input and every measured
 take records what produced it.
 

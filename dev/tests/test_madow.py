@@ -33,6 +33,7 @@ params_mod = _load("madow_params", "madow/params.py")
 validate_mod = _load("madow_validate", "madow/validate.py")
 context_mod = _load("madow_context", "madow/context.py")
 presets_mod = _load("madow_presets", "madow/presets.py")
+naming_mod = _load("madow_naming", "madow/naming.py")
 
 PASS = FAIL = 0
 
@@ -51,7 +52,11 @@ print("MadowInputs\n")
 
 # ---- the parameter table --------------------------------------------------
 K = params_mod
-ck("23 parameters, as specified", len(K.PARAMS) == 23, str(len(K.PARAMS)))
+ck("27 parameters: 23 generation plus 4 naming",
+   len(K.PARAMS) == 27, str(len(K.PARAMS)))
+ck("the naming fields are last, above the preset row",
+   [k for k in K.KEYS[-4:]] == ["file.prefix", "file.name", "file.folder",
+                                "file.separator"], str(K.KEYS[-4:]))
 ck("no duplicate keys", len(set(K.KEYS)) == len(K.KEYS))
 ck("no duplicate output names",
    len(set(K.OUTPUT_NAMES)) == len(K.OUTPUT_NAMES))
@@ -69,6 +74,47 @@ ck("the widget-name mapping is unique — no two keys collide",
    str([a for a in K.ARG.values() if list(K.ARG.values()).count(a) > 1]))
 ck("seed is excluded from presets by default",
    K.DEFAULT_EXCLUDES == [K.SEED_KEY], str(K.DEFAULT_EXCLUDES))
+
+# ---- output path assembly -------------------------------------------------
+# file_path is DERIVED, never stored, so the parts and the whole cannot drift.
+N = naming_mod
+bp = N.build_file_path
+ck("the assembled path is folder/prefix<sep>name",
+   bp("NOVA", "take01", "ace_step", "_") == "ace_step/NOVA_take01",
+   bp("NOVA", "take01", "ace_step", "_"))
+
+# Empty fields must collapse, not leave their punctuation behind. A dangling
+# "NOVA_" or a leading "/" survives into a hundred filenames before anyone
+# looks closely.
+ck("an empty prefix leaves no leading separator",
+   bp("", "take01", "ace_step", "_") == "ace_step/take01",
+   bp("", "take01", "ace_step", "_"))
+ck("an empty name leaves no trailing separator",
+   bp("NOVA", "", "ace_step", "_") == "ace_step/NOVA",
+   bp("NOVA", "", "ace_step", "_"))
+ck("an empty folder leaves no leading slash",
+   bp("NOVA", "take01", "", "_") == "NOVA_take01",
+   bp("NOVA", "take01", "", "_"))
+ck("everything empty yields an empty string, not punctuation",
+   bp("", "", "", "_") == "", repr(bp("", "", "", "_")))
+
+ck("a folder typed with slashes does not double them",
+   bp("NOVA", "take01", "/ace_step/", "_") == "ace_step/NOVA_take01",
+   bp("NOVA", "take01", "/ace_step/", "_"))
+ck("backslashes are normalised to forward slashes",
+   bp("NOVA", "take01", "a\\b", "_") == "a/b/NOVA_take01",
+   bp("NOVA", "take01", "a\\b", "_"))
+ck("an empty separator simply concatenates",
+   bp("NOVA", "take01", "", "") == "NOVAtake01",
+   bp("NOVA", "take01", "", ""))
+# A space is a legitimate separator; stripping it would turn "a b" into "ab".
+ck("a space separator is preserved, not stripped",
+   bp("NOVA", "take01", "", " ") == "NOVA take01",
+   repr(bp("NOVA", "take01", "", " ")))
+ck("surrounding whitespace on the fields is trimmed",
+   bp("  NOVA ", " take01 ", " ace_step ", "_") == "ace_step/NOVA_take01")
+ck("None is treated as empty, not as the string 'None'",
+   bp(None, "take01", None, "_") == "take01", bp(None, "take01", None, "_"))
 
 # ---- validation -----------------------------------------------------------
 V = validate_mod
@@ -167,6 +213,34 @@ ck("a seed change alone does not mark a preset dirty",
    C.preset_dirty(p2, p1, ["ksampler.seed"]) is False)
 ck("no preset loaded is not 'dirty'",
    C.preset_dirty(p1, None, []) is False)
+
+# Naming must not touch either hash: renaming a file does not change the audio,
+# and hashing it would split two identical renders into different groups —
+# the same failure the seed exclusion avoids, arriving from the other side.
+named = {**p1, "file.prefix": "NOVA", "file.name": "take01",
+         "file.folder": "out", "file.separator": "_"}
+renamed = {**named, "file.prefix": "OTHER", "file.name": "take99",
+           "file.folder": "elsewhere"}
+hn = C.hashes(named, "ksampler.seed", K.NON_AUDIO_KEYS)
+hr = C.hashes(renamed, "ksampler.seed", K.NON_AUDIO_KEYS)
+ck("renaming the output does not change params_sha256", hn[0] == hr[0])
+ck("renaming the output does not change params_seeded_sha256", hn[1] == hr[1])
+ck("a real parameter change still moves the hash",
+   C.hashes({**named, "apg.eta": 0.9}, "ksampler.seed", K.NON_AUDIO_KEYS)[0] != hn[0])
+ck("the naming fields are still IN context.params — excluded from the hash, "
+   "not from the record",
+   all(k in json.loads(C.build_json(named, [], "ksampler.seed",
+                                    non_audio=K.NON_AUDIO_KEYS))["params"]
+       for k in K.NON_AUDIO_KEYS))
+ck("context records the assembled file_path",
+   json.loads(C.build_json(named, [], "ksampler.seed",
+                           non_audio=K.NON_AUDIO_KEYS,
+                           file_path="out/NOVA_take01"))["file_path"]
+   == "out/NOVA_take01")
+ck("context states which keys were excluded from hashing",
+   json.loads(C.build_json(named, [], "ksampler.seed",
+                           non_audio=K.NON_AUDIO_KEYS))["hash_excludes"]
+   == sorted(K.NON_AUDIO_KEYS))
 
 blob = json.loads(C.build_json(p1, ["a warning"], "ksampler.seed",
                                preset_name="hm", preset_params=p1,

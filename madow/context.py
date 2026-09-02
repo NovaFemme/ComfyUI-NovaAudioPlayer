@@ -51,10 +51,19 @@ def _sha(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def hashes(params, seed_key):
-    """(params_sha256, params_seeded_sha256) — seed excluded, then included."""
-    without = {k: v for k, v in params.items() if k != seed_key}
-    return _sha(canonical(without)), _sha(canonical(params))
+def hashes(params, seed_key, non_audio=()):
+    """(params_sha256, params_seeded_sha256).
+
+    `non_audio` names parameters that do not affect the generated audio — the
+    output naming fields — and they are dropped from BOTH hashes. Renaming a
+    file must not make an identical render look like a different configuration.
+    The seed is dropped from the first hash only, which is what makes runs
+    differing solely by seed group together.
+    """
+    skip = set(non_audio)
+    audio = {k: v for k, v in params.items() if k not in skip}
+    without_seed = {k: v for k, v in audio.items() if k != seed_key}
+    return _sha(canonical(without_seed)), _sha(canonical(audio))
 
 
 def preset_dirty(params, preset_params, excludes):
@@ -81,9 +90,9 @@ def preset_dirty(params, preset_params, excludes):
 
 
 def build(params, validation, seed_key, preset_name=None, preset_params=None,
-          excludes=None, env=None):
+          excludes=None, env=None, non_audio=(), file_path=None):
     """Assemble the context blob. Never raises — see build_json."""
-    unseeded, seeded = hashes(params, seed_key)
+    unseeded, seeded = hashes(params, seed_key, non_audio)
     return {
         "schema_ver": SCHEMA_VER,
         "emitter": EMITTER,
@@ -93,6 +102,11 @@ def build(params, validation, seed_key, preset_name=None, preset_params=None,
         "preset_name": preset_name or None,
         "preset_dirty": preset_dirty(params, preset_params, excludes),
         "params": params,
+        # The assembled output path, recorded so a logged row can be matched to
+        # the file on disk without re-deriving it and risking a different
+        # answer. Excluded from the hashes above, deliberately.
+        "file_path": file_path,
+        "hash_excludes": sorted(set(non_audio)),
         "validation": list(validation or ()),
         "env": env or {},
     }
