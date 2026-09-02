@@ -55,12 +55,16 @@ PARAMS = [
      120, {"min": 1, "max": 400}),
     ("music.duration",       "Text",    "duration",             "FLOAT",
      120.0, {"min": 1.0, "max": 3600.0, "step": 0.1}),
-    ("music.timesignature",  "Text",    "timesignature",        "INT",
-     4, {"min": 1, "max": 32}),
-    ("music.language",       "Text",    "language",             "STRING",
-     "english", {}),
-    ("music.keyscale",       "Text",    "keyscale",             "STRING",
-     "", {}),
+    # These three are ACE-Step's own combo domains, not free text. The encoder
+    # holds them as lists, so a STRING would neither connect to it nor carry a
+    # value it accepts: it wants the string "4", the code "en", and one of its
+    # 34 key names -- never 4, "english" or "". See comfy_types.ace_combo.
+    ("music.timesignature",  "Text",    "timesignature",        "TIMESIGNATURES",
+     "4", {}),
+    ("music.language",       "Text",    "language",             "LANGUAGES",
+     "en", {}),
+    ("music.keyscale",       "Text",    "keyscale",             "KEYSCALES",
+     "E minor", {}),
 
     # -- text encoder / language model ------------------------------------
     # NOT the KSampler cfg. Two cfg-shaped parameters, different stages.

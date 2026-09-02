@@ -153,6 +153,14 @@ into the player's `panel_info`.
   git-trackable and hand-editable. Loading one writes the real widgets; the
   backend never substitutes values, or the saved workflow would record a preset
   name without recording what actually ran.
+- **ACE-Step's own domains** for `timesignature`, `language` and `keyscale`.
+  Those three are combo inputs on `ACEStep15XLTextEncode`, so they are combo
+  widgets here too, with the option lists read from that node when it is
+  installed. Typed as plain strings they would not connect to it, and the
+  values a human writes — `4`, `english`, an empty key — are not values it
+  accepts. Presets written before this are migrated on load (`4` → `"4"`,
+  `english` → `en`) and anything unreadable falls back to the default with a
+  note rather than silently.
 - **Cross-field validation**, warn-only. A caption saying `98 BPM` against a bpm
   widget of 122 is a live conflict ACE-Step reads both sides of.
 - **`context`** carries both a seed-excluded and a seed-included hash: the first

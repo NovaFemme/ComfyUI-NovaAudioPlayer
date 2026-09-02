@@ -14,6 +14,9 @@ import os
 import re
 from datetime import datetime, timezone
 
+from .comfy_types import kind_for
+from .params import DEFAULTS, KEYS
+
 SCHEMA_VER = 1
 
 # Conservative on purpose. A preset name becomes a filename, and the set of
@@ -78,6 +81,75 @@ def list_presets():
     return out
 
 
+# Presets written before `timesignature`, `language` and `keyscale` became
+# combo parameters hold values ACE-Step's encoder will not accept: the integer
+# 4, the word "english", an empty key. They are still perfectly good presets,
+# so they are migrated on read rather than rejected -- but only where the
+# intent is unambiguous.
+#
+# Full English names are mapped because that is what a human writes, and
+# because a preset saying "english" plainly meant `en`. Anything else falls
+# back to the parameter default and says so: a preset carrying a value the
+# encoder would refuse is not worth preserving faithfully.
+_LANGUAGE_ALIASES = {
+    "english": "en", "japanese": "ja", "chinese": "zh", "mandarin": "zh",
+    "spanish": "es", "german": "de", "french": "fr", "portuguese": "pt",
+    "russian": "ru", "italian": "it", "dutch": "nl", "polish": "pl",
+    "turkish": "tr", "vietnamese": "vi", "czech": "cs", "persian": "fa",
+    "farsi": "fa", "indonesian": "id", "korean": "ko", "ukrainian": "uk",
+    "hungarian": "hu", "arabic": "ar", "swedish": "sv", "romanian": "ro",
+    "greek": "el",
+}
+
+
+def _coerce_one(key, value):
+    """(value, note) — a value inside the parameter's combo domain."""
+    options = kind_for(key)
+    if not isinstance(options, list):
+        return value, None
+    if isinstance(value, str) and value in options:
+        return value, None
+
+    # The integer 4 and the string "4" are the same time signature.
+    text = str(value).strip()
+    if text in options:
+        return text, f"{key}: {value!r} -> {text!r}"
+
+    lowered = text.lower()
+    alias = _LANGUAGE_ALIASES.get(lowered)
+    if alias and alias in options:
+        return alias, f"{key}: {value!r} -> {alias!r}"
+
+    # Case and spacing only, for key names: "d minor" is D minor.
+    squashed = lowered.replace(" ", "")
+    for opt in options:
+        if opt.lower().replace(" ", "") == squashed:
+            return opt, f"{key}: {value!r} -> {opt!r}"
+
+    fallback = DEFAULTS[key]
+    return fallback, (f"{key}: {value!r} is not one of ACE-Step's options "
+                      f"— using {fallback!r}")
+
+
+def coerce(params):
+    """(params, notes) with every combo parameter inside its domain.
+
+    Returns a NEW dict; the caller's is not mutated, because the same preset
+    body is compared against the widgets for `preset_dirty` and quietly
+    rewriting it under the comparison would make a clean preset look dirty.
+    """
+    out = dict(params or {})
+    notes = []
+    for key in KEYS:
+        if key not in out:
+            continue
+        value, note = _coerce_one(key, out[key])
+        out[key] = value
+        if note:
+            notes.append(note)
+    return out, notes
+
+
 def load(name):
     """Full preset JSON, or None. Read fresh every time, never cached.
 
@@ -89,7 +161,14 @@ def load(name):
         return None
     try:
         with open(p, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        if isinstance(data.get("params"), dict):
+            data["params"], notes = coerce(data["params"])
+            if notes:
+                data["coerced"] = notes
+                print(f"[MadowInputs] preset '{name}' migrated: "
+                      + "; ".join(notes))
+        return data
     except Exception as exc:                                  # noqa: BLE001
         print(f"[MadowInputs] preset '{name}' is unreadable: {exc}")
         return None

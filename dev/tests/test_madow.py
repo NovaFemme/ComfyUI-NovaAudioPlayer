@@ -32,7 +32,6 @@ def _load(name, rel):
 params_mod = _load("madow_params", "madow/params.py")
 validate_mod = _load("madow_validate", "madow/validate.py")
 context_mod = _load("madow_context", "madow/context.py")
-presets_mod = _load("madow_presets", "madow/presets.py")
 naming_mod = _load("madow_naming", "madow/naming.py")
 
 
@@ -286,7 +285,10 @@ ck("context never raises, even on unserialisable input",
    isinstance(C.build_json({"x": object()}, [], "ksampler.seed"), str))
 
 # ---- presets --------------------------------------------------------------
-P = presets_mod
+# presets.py imports comfy_types to learn ACE-Step's combo domains, so it has
+# to come through the package rather than by file path.
+_load_pkg()
+P = importlib.import_module("madow.presets")
 tmp = tempfile.mkdtemp()
 P.PRESET_DIR = tmp
 try:
@@ -430,6 +432,52 @@ ck("only the free-text fields are trimmed",
    K.TRIMMED_KEYS == {"caption.prompt", "caption.lyrics"}, str(sorted(K.TRIMMED_KEYS)))
 ck("the file separator is NOT trimmed — a space is a legitimate separator",
    "file.separator" not in K.TRIMMED_KEYS)
+
+# ---- ACE-Step's combo domains ---------------------------------------------
+# THE BUG THIS PINS. timesignature, language and keyscale are combo inputs on
+# ACEStep15XLTextEncode. Typed as INT/STRING/STRING they would not connect to
+# it at all, and the values Madow held -- 4, "english", "" -- are not values
+# that encoder accepts even if they had.
+CT = importlib.import_module("madow.comfy_types")
+
+for key, must_hold in [("music.timesignature", "4"),
+                       ("music.language", "en"),
+                       ("music.keyscale", "E minor")]:
+    opts = CT.kind_for(key)
+    ck(f"{key} resolves to a combo list", isinstance(opts, list),
+       type(opts).__name__)
+    ck(f"{key}'s default is inside its own domain",
+       K.DEFAULTS[key] in opts, repr(K.DEFAULTS[key]))
+    ck(f"{key} offers {must_hold!r}", must_hold in opts)
+
+ck("the time signature is the STRING \"4\", not the integer 4",
+   K.DEFAULTS["music.timesignature"] == "4",
+   repr(K.DEFAULTS["music.timesignature"]))
+
+# ---- migrating presets written before that ---------------------------------
+old_preset = {"music.timesignature": 4, "music.language": "english",
+              "music.keyscale": "D minor", "ksampler.cfg": 2.8}
+migrated, notes = P.coerce(old_preset)
+ck("an integer time signature becomes its combo string",
+   migrated["music.timesignature"] == "4", repr(migrated["music.timesignature"]))
+ck("'english' becomes the code the encoder wants",
+   migrated["music.language"] == "en", repr(migrated["music.language"]))
+ck("a key that was already valid is left alone",
+   migrated["music.keyscale"] == "D minor")
+ck("a non-combo parameter is untouched", migrated["ksampler.cfg"] == 2.8)
+ck("every migration is reported, not silent", len(notes) == 2, "; ".join(notes))
+ck("coerce does not mutate the caller's dict",
+   old_preset["music.language"] == "english")
+
+junk, junk_notes = P.coerce({"music.keyscale": "", "music.language": "klingon"})
+ck("a value with no sane reading falls back to the default",
+   junk["music.keyscale"] == K.DEFAULTS["music.keyscale"] and
+   junk["music.language"] == K.DEFAULTS["music.language"])
+ck("and the fallback says so rather than passing quietly",
+   all("not one of" in n for n in junk_notes), "; ".join(junk_notes))
+
+ck("case and spacing alone are not a fallback",
+   P.coerce({"music.keyscale": "d  minor"})[0]["music.keyscale"] == "D minor")
 
 ck("context is still emitted by the node that has every parameter",
    json.loads(ctx_json)["params"].keys() == bundle["params"].keys())
