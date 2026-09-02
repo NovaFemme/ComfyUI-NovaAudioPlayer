@@ -64,6 +64,19 @@ import {
 // never disagree about what counts as clipped.
 import { CLIP_THRESHOLD as CLIP_LEVEL } from "../core/audio-engine.js";
 
+// Two integration windows are treated as comparable when their coverage of the
+// take agrees to within this. Used by BOTH the delta column and the hypothesis
+// line: the panel said "deltas not comparable" in its header while the hint
+// underneath drew a conclusion from those same deltas, which is worse than
+// either behaviour on its own.
+export const COVERAGE_TOL = 0.05;
+
+/** Do a reference and the current window cover comparable amounts of the take? */
+function comparable(ref, coverage) {
+    return !(ref && ref.coverage != null && coverage != null &&
+             Math.abs(coverage - ref.coverage) > COVERAGE_TOL);
+}
+
 // Below this frame RMS the material is treated as silence and left out of the
 // integrated figures.
 const SILENCE_RMS = 0.002;
@@ -453,8 +466,7 @@ export default {
             // labelled rather than hidden: the numbers are still real, they
             // just are not comparable yet, and saying so is more use than
             // removing them.
-            const covMismatch = ref && ref.coverage != null && cov != null &&
-                                Math.abs(cov - ref.coverage) > 0.05;
+            const covMismatch = !comparable(ref, cov);
             ctx.font = "9px ui-monospace, monospace";
             ctx.textAlign = "left";
             ctx.fillStyle = palette.get(
@@ -667,7 +679,14 @@ export function suggest(m, ref, bench = null, coverage = null) {
 
     const over = coverage === null ? "" : ` over ${Math.round(coverage * 100)}% of take`;
 
-    if (ref) {
+    // A drift claim is a claim about two windows. When they cover different
+    // amounts of the take, the difference between them is not a measurement of
+    // anything, so neither `relative()` nor the "tracking REF" line below is
+    // allowed to speak -- the panel already greys the delta column for exactly
+    // this reason and the two must agree.
+    const refUsable = ref && comparable(ref, coverage);
+
+    if (refUsable) {
         const rel = relative(m, ref);
         if (rel) return rel;
     }
@@ -696,7 +715,12 @@ export function suggest(m, ref, bench = null, coverage = null) {
                  text: `FLATNESS ${m.flatness.toFixed(1)} dB${over} (<-20) — more tonal than any measured material.` };
     }
 
-    if (ref) return { tier: 3, strong: false, text: "tracking REF — no meaningful drift yet" };
+    if (refUsable) return { tier: 3, strong: false, text: "tracking REF — no meaningful drift yet" };
+    if (ref) {
+        return { tier: 3, strong: false, partial: true,
+                 text: `REF covers ${Math.round(ref.coverage * 100)}% against ` +
+                       `${Math.round(coverage * 100)}% here — freeze again to compare.` };
+    }
     return { tier: 3, strong: false, text: "no strong artifact signature" };
 }
 

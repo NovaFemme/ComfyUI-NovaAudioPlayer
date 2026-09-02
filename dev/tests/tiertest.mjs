@@ -59,6 +59,11 @@ const r = await p.evaluate(async () => {
     // this fires, the DC line is alarming on ordinary material and, being
     // tier 1, is suppressing every generation hypothesis behind it.
     dcTypical:  suggest(healthy, null, { peak_db: -3, over_fs: 0, dc_offset: 0.0027, lr_corr: 0.8 }),
+    // A reference frozen over half the take, read against a near-complete one.
+    // The panel greys this delta column and says so in its header; the hint
+    // line must not then draw a conclusion from the same numbers.
+    refMismatch: suggest(healthy, { ...healthy, crest: 13.0, coverage: 0.50 }, clean, 0.98),
+    refMatched:  suggest(healthy, { ...healthy, coverage: 0.96 }, clean, 0.98),
     phase:      suggest(healthy, null, { peak_db: -3, over_fs: 0, dc_offset: 0, lr_corr: -0.2 }),
     mono:       suggest(healthy, null, { peak_db: -3, over_fs: 0, dc_offset: 0, lr_corr: null }),
     satFault:   suggest({ ...healthy, sat: 21.9 }, null, clean),
@@ -92,6 +97,11 @@ ck("an overshoot fires even on otherwise healthy metrics",
 ck("DC offset is tier 1", r.dc.tier === 1 && /DC offset/.test(r.dc.text), r.dc.text);
 ck("a decoder's ordinary DC does not fire",
    !/DC offset/.test(r.dcTypical.text), r.dcTypical.text);
+ck("no drift claim across mismatched windows",
+   r.refMismatch.partial === true && /freeze again/.test(r.refMismatch.text),
+   r.refMismatch.text);
+ck("comparable windows still compare",
+   /tracking REF/.test(r.refMatched.text), r.refMatched.text);
 ck("weak L/R correlation is tier 1",
    r.phase.tier === 1 && /mono compatibility/.test(r.phase.text), r.phase.text);
 ck("mono is not a fault — null correlation must not fire",
