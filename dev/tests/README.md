@@ -47,6 +47,7 @@ that already holds that colour makes them fail for no reason:
 | `perfprobe.mjs` | Not a test — measures where the spectrum renderer's frame time goes |
 | `tooltiptest.mjs` | Control hints: wording, the rest delay, and that they never escape the node |
 | `test_panel_info.py` | The `panel_info` output mirrors the bench strip, in all three formats |
+| `doccheck.mjs` | Every documented visualiser count matches `registry.js` (no browser needed) |
 
 ## calibrate.mjs
 

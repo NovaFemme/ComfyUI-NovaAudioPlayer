@@ -8,7 +8,7 @@ NovaConfigManager, so the whole UI can be exercised without ComfyUI running.
     python3 dev/devserver.py          # from anywhere; paths are self-locating
     -> http://127.0.0.1:8731/dev/harness.html
 
-The harness feeds every renderer a synthetic signal, so all five views work
+The harness feeds every renderer a synthetic signal, so every view works
 without an audio file. `folder_paths` is stubbed in dev/stubs/ because it only
 exists inside a ComfyUI process.
 """

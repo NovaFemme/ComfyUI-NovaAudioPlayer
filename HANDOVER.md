@@ -73,7 +73,10 @@ Two gotchas that have caused false failures more than once:
 - **`zoomtest.mjs` prints two blocks.** The first deliberately restores the old
   broken pointer mapping to demonstrate the bug — its failures are expected.
 
-Run `node dev/lint-templates.mjs` after touching any inline stylesheet.
+Run `node dev/lint-templates.mjs` after touching any inline stylesheet, and
+`node dev/tests/doccheck.mjs` after adding or removing a renderer — it fails
+until every documented count matches `registry.js`. Both are instant and need
+neither a browser nor the devserver.
 
 ---
 
