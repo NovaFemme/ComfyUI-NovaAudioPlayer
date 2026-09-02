@@ -274,10 +274,10 @@ DEFAULT_SYSTEM_CONFIG = {
         "show_tooltips": True,
     },
     "audio_engine": {
-        "supported_formats": ["wav", "mp3", "flac", "ogg", "opus", "m4a", "webm"],
+        # What soundfile can write. The lossy formats needed ffmpeg through a
+        # subprocess, which the registry's scanner would not have.
+        "supported_formats": ["wav", "flac", "ogg"],
         "default_format": "wav",
-        "default_bitrate_kbps": 192,
-        "bitrate_options_kbps": [128, 192, 320],
         "fft_size": 4096,
         "smoothing_time_constant": 0.6,
         "analyser_fps": 30,
@@ -336,10 +336,5 @@ DEFAULT_SYSTEM_CONFIG = {
             "spectrogramWidth": 0.28,
             "spectrumWidth": 0.52,
         },
-    },
-    "encoder_settings": {
-        "lame_quality": 2,
-        "enable_vbr": False,
-        "temp_cleanup_on_finish": True,
     },
 }

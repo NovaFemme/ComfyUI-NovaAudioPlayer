@@ -25,9 +25,11 @@ async function fetchFormat(filename, fmt, extraQuery = "") {
     return resp.arrayBuffer();
 }
 
+// The three formats soundfile can write. mp3, m4a, opus and webm needed
+// ffmpeg, and the subprocess call that reached it was removed for the registry
+// — see nova_player/routes.py for the whole story.
 const MIME = {
-    wav: "audio/wav", mp3: "audio/mpeg", flac: "audio/flac",
-    ogg: "audio/ogg", opus: "audio/ogg", m4a: "audio/mp4", webm: "audio/webm",
+    wav: "audio/wav", flac: "audio/flac", ogg: "audio/ogg",
 };
 
 export function closeDownloadMenu() {
@@ -118,14 +120,7 @@ export function showDownloadMenu(filename, palette, clientX, clientY) {
     asyncItem("Download FLAC", "flac");
 
     addSeparator("Lossy");
-    for (const kbps of [128, 192, 320]) {
-        asyncItem(`Download MP3 (${kbps}kbps)`, "mp3", `&bitrate=${kbps}`,
-                  `audio_output_${kbps}k.mp3`);
-    }
     asyncItem("Download OGG (Vorbis)", "ogg");
-    asyncItem("Download Opus", "opus");
-    asyncItem("Download M4A (AAC)", "m4a");
-    asyncItem("Download WebM (Opus)", "webm");
 
     document.body.appendChild(menu);
 

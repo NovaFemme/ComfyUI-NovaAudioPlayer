@@ -9,7 +9,7 @@ Here the import guard is narrow and each handler fails with a real status code.
 Route map (all under the /nova_player/ namespace the node already owns):
 
     GET  /nova_player/peaks/{filename}          waveform peak data
-    GET  /nova_player/audio/{filename}?fmt=...  original or transcoded audio
+    GET  /nova_player/audio/{filename}?fmt=...  original or converted audio
     GET  /nova_player/flac/{filename}           legacy redirect -> audio?fmt=flac
     GET  /nova_player/config                    full config snapshot
     GET  /nova_player/config/version            cheap change poll
@@ -23,8 +23,6 @@ Route map (all under the /nova_player/ namespace the node already owns):
 import io
 import logging
 import os
-import subprocess
-import tempfile
 
 import folder_paths
 
@@ -33,27 +31,25 @@ from .peaks_cache import get_cached_peaks, cache_peaks, read_peaks_sidecar
 
 logger = logging.getLogger("NovaAudioPlayer")
 
+# wav, flac and ogg — everything `soundfile` can write, and nothing else.
+#
+# THE FORMATS THAT ARE NOT HERE. mp3, m4a, opus and webm were produced by
+# shelling out to ffmpeg. The call was argv-list, never shell=True, with the
+# format checked against this table first and the filename resolved inside the
+# temp directory — but the Comfy registry's scanner flagged 2.2.0 and 2.2.1,
+# and `subprocess` is the only thing in this package it plausibly objected to.
+# A node nobody can install exports nothing at all, so the four lossy formats
+# went rather than the release.
+#
+# Anyone who wants an mp3 has ffmpeg one command away from the wav; the node
+# does not need to be the thing that runs it.
 MIME = {
     "wav":  "audio/wav",
-    "mp3":  "audio/mpeg",
-    "m4a":  "audio/mp4",
-    "ogg":  "audio/ogg",
-    "opus": "audio/ogg; codecs=opus",
     "flac": "audio/flac",
-    "webm": "audio/webm",
+    "ogg":  "audio/ogg",
 }
 
-SOUNDFILE_FMTS = {"wav", "flac", "ogg"}
-
-FFMPEG_ARGS = {
-    "mp3":  lambda q: ["-c:a", "libmp3lame", "-b:a", f"{q}k"],
-    "m4a":  lambda q: ["-c:a", "aac", "-b:a", "256k"],
-    "ogg":  lambda q: ["-c:a", "libvorbis", "-q:a", "6"],
-    "opus": lambda q: ["-c:a", "libopus", "-b:a", "192k"],
-    "flac": lambda q: ["-c:a", "flac"],
-    "webm": lambda q: ["-c:a", "libopus", "-b:a", "192k"],
-    "wav":  lambda q: ["-c:a", "pcm_s16le"],
-}
+SOUNDFILE_FORMAT = {"wav": "WAV", "flac": "FLAC", "ogg": "OGG"}
 
 
 def _safe_temp_path(filename: str):
@@ -137,51 +133,24 @@ def register_routes() -> bool:
             with open(src_path, "rb") as f:
                 return web.Response(body=f.read(), content_type=MIME[fmt], headers=disposition)
 
-        # Lossless formats go through soundfile when it is available — no
-        # subprocess, no ffmpeg dependency for the common cases.
-        if fmt in SOUNDFILE_FMTS:
-            try:
-                import soundfile as sf
-
-                data, sr = sf.read(src_path, dtype="int16", always_2d=True)
-                buf = io.BytesIO()
-                sf.write(buf, data, sr,
-                         format={"wav": "WAV", "flac": "FLAC", "ogg": "OGG"}[fmt],
-                         subtype="PCM_16")
-                return web.Response(body=buf.getvalue(),
-                                    content_type=MIME[fmt], headers=disposition)
-            except ImportError:
-                pass                     # soundfile absent — fall through to ffmpeg
-            except Exception as e:       # bad data, unsupported subtype, ...
-                logger.warning("[NovaAudioPlayer] soundfile failed for %s: %s", fmt, e)
-
-        # Everything else needs ffmpeg.
-        bitrate = request.rel_url.query.get("bitrate", "192")
-        if not bitrate.isdigit():
-            bitrate = "192"
-
-        with tempfile.NamedTemporaryFile(suffix=f".{fmt}", delete=False) as tmp:
-            tmp_path = tmp.name
         try:
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", src_path] + FFMPEG_ARGS[fmt](bitrate) + [tmp_path],
-                capture_output=True, check=True,
-            )
-            with open(tmp_path, "rb") as f:
-                audio_bytes = f.read()
-        except FileNotFoundError:
-            return web.Response(status=501, text="ffmpeg is not installed on the server")
-        except subprocess.CalledProcessError as e:
-            detail = (e.stderr or b"").decode("utf-8", "replace")[-400:]
-            logger.error("[NovaAudioPlayer] ffmpeg failed: %s", detail)
-            return web.Response(status=500, text=f"Transcode failed: {detail}")
-        finally:
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
+            import soundfile as sf
+        except ImportError:
+            return web.Response(
+                status=501,
+                text=(f"Converting to {fmt} needs the soundfile package. "
+                      f"The original WAV is available with fmt=wav."))
 
-        return web.Response(body=audio_bytes, content_type=MIME[fmt], headers=disposition)
+        try:
+            data, sr = sf.read(src_path, dtype="int16", always_2d=True)
+            buf = io.BytesIO()
+            sf.write(buf, data, sr, format=SOUNDFILE_FORMAT[fmt], subtype="PCM_16")
+        except Exception as e:                                # noqa: BLE001
+            logger.warning("[NovaAudioPlayer] soundfile failed for %s: %s", fmt, e)
+            return web.Response(status=500, text=f"Could not write {fmt}: {e}")
+
+        return web.Response(body=buf.getvalue(),
+                            content_type=MIME[fmt], headers=disposition)
 
     @routes.get("/nova_player/flac/{filename}")
     async def serve_flac_legacy(request):

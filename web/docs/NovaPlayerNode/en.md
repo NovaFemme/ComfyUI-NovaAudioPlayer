@@ -12,6 +12,12 @@ suite, FFT analyzer, RTA analyzer, and the APG artifact meter.
 **`panel_info`** (STRING) — the bench strip's contents, for a display node or a
 database. `panel_format` selects `json`, `text` or `csv_row`.
 
+## Downloads
+
+WAV, FLAC and OGG, written by `soundfile`. No mp3 — that needed ffmpeg through
+a subprocess call, which the Comfy registry's scanner flagged; the WAV is one
+ffmpeg command away from anything you want.
+
 ## Controls
 
 Rest the pointer on any transport control for a hint. Turn them off with

@@ -61,6 +61,17 @@ shape: `json` for a parser, `text` for reading, `csv_row` for appending to a
 log. It is built from the same numbers the panel draws, so a logged take and
 the screen can never disagree.
 
+### Downloads
+
+The download arrow offers **WAV**, **FLAC** and **OGG** — everything
+`soundfile` can write, with no external binary involved.
+
+There is deliberately no MP3, M4A, Opus or WebM. Those needed ffmpeg, reached
+through a `subprocess` call, and the Comfy registry's scanner flagged the two
+releases that contained it. A node nobody can install exports nothing at all,
+so the four lossy formats went rather than the release. If you want an mp3, the
+WAV is one ffmpeg command away.
+
 ### A bench panel that agrees with itself
 
 Click the bar-chart button next to the download arrow. Everything in the strip

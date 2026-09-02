@@ -424,7 +424,7 @@ All under `/nova_player/`.
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/peaks/{filename}` | waveform peak data |
-| GET | `/audio/{filename}?fmt=` | the audio, optionally transcoded |
+| GET | `/audio/{filename}?fmt=` | the audio as wav, flac or ogg (soundfile) |
 | GET | `/config` | `{themes, activeTheme, renderers, system, version}` |
 | GET | `/config/version` | integer, bumped on write — the front end polls this, not the blob |
 | POST | `/config/theme` | create or update a named theme, validating every colour |
