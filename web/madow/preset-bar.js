@@ -84,11 +84,27 @@ export function buildPresetBar(node) {
         }
         .madow-presets__msg.err { color: #ff8a5c; }
         .madow-presets__dirty { color: #d4c94a; }
+        .madow-presets__form {
+            flex: 1 1 100%; display: flex; gap: 6px; align-items: center;
+            flex-wrap: wrap;
+        }
+        .madow-presets__form input {
+            background: #1b1e2b; color: inherit; border: 1px solid #ffffff24;
+            border-radius: 4px; padding: 3px 5px; font: inherit; min-width: 0;
+        }
+        .madow-presets__form input[name="preset"] { flex: 2 1 120px; }
+        .madow-presets__form input[name="note"]   { flex: 3 1 140px; }
         </style>
         <select title="Load a preset into the widgets below"></select>
         <button data-act="save" title="Save the current values as a preset">Save as</button>
         <button data-act="new" title="Clear the loaded preset name">New</button>
         <button data-act="del" class="danger" title="Delete the selected preset">Delete</button>
+        <div class="madow-presets__form" hidden>
+            <input name="preset" type="text" placeholder="Preset name" maxlength="64">
+            <input name="note" type="text" placeholder="Note (optional)" maxlength="200">
+            <button data-act="confirm">Save</button>
+            <button data-act="cancel">Cancel</button>
+        </div>
         <div class="madow-presets__msg"></div>
     `;
 
@@ -176,12 +192,37 @@ export function buildPresetBar(node) {
         say("Preset cleared — values unchanged");
     });
 
-    root.querySelector('[data-act="save"]').addEventListener("click", async () => {
-        const suggested = nameWidget()?.value || "";
-        const name = window.prompt("Preset name", suggested);
-        if (!name) return;
-        try { await table(); } catch { /* readParams yields {} and the save is refused */ }
-        const note = window.prompt("Note (optional)", "") || "";
+    // SAVING IS ONE INTERACTION, NOT TWO MODALS.
+    //
+    // This was `window.prompt` for the name and then a second `window.prompt`
+    // for the note. Two identical-looking OS dialogs in a row read as "the
+    // first one failed, it is asking again" — NovaFemme hit Enter through the
+    // second one twice, believing the save had not taken. A note is optional;
+    // it is not worth a dialog of its own, and neither field is worth blocking
+    // the whole browser for.
+    const form = root.querySelector(".madow-presets__form");
+    const nameField = form.querySelector('input[name="preset"]');
+    const noteField = form.querySelector('input[name="note"]');
+
+    const closeForm = () => {
+        form.hidden = true;
+        nameField.value = "";
+        noteField.value = "";
+    };
+
+    const openForm = () => {
+        nameField.value = nameWidget()?.value || "";
+        noteField.value = "";
+        form.hidden = false;
+        // Prefetch while the user is typing, so Save is one request.
+        table().catch(() => { /* readParams yields {} and the save is refused */ });
+        requestAnimationFrame(() => { nameField.focus(); nameField.select(); });
+    };
+
+    async function commit() {
+        const name = nameField.value.trim();
+        if (!name) { say("A preset needs a name", true); nameField.focus(); return; }
+        const note = noteField.value.trim();
         try {
             const res = await api(API, {
                 method: "POST",
@@ -189,11 +230,32 @@ export function buildPresetBar(node) {
                 body: JSON.stringify({ name, note, params: readParams(node) }),
             });
             if (nameWidget()) nameWidget().value = name;
+            closeForm();
             await refresh(name);
             say(res.message || `Saved "${name}"`);
         } catch (e) {
             say(`Could not save: ${e.message}`, true);
         }
+    }
+
+    // The canvas listens for single keys — "n" adds a node, Delete removes the
+    // selected one. Without this a preset called "Nine" deletes the node it is
+    // being saved from.
+    for (const field of [nameField, noteField]) {
+        field.addEventListener("keydown", (e) => {
+            e.stopPropagation();
+            if (e.key === "Enter") { e.preventDefault(); commit(); }
+            else if (e.key === "Escape") { e.preventDefault(); closeForm(); say(""); }
+        });
+    }
+
+    root.querySelector('[data-act="save"]').addEventListener("click", () => {
+        if (form.hidden) openForm(); else closeForm();
+    });
+    root.querySelector('[data-act="confirm"]').addEventListener("click", commit);
+    root.querySelector('[data-act="cancel"]').addEventListener("click", () => {
+        closeForm();
+        say("");
     });
 
     root.querySelector('[data-act="del"]').addEventListener("click", async () => {
