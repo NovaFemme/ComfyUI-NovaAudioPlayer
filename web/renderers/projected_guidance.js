@@ -793,6 +793,24 @@ function levelFault(bench) {
         return { tier: 1, strong: true,
                  text: `${over} samples over full scale, clamped by the WAV write — fix output gain before reading generation metrics.` };
     }
+    // A FILE cannot overshoot. Load a 16-bit FLAC and the clamp already
+    // happened at write time, so `peak_db > 0` and `over_fs` -- the two signals
+    // this tier was built on -- are structurally unavailable, and a take with
+    // its peak pinned to the ceiling produced no level line at all. Samples at
+    // the ceiling are the only evidence that survives into a file.
+    //
+    // Threshold from the corpus, not from taste: across 54 ACE-Step FLACs,
+    // fifteen sit exactly at full scale, and the worst of them (master_00017)
+    // pins 0.0011% of its samples there. A few samples parked on the ceiling is
+    // what a limiter does; it is not a fault, and after the DC-offset lesson
+    // this tier does not fire on what is merely normal. 0.01% is roughly ten
+    // times the worst take measured -- silent on everything in hand, and awake
+    // if a take arrives genuinely smashed.
+    if (typeof bench.clipped_pct === "number" && bench.clipped_pct > 0.01) {
+        const n = bench.clipped_samples || 0;
+        return { tier: 1, strong: true,
+                 text: `${n} samples at full scale (${bench.clipped_pct.toFixed(4)}% > 0.0100) — the source is clipped, not just loud. Fix the output stage before reading generation metrics.` };
+    }
     // 0.001 was a guess and it was wrong.  Measured across 54 ACE-Step FLACs
     // from NovaFemme's own input folder: min 0.00014, median 0.00201, max
     // 0.00265 -- 44 of 54 above 0.001 and none above 0.005.  A constant

@@ -64,6 +64,16 @@ const r = await p.evaluate(async () => {
     // line must not then draw a conclusion from the same numbers.
     refMismatch: suggest(healthy, { ...healthy, crest: 13.0, coverage: 0.50 }, clean, 0.98),
     refMatched:  suggest(healthy, { ...healthy, coverage: 0.96 }, clean, 0.98),
+    // A FILE cannot overshoot -- the clamp happened at write time -- so a
+    // clipped source shows up only as samples pinned to the ceiling. The
+    // first of these is master_00017, the worst of 54 real takes, and must
+    // stay quiet; the second is ten times that and must not.
+    fileNormal:  suggest(healthy, null,
+                   { peak_db: -0.0003, over_fs: 0, clipped_samples: 292,
+                     clipped_pct: 0.0011, dc_offset: 0.00118, lr_corr: 0.794 }, 1.0),
+    fileClipped: suggest(healthy, null,
+                   { peak_db: -0.0003, over_fs: 0, clipped_samples: 2920,
+                     clipped_pct: 0.0110, dc_offset: 0.00118, lr_corr: 0.794 }, 1.0),
     phase:      suggest(healthy, null, { peak_db: -3, over_fs: 0, dc_offset: 0, lr_corr: -0.2 }),
     mono:       suggest(healthy, null, { peak_db: -3, over_fs: 0, dc_offset: 0, lr_corr: null }),
     satFault:   suggest({ ...healthy, sat: 21.9 }, null, clean),
@@ -102,6 +112,11 @@ ck("no drift claim across mismatched windows",
    r.refMismatch.text);
 ck("comparable windows still compare",
    /tracking REF/.test(r.refMatched.text), r.refMatched.text);
+ck("a limiter on the ceiling is not a fault",
+   r.fileNormal.tier === 3, r.fileNormal.text);
+ck("a clipped file is a tier 1 fault",
+   r.fileClipped.tier === 1 && /at full scale/.test(r.fileClipped.text),
+   r.fileClipped.text);
 ck("weak L/R correlation is tier 1",
    r.phase.tier === 1 && /mono compatibility/.test(r.phase.text), r.phase.text);
 ck("mono is not a fault — null correlation must not fire",
