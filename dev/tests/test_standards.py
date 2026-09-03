@@ -39,6 +39,23 @@ PY_FORBIDDEN = [
     (r"\bimport\s+pickle\b", "pickle"),
 ]
 
+# JavaScript is scanned too, and this is where 2.3.0 went wrong: the Python
+# rules were checked and the front end was not. Colour parsing used the RegExp
+# object's own matching method -- a regular expression, not code execution --
+# and the scanner, which greps rather than parses, saw a prohibited word.
+#
+# The rule below is therefore deliberately blunt. It forbids a construct that
+# is perfectly safe, because "safe" is not the test being run here: the test is
+# whether a text search finds something it objects to. `str.match(re)` does the
+# same job. The comments explaining all this avoid the word as well -- a
+# comment is text like any other, and one describing the fix would re-trigger
+# the very rule it documents.
+JS_FORBIDDEN = [
+    (r"(?<![\w.])eval\s*\(", "eval()"),
+    (r"\bnew\s+Function\s*\(", "new Function()"),
+    (r"\.e" + r"xec\s*\(", "a regex run through the prohibited method name"),
+]
+
 # A minified bundle is indistinguishable from obfuscation to a scanner, and to
 # a reviewer. The threshold is characters per line averaged over the file:
 # hand-written JavaScript does not average 500.
@@ -79,6 +96,19 @@ for pattern, label in PY_FORBIDDEN:
                 if rx.search(line):
                     hits.append(f"{os.path.relpath(path, ROOT)}:{i}")
     ck(f"no {label}", not hits, ", ".join(hits[:3]))
+
+for pattern, label in JS_FORBIDDEN:
+    hits = []
+    rx = re.compile(pattern)
+    for path in shipped(".js"):
+        with open(path, "r", encoding="utf-8") as f:
+            for i, line in enumerate(f, 1):
+                stripped = line.lstrip()
+                if stripped.startswith("//") or stripped.startswith("*"):
+                    continue
+                if rx.search(line):
+                    hits.append(f"{os.path.relpath(path, ROOT)}:{i}")
+    ck(f"no {label} in JavaScript", not hits, ", ".join(hits[:3]))
 
 blobs = []
 for path in shipped(".js"):
