@@ -224,5 +224,70 @@ batched = FakeTensor(np.stack([np.stack([sig, sig])]).astype(np.float32))
 ck("a batched (1, ch, n) tensor is handled",
    abs(audio_io.compute_bench(batched, SR)["peak_db"] - (-6.02)) < 0.02)
 
+# ---- DC is not bass ---------------------------------------------------------
+# Bin 0 is the DC term. ACE-Step's decoder leaves ~0.002 of constant offset on
+# every take measured, and counted as bass it inflates the one band that is
+# hardest to check by ear. The renderer skips bin 0 for the same reason.
+quiet = tone(1000.0, 0.2, 3.0)
+b_clean = audio_io.compute_bench(stereo(quiet, quiet), SR)["bands"]
+shifted = quiet + 0.05                    # a DC offset far larger than real
+b_dc = audio_io.compute_bench(stereo(shifted, shifted), SR)["bands"]
+ck("a large DC offset does not become bass",
+   abs(b_dc["BASS"] - b_clean["BASS"]) < 1.0,
+   f"clean {b_clean['BASS']:.2f}% vs offset {b_dc['BASS']:.2f}%")
+ck("...and the shares still total 100",
+   abs(sum(b_dc.values()) - 100.0) < 0.05, f"{sum(b_dc.values()):.2f}%")
+
+# ---- the per-bin invariant --------------------------------------------------
+# THE ONE THAT SURVIVES BOTH PATHS CHANGING TOGETHER. At 8192/48k the bass band
+# holds ~42 bins and HF ~3500, so a per-band share says little on its own: a
+# domain error hides inside the bin counts. Energy per BIN does not.
+bass_heavy = tone(80.0, 0.5, 3.0)
+bands = audio_io.compute_bench(stereo(bass_heavy, bass_heavy), SR)["bands"]
+BIN_HZ = SR / 8192.0
+bins = {"BASS": 250.0 / BIN_HZ, "MID": (2000.0 - 250.0) / BIN_HZ,
+        "PRES": (6000.0 - 2000.0) / BIN_HZ, "HF": (SR / 2 - 6000.0) / BIN_HZ}
+per_bin = {k: bands[k] / bins[k] for k in bands}
+ck("bass energy per bin is orders above HF on bass-heavy material",
+   per_bin["BASS"] / max(per_bin["HF"], 1e-12) > 100,
+   f"{per_bin['BASS'] / max(per_bin['HF'], 1e-12):.0f} : 1")
+
+# ---- the three band-edge tables must be one table ---------------------------
+# Bug 2 in the review: edges defined in three places drift, and then a domain
+# fix cannot be verified because an edge mismatch is confounded with it. This
+# reads the other two and compares.
+import re
+
+_ROOT_DIR = os.path.dirname(os.path.dirname(_HERE))
+
+
+def _js_edges():
+    src = open(os.path.join(_ROOT_DIR, "web", "renderers",
+                            "freq_percentages.js"), encoding="utf-8").read()
+    m = re.search(r"const BAND_EDGES_HZ = \[([^\]]+)\]", src)
+    if not m:
+        return None
+    out = []
+    for tok in m.group(1).split(","):
+        tok = tok.strip()
+        out.append(float("inf") if tok == "Infinity" else float(tok))
+    return tuple(out)
+
+
+def _panel_info_edges():
+    spec = importlib.util.spec_from_file_location(
+        "panel_info_edges", os.path.join(_ROOT_DIR, "nova_player", "panel_info.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return tuple(mod.BAND_EDGES_HZ)
+
+
+ck("the renderer's band edges match compute_bench's",
+   _js_edges() == tuple(audio_io.BAND_EDGES_HZ),
+   f"js {_js_edges()} vs py {tuple(audio_io.BAND_EDGES_HZ)}")
+ck("panel_info's band edges match compute_bench's",
+   _panel_info_edges() == tuple(audio_io.BAND_EDGES_HZ),
+   f"panel_info {_panel_info_edges()}")
+
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)

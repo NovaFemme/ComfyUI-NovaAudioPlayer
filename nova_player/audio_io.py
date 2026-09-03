@@ -101,7 +101,12 @@ def build_peaks(waveform, num_bars: int = 120) -> dict:
 # 2-4 kHz and everything above 6 kHz uncounted, so their "percentages" are
 # shares of an arbitrary subset and move whenever the gaps do. These edges mean
 # every bin lands in exactly one band and the four figures always total 100%.
-BAND_EDGES_HZ = (0.0, 250.0, 2000.0, 6000.0, float("inf"))
+# The first edge is 20 Hz, not 0. Bin 0 is DC, and a Hann window smears a
+# constant offset across the first few bins either side of it — zeroing bin 0
+# alone still left a 0.05 offset showing up as 4% "bass" in the test below.
+# Nothing musical lives under 20 Hz, both paths use the same first edge, and
+# the shares are of what was counted, so they still total 100.
+BAND_EDGES_HZ = (20.0, 250.0, 2000.0, 6000.0, float("inf"))
 BAND_LABELS = ("BASS", "MID", "PRES", "HF")
 
 
@@ -223,7 +228,12 @@ def _band_energy(mono, sample_rate: int):
     acc /= frames
 
     freqs = np.fft.rfftfreq(size, 1.0 / sample_rate)[:size // 2]
-    total = float(acc.sum()) or 1.0
+
+    # The denominator is the energy INSIDE the bands, not all of it. With a
+    # first edge above DC the two differ, and dividing by the larger would give
+    # four shares that quietly fail to reach 100.
+    counted = freqs >= BAND_EDGES_HZ[0]
+    total = float(acc[counted].sum()) or 1.0
 
     bands = {}
     for i, lbl in enumerate(BAND_LABELS):

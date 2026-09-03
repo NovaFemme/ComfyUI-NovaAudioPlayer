@@ -123,8 +123,21 @@ ck("json carries the analyser configuration",
    {"fft_size", "analyser_fps", "analyser_smoothing", "band_edges_hz"} <= set(a),
    str(sorted(a)))
 ck("fft_size is the real configured value", a["fft_size"] == 4096, str(a["fft_size"]))
-ck("band edges are recorded, contiguous and open-ended",
-   a["band_edges_hz"] == "0/250/2000/6000/inf", a["band_edges_hz"])
+# Derived from audio_io rather than restated: this check exists because the
+# edges live in three files, and a test carrying a fourth copy of them would be
+# part of the problem it is meant to catch.
+_AIO_SPEC = importlib.util.spec_from_file_location(
+    "audio_io_edges", os.path.join(os.path.dirname(_HERE), "..", "nova_player",
+                                   "audio_io.py"))
+_aio = importlib.util.module_from_spec(_AIO_SPEC)
+_AIO_SPEC.loader.exec_module(_aio)
+_expected = "/".join("inf" if e == float("inf") else str(int(e))
+                     for e in _aio.BAND_EDGES_HZ)
+ck("band edges are recorded, and are compute_bench's",
+   a["band_edges_hz"] == _expected, f'{a["band_edges_hz"]} vs {_expected}')
+ck("the first edge is above DC",
+   _aio.BAND_EDGES_HZ[0] > 0, f"{_aio.BAND_EDGES_HZ[0]} Hz")
+ck("the last band is open-ended", _aio.BAND_EDGES_HZ[-1] == float("inf"))
 
 t2 = panel_info.build_panel_info(TAKE, "text")
 ck("text carries an ANALYSIS block", "ANALYSIS" in t2 and "FFT SIZE" in t2)

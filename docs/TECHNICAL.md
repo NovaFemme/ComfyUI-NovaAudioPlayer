@@ -283,6 +283,31 @@ theme switch; "Reset node" is the explicit way to clear them.
 
 ## Whole-file measurement
 
+## Two band-share readings
+
+The FREQ % view and the bench strip both report BASS / MID / PRES / HF and they
+will not agree exactly. Three reasons, none of them a bug:
+
+- **Window.** The bench strip is the whole file. The FREQ % view is the
+  analyser's current frame — roughly 85 ms — and says so in its footer. On a
+  track whose arrangement changes, these are answering different questions.
+- **Smoothing.** `smoothing_time_constant` 0.6 makes the browser spectrum an
+  EMA across frames; the Welch average in `_band_energy` is not.
+- **Overlap.** The analyser reads 4096 samples per poll while about 1600 are
+  new at 30 fps, so recent samples are weighted roughly 2.6x.
+
+**Expect agreement within about 3 percentage points per band on steady
+material.** A larger gap is worth investigating; an exact match is not
+achievable and chasing one will produce a worse measurement, not a better one.
+
+What they must NOT differ on is the domain or the edges. Both sum **power** —
+`10^(dB/10)` in the renderer, `|FFT|^2` in Python — and both use
+`BAND_EDGES_HZ = (20, 250, 2000, 6000, inf)`, asserted identical across all
+three definitions by `dev/tests/test_bench.py`. The renderer once summed
+`(byte/255)^2` from `getByteFrequencyData`, which squares a decibel scale: with
+1536 bins above 6 kHz against 22 below 250 Hz, floor-level bins won on
+population and the panel read BASS 5.0% where the bench read 43.9%.
+
 `compute_bench(waveform, sample_rate)` in `audio_io.py` runs once per execution,
 on the same tensor that produces the WAV. It returns peak, RMS (in two
 conventions — see below), crest, DC offset,

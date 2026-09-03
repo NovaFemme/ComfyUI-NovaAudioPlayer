@@ -39,7 +39,7 @@ BANDS = (("BASS", "0-250"), ("MID", "250-2k"), ("PRES", "2k-6k"), ("HF", "6k+"))
 # Mirrors audio_io.BAND_EDGES_HZ. Recorded in every row because the band shares
 # are only meaningful against the edges that produced them, and those edges have
 # changed once already.
-BAND_EDGES_HZ = (0.0, 250.0, 2000.0, 6000.0, float("inf"))
+BAND_EDGES_HZ = (20.0, 250.0, 2000.0, 6000.0, float("inf"))
 
 # Column order for csv_row. Stable: appending to an existing log must not
 # silently shift columns, so new fields go on the END of this tuple.
