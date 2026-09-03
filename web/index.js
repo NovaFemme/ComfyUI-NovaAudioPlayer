@@ -36,6 +36,19 @@ const WIDGET_NAME = "nova_player_display";
 /** node.id -> PlayerHost */
 const hosts = new Map();
 
+// What a node with no audio yet shows: the real player, drawing its idle
+// state. Every renderer already handles `!sig.hasData` with a placeholder, so
+// this needs no special-casing anywhere downstream — it is the same host, the
+// same chrome and the same view pill, waiting for a file.
+const IDLE_DATA = { filename: null, duration: 0, stereo: false,
+                    peaks: { ch0: [0] } };
+
+// The size a freshly placed node gets. The minimum (460 x 203) is a floor, not
+// a good first impression: at that size the transport crowds itself and the
+// visualiser is a sliver. This is what the node looks like in the screenshots
+// people judge a pack by.
+const DEFAULT_SIZE = [560, 420];
+
 async function fetchPeaks(filename) {
     const resp = await fetch(`/nova_player/peaks/${encodeURIComponent(filename)}`);
     if (!resp.ok) throw new Error(await resp.text());
@@ -46,6 +59,15 @@ function ensureHost(node, data) {
     let host = hosts.get(node.id);
 
     if (host) {
+        // A saved workflow now meets an idle host that onNodeCreated built, so
+        // the value LiteGraph parked for us has to be consumed HERE as well —
+        // it used to be handled only on the creation path, which for a restored
+        // node no longer runs. Miss it and the node comes back with default
+        // colours and the wrong view.
+        if (node._novaPendingValue !== undefined) {
+            host.restore(node._novaPendingValue);
+            delete node._novaPendingValue;
+        }
         host.setData(data);
         return host;
     }
@@ -99,6 +121,27 @@ app.registerExtension({
 
         // The one remaining override. Still the documented route for a node's
         // `ui` payload, and now a three-line handoff rather than a widget rebuild.
+        // A node that has never been run still gets a player. Without this the
+        // host was built only in onExecuted, so a newly placed node was an
+        // input, two widgets and nothing else — which is what someone browsing
+        // for an audio player sees before they ever run it.
+        const onNodeCreated = nodeType.prototype.onNodeCreated;
+        nodeType.prototype.onNodeCreated = function () {
+            const r = onNodeCreated?.apply(this, arguments);
+            try {
+                ensureHost(this, IDLE_DATA);
+                // setSize AFTER the widget exists, or LiteGraph recomputes the
+                // height from the widgets alone and the canvas collapses.
+                this.setSize([
+                    Math.max(DEFAULT_SIZE[0], this.size[0]),
+                    Math.max(DEFAULT_SIZE[1], this.size[1]),
+                ]);
+            } catch (e) {
+                console.error("[NovaPlayer] idle player failed to build:", e);
+            }
+            return r;
+        };
+
         const onExecuted = nodeType.prototype.onExecuted;
         nodeType.prototype.onExecuted = function (message) {
             onExecuted?.apply(this, arguments);

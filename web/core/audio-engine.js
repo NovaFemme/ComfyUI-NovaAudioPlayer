@@ -83,6 +83,21 @@ export class AudioEngine {
         this._peakHoldTime = 0;
         this.peakHoldMs = opts.peakHoldMs ?? 300;
 
+        // IDLE: a node that has never run has no file, and it still draws.
+        // Without this the player did not exist at all until the first
+        // execution — a freshly placed node was three widgets and a title, so
+        // anyone browsing the node library saw a plain box where the point of
+        // the pack is what it looks like running.
+        //
+        // A src-less <audio> is deliberate rather than a null element: 25 call
+        // sites touch `this.el`, and an element that exists and does nothing is
+        // safer than twenty-five null guards. play() refuses early, so nothing
+        // reaches it that would throw.
+        this.idle = !filename;
+        if (this.idle) {
+            this.el = new Audio();
+            this.el.preload = "none";
+        } else {
         // Adopt an existing element for this file if there is one — otherwise a
         // second <audio> starts playing the same file and you hear it twice.
         const existing = _graphRegistry.get(filename);
@@ -96,6 +111,7 @@ export class AudioEngine {
                 console.error("[NovaPlayer] audio error:", this.el.error);
             });
             _graphRegistry.set(filename, { el: this.el, refs: 1 });
+        }
         }
 
         // The shared signal bag.  One object, reused every tick; renderers hold
@@ -138,6 +154,7 @@ export class AudioEngine {
      * Idempotent, and safe to call on every play event.
      */
     ensureGraph() {
+        if (this.idle) return false;
         const entry = _graphRegistry.get(this.filename);
         if (entry && entry.analyserL) {
             this._adopt(entry);
@@ -234,6 +251,9 @@ export class AudioEngine {
     get currentTime() { return this.el.currentTime; }
 
     play() {
+        // Nothing to play, and nothing to warn about: an idle player is a
+        // preview of the real one, and its transport is inert by design.
+        if (this.idle) return Promise.resolve();
         this.ensureGraph();
         const ctx = sharedContext();
         if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
