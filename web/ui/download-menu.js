@@ -18,8 +18,12 @@ function triggerDownload(blob, name) {
 }
 
 async function fetchFormat(filename, fmt, extraQuery = "") {
+    // download=1 asks for the attachment disposition. Without it the route
+    // serves inline, which is what the player wants when it streams the same
+    // file — see audioUrl() in audio-engine.js.
     const resp = await fetch(
-        `/nova_player/audio/${encodeURIComponent(filename)}?fmt=${fmt}${extraQuery}`,
+        `/nova_player/audio/${encodeURIComponent(filename)}` +
+        `?fmt=${fmt}&download=1${extraQuery}`,
     );
     if (!resp.ok) throw new Error(await resp.text());
     return resp.arrayBuffer();

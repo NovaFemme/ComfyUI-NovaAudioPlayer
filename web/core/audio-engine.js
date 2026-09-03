@@ -68,7 +68,13 @@ const INTRO_KEY = "__nova_intro__";
 let _introSeq = 0;
 
 export function audioUrl(filename) {
-    return `/view?filename=${encodeURIComponent(filename)}&type=temp`;
+    // This pack's own route rather than ComfyUI's /view, because playback needs
+    // RANGE requests. A browser playing a long file buffers ahead and asks for
+    // later byte ranges as it goes; a server that answers 200-with-everything
+    // instead of 206-with-the-slice forces it to start again from the top, and
+    // that is heard as a short break mid-track. /nova_player/audio serves
+    // through web.FileResponse, which handles Range and streams from disk.
+    return `/nova_player/audio/${encodeURIComponent(filename)}?fmt=wav`;
 }
 
 // ---------------------------------------------------------------------------

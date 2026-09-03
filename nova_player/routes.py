@@ -126,12 +126,33 @@ def register_routes() -> bool:
             return web.Response(status=404, text="Audio file not found — re-run the node")
 
         src_ext = os.path.splitext(src_path)[1].lower().lstrip(".")
-        disposition = {"Content-Disposition": f'attachment; filename="audio_output.{fmt}"'}
+        # `attachment` only when the download menu asks. The player uses this
+        # same route to STREAM, and a browser handed an attachment disposition
+        # for an <audio> src is being told two different things.
+        want_download = request.rel_url.query.get("download") == "1"
+        disposition = ({"Content-Disposition": f'attachment; filename="audio_output.{fmt}"'}
+                       if want_download else {})
 
         # Fast path: already in the requested format.
+        #
+        # FileResponse, NOT a read into memory. It streams from disk and — the
+        # part that matters — it honours Range requests, answering 206 with the
+        # slice asked for.
+        #
+        # WHY THAT MATTERS FOR PLAYBACK. A browser playing a long file does not
+        # download it once: it buffers ahead, drops what it has played, and
+        # re-requests a later byte range when it needs more. Against a server
+        # that ignores Range and returns 200 with the whole body, it must start
+        # over from byte zero and wait — which is heard as a short break in the
+        # middle of a track, on a file that is perfectly fine. A 50 MB WAV also
+        # meant a 50 MB read into memory per request, in the server process
+        # ComfyUI is generating on.
         if src_ext == fmt:
-            with open(src_path, "rb") as f:
-                return web.Response(body=f.read(), content_type=MIME[fmt], headers=disposition)
+            return web.FileResponse(src_path, headers={
+                "Content-Type": MIME[fmt],
+                "Accept-Ranges": "bytes",
+                **disposition,
+            })
 
         try:
             import soundfile as sf
@@ -149,6 +170,8 @@ def register_routes() -> bool:
             logger.warning("[NovaAudioPlayer] soundfile failed for %s: %s", fmt, e)
             return web.Response(status=500, text=f"Could not write {fmt}: {e}")
 
+        # The converted path still builds in memory: it is the download menu's
+        # path, one request per click, and there is nothing on disk to stream.
         return web.Response(body=buf.getvalue(),
                             content_type=MIME[fmt], headers=disposition)
 
