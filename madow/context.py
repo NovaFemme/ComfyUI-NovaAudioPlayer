@@ -29,6 +29,31 @@ SCHEMA_VER = 1
 EMITTER = "MadowInputs"
 EMITTER_VERSION = "0.1.0"
 
+# WHAT THE HASH MEANS, recorded in every row.
+#
+# A hash nothing outside this node can reproduce is not a grouping key, it is a
+# number that happens to be stable until someone refactors. Anyone with the
+# params dict and this string can recompute `params_sha256` and check it.
+#
+# Each clause is load-bearing:
+#   sorted-keys, no-ws        JSON key order and spacing are not information
+#   float:%.6f                280.0 and 280.00 must not fork into two hashes
+#   int:as-is                 an int stays an int; see PARAM_TYPES_VER
+#   text:lf-normalised-rstripped   a CRLF paste must not split identical runs
+#   minus:hash_excludes       the naming fields never entered the hash
+#
+# CHANGING ANY CLAUSE MEANS A NEW STRING, not an edited one: rows carrying the
+# old spec stay verifiable against the rules they were made under.
+HASH_SPEC = ("sha256/sorted-keys/no-ws/float:%.6f/int:as-is/"
+             "text:lf-normalised-rstripped/minus:hash_excludes")
+
+# The declared type of every parameter is part of the contract too. Today
+# `music.timesignature` is the STRING "4" — ACE-Step's combo holds strings —
+# while every other numeric parameter is a number. That is fine; changing it
+# later without a version bump is not, because "4" and 4 hash differently and
+# the two groups would look like different configurations.
+PARAM_TYPES_VER = 1
+
 
 def canonical(params):
     """Deterministic JSON for hashing. Sorted, compact, floats fixed to 6 dp."""
@@ -123,7 +148,8 @@ def preset_dirty(params, preset_params, excludes, kinds=None):
 
 
 def build(params, validation, seed_key, preset_name=None, preset_params=None,
-          excludes=None, env=None, non_audio=(), file_path=None, kinds=None):
+          excludes=None, env=None, non_audio=(), file_path=None, kinds=None,
+          ruleset_ver=None):
     """Assemble the context blob. Never raises — see build_json."""
     unseeded, seeded = hashes(params, seed_key, non_audio)
     return {
@@ -132,6 +158,11 @@ def build(params, validation, seed_key, preset_name=None, preset_params=None,
         "emitter_version": EMITTER_VERSION,
         "params_sha256": unseeded,
         "params_seeded_sha256": seeded,
+        # How to recompute the two hashes above, and under which type
+        # declarations. Without these a row is only comparable to rows made by
+        # the identical build.
+        "hash_spec": HASH_SPEC,
+        "param_types_ver": PARAM_TYPES_VER,
         "preset_name": preset_name or None,
         "preset_dirty": preset_dirty(params, preset_params, excludes, kinds),
         "params": params,
@@ -141,6 +172,11 @@ def build(params, validation, seed_key, preset_name=None, preset_params=None,
         "file_path": file_path,
         "hash_excludes": sorted(set(non_audio)),
         "validation": list(validation or ()),
+        # An empty `validation` means "these checks ran and none fired". It
+        # cannot mean that without saying WHICH checks: when a rule is added,
+        # tonight's clean rows would otherwise read as having passed a test
+        # they were never given.
+        "validation_ruleset_ver": ruleset_ver,
         "env": env or {},
     }
 

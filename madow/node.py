@@ -30,7 +30,7 @@ from .naming import build_file_path
 from .params import (ARG, DEFAULTS, KEYS, KIND, NON_AUDIO_KEYS, PARAMS,
                      SEED_KEY, TRIMMED_KEYS)
 from . import presets as preset_store
-from .validate import validate
+from .validate import RULESET_VER, validate
 
 PACK_VERSION = "0.1.0"
 
@@ -96,9 +96,20 @@ class MadowInputs:
         # preset comparison — takes the trimmed value, so what was sent to the
         # model and what was hashed are the same string by construction rather
         # than by agreement between two code paths.
+        # Normalised BEFORE anything reads them, so the value that is hashed,
+        # the value that is emitted and the value ACE-Step receives are one
+        # string rather than three nearly-identical ones.
+        #
+        # Line endings matter more than they look. A lyrics block pasted from a
+        # Windows editor carries CRLF; the same words typed here carry LF. Two
+        # identical runs would then hash differently and never group, and
+        # nothing on screen would show why — the text looks the same.
+        # Trailing whitespace per line is stripped for the same reason.
         for k in TRIMMED_KEYS:
             v = params.get(k)
             if isinstance(v, str):
+                v = v.replace("\r\n", "\n").replace("\r", "\n")
+                v = "\n".join(line.rstrip() for line in v.split("\n"))
                 params[k] = v.strip()
 
         # A latent of 0 means "not wired", not "zero seconds".
@@ -125,6 +136,7 @@ class MadowInputs:
             # So a float written by the browser as `4` compares equal to the
             # widget's 4.0 — see context._as_declared.
             kinds=KIND,
+            ruleset_ver=RULESET_VER,
         )
 
         # Printed as well as returned: a conflict the user does not notice on

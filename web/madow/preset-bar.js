@@ -222,6 +222,17 @@ export function buildPresetBar(node) {
     async function commit() {
         const name = nameField.value.trim();
         if (!name) { say("A preset needs a name", true); nameField.focus(); return; }
+
+        // Saving onto an existing name overwrites the file. That is the right
+        // behaviour — updating a preset is the common case — but it is not
+        // something to discover by losing one, so it asks. Same rule as
+        // Delete: one dialog, for the one action that destroys something.
+        const exists = [...select.options].some(o => o.value === name);
+        if (exists && !window.confirm(`Overwrite the preset "${name}"?`)) {
+            nameField.focus();
+            return;
+        }
+
         const note = noteField.value.trim();
         try {
             const res = await api(API, {

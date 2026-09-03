@@ -493,6 +493,61 @@ ck("and the fallback says so rather than passing quietly",
 ck("case and spacing alone are not a fallback",
    P.coerce({"music.keyscale": "d  minor"})[0]["music.keyscale"] == "D minor")
 
+# ---- the hash contract ------------------------------------------------------
+# A hash nothing outside the node can reproduce is not a grouping key. These
+# pin the promises the recorded spec string makes.
+ctx_obj = json.loads(ctx_json)
+ck("context records how to recompute its hashes",
+   ctx_obj.get("hash_spec") == C.HASH_SPEC, str(ctx_obj.get("hash_spec")))
+ck("...and the type declarations they were made under",
+   ctx_obj.get("param_types_ver") == C.PARAM_TYPES_VER)
+ck("an empty validation list names the ruleset that produced it",
+   ctx_obj.get("validation_ruleset_ver") == V.RULESET_VER,
+   str(ctx_obj.get("validation_ruleset_ver")))
+
+# float:%.6f — the clause that stops a refactor forking the log.
+ck("280.0 and 280.00 are the same hash",
+   C.canonical({"music.duration": 280.0}) == C.canonical({"music.duration": 280.00}))
+ck("...but 280.0 and 280.1 are not",
+   C.canonical({"music.duration": 280.0}) != C.canonical({"music.duration": 280.1}))
+ck("a float and an int of equal value are NOT the same canonical form",
+   C.canonical({"x": 4.0}) != C.canonical({"x": 4}),
+   "which is why param_types_ver exists")
+
+# text:lf-normalised-rstripped — the clause that stops an editor forking it.
+crlf = _run(lyrics="verse one\r\nverse two\r\n")[0]["params"]["caption.lyrics"]
+lf = _run(lyrics="verse one\nverse two\n")[0]["params"]["caption.lyrics"]
+ck("a CRLF paste and an LF paste give the same text", crlf == lf, repr(crlf))
+ck("...and therefore the same hash",
+   json.loads(_run(lyrics="verse one\r\nverse two")[2])["params_sha256"]
+   == json.loads(_run(lyrics="verse one\nverse two")[2])["params_sha256"])
+trailing = _run(lyrics="line one   \nline two\t\n")[0]["params"]["caption.lyrics"]
+ck("trailing whitespace per line is stripped before hashing",
+   trailing == "line one\nline two", repr(trailing))
+
+# ---- the type table is frozen ----------------------------------------------
+# Not a style check. "4" and 4 hash differently, so a type change without a
+# param_types_ver bump splits one configuration into two groups in the log and
+# nothing in the numbers reveals it.
+FROZEN_KINDS = {
+    "apg.eta": "FLOAT", "apg.norm_threshold": "FLOAT", "apg.momentum": "FLOAT",
+    "sched.shift": "FLOAT", "ksampler.steps": "INT", "ksampler.cfg": "FLOAT",
+    "ksampler.sampler_name": "SAMPLERS", "ksampler.scheduler": "SCHEDULERS",
+    "ksampler.denoise": "FLOAT", "ksampler.seed": "INT",
+    "caption.prompt": "STRING", "caption.lyrics": "STRING",
+    "music.bpm": "INT", "music.duration": "FLOAT",
+    "music.timesignature": "TIMESIGNATURES", "music.language": "LANGUAGES",
+    "music.keyscale": "KEYSCALES",
+    "text.cfg_scale": "FLOAT", "lm.temperature": "FLOAT", "lm.top_p": "FLOAT",
+    "lm.top_k": "INT", "lm.min_p": "FLOAT", "lm.generate_audio_codes": "BOOLEAN",
+    "file.prefix": "STRING", "file.name": "STRING", "file.folder": "STRING",
+    "file.separator": "STRING",
+}
+drift = {k: (K.KIND.get(k), v) for k, v in FROZEN_KINDS.items() if K.KIND.get(k) != v}
+ck("no parameter has changed type without a param_types_ver bump",
+   not drift and set(K.KIND) == set(FROZEN_KINDS),
+   str(drift) if drift else f"{len(FROZEN_KINDS)} types match")
+
 ck("context is still emitted by the node that has every parameter",
    json.loads(ctx_json)["params"].keys() == bundle["params"].keys())
 

@@ -14,6 +14,14 @@ close.
 import re
 
 # Two to three digits: "8 BPM" is not a tempo, and four digits is not either.
+# Bumped whenever a rule is added, removed or its threshold moves. Recorded in
+# every context blob: an empty warning list only means something against a
+# known set of checks.
+#
+#   1  bpm conflict, key conflict, duration vs latent, vocals without lyrics,
+#      multiple truncation methods, apg.eta above 1.0, prompt tension
+RULESET_VER = 1
+
 _BPM_RE = re.compile(r"(\d{2,3})\s*BPM", re.I)
 
 # "G major", "Eb minor", "F# min". Accepts the sharp/flat spellings ACE-Step
