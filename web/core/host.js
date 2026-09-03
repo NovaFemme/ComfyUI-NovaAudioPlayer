@@ -23,7 +23,7 @@
  */
 
 import { config } from "./config.js";
-import { INTRO_LINE, slogan } from "./idle-demo.js";
+import { IDLE_LINE, INTRO_LINE } from "./idle-demo.js";
 import { AudioEngine } from "./audio-engine.js";
 import { computeLayout, minimumNodeSize } from "./layout.js";
 import {
@@ -352,9 +352,7 @@ export class PlayerHost {
         // pack by, so the demo signs itself there instead.
         if (this.engine.idle) {
             chrome.drawIdleBadge(ctx, L, palette,
-                                 this.engine.playing
-                                     ? INTRO_LINE
-                                     : slogan((this._frameNow || 0) / 1000));
+                                 this.engine.playing ? INTRO_LINE : IDLE_LINE);
         } else {
             chrome.drawBadge(ctx, L, palette, this.data);
         }

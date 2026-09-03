@@ -87,17 +87,15 @@ export function drawBadge(ctx, L, palette, data) {
  * thing does.
  */
 export function drawIdleBadge(ctx, L, palette, text) {
+    // Where the file's format goes when there is a file. With no file it says
+    // so — dimmed, one line, no name and no pitch. The node's title already
+    // carries the name, and repeating it here would be the node advertising
+    // itself on every frame in a row meant for facts about the audio.
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
-
-    ctx.fillStyle = palette.get("text");
-    ctx.font = "10px sans-serif";
-    const name = "NOVA AUDIO PLAYER";
-    ctx.fillText(name, 10, 20);
-
     ctx.fillStyle = palette.get("text.dim");
     ctx.font = "10px sans-serif";
-    ctx.fillText(`  ·  ${text}`, 10 + ctx.measureText(name).width, 20);
+    ctx.fillText(text, 10, 20);
 }
 
 /**

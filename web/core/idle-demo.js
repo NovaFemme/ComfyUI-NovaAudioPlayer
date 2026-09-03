@@ -133,22 +133,16 @@ export function fillDemoSignal(sig, t) {
     sig.frame++;
 }
 
-// Shown in the badge row while the demo runs. Cycled rather than fixed: the
-// node is a shop window before it is a tool, and a line that changes is read
-// twice.
-// What the voiceover actually says. Shown while it plays, because a caption
-// that disagrees with the audio it captions is worse than no caption: the eye
-// wins, and then the line you recorded is the one nobody read.
+// THE BADGE IS STATE, NOT ADVERTISING.
+//
+// This was five rotating taglines. The registry's standards permit
+// self-promotion "only within your designated settings menu section" and list
+// excessive self-promotion as a community violation — and beyond compliance,
+// a node that pitches itself on every frame is tiresome to work beside. A
+// player with no audio should say that it has no audio and what to press.
+//
+// INTRO_LINE is different: it is a CAPTION. It appears only while the
+// voiceover is speaking those exact words, which is a transcript rather than a
+// claim, and it goes when the audio does.
+export const IDLE_LINE = "no audio connected  ·  press play for a demo";
 export const INTRO_LINE = "measures the take, enjoy the vibe";
-
-export const SLOGANS = [
-    "twelve ways to look at a waveform",
-    INTRO_LINE,
-    "your ears are the instrument — this is the tape measure",
-    "nothing here is a guess. every number names its threshold",
-    "drop an AUDIO in and it stops pretending",
-];
-
-export function slogan(t) {
-    return SLOGANS[Math.floor(t / 6) % SLOGANS.length];
-}

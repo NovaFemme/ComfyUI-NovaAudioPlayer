@@ -15,9 +15,10 @@ database. `panel_format` selects `json`, `text` or `csv_row`.
 ## A node with no audio yet
 
 A freshly placed node is not blank. It draws the real player and animates a
-synthetic signal so the visualisers show what they do, and **pressing play on
-it plays a four-second voiceover** bundled with the pack — a real file through
-the real analyser, so what you see is an actual measurement.
+synthetic signal so the visualisers show what they do, and the badge row reads
+`no audio connected · press play for a demo`. Pressing play runs a four-second
+clip bundled with the pack through the real analyser, so what you see is an
+actual measurement rather than a mock-up.
 
 Nothing loads or plays until you press it. Wire an `AUDIO` in and the demo
 stops for good. `ui.idle_demo: false` in the system config turns the animation
