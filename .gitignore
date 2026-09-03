@@ -16,3 +16,7 @@ node_modules/
 
 # Screenshots written by the browser suites.
 dev/tests/_shots/
+
+# Replies to the research agent — hand over, then delete. Never committed.
+band-shares-fixed.md
+madow-context-contract.md
