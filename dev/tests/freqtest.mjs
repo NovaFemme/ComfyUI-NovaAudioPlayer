@@ -33,13 +33,23 @@ const out = await p.evaluate(async () => {
   const { bandShares } = await import("/web/renderers/freq_percentages.js");
   const SR = 48000, FFT = 4096, BINS = FFT / 2;
 
-  // One analyser frame of a tone at `hz`, as both float dBFS and bytes.
-  async function frame(hz, amp = 0.5) {
+  // One analyser frame of a tone at `hz` over a broadband noise floor, as both
+  // float dBFS and bytes.
+  //
+  // THE NOISE IS THE POINT. A pure tone in digital silence does not reproduce
+  // the bug: every other bin reads byte 0, so the broken domain sums almost
+  // nothing and lands on the right answer by accident. The failure needs a
+  // floor ABOVE the analyser's -100 dB clamp — which is what music has, and
+  // what makes 1536 floor-level HF bins outweigh a handful of loud bass ones.
+  async function frame(hz, amp = 0.5, noise = 0) {
     const ctx = new OfflineAudioContext(1, SR, SR);
     const src = ctx.createBufferSource();
     const buf = ctx.createBuffer(1, SR, SR);
     const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = amp * Math.sin(2 * Math.PI * hz * i / SR);
+    for (let i = 0; i < d.length; i++) {
+      d[i] = amp * Math.sin(2 * Math.PI * hz * i / SR)
+           + (noise ? noise * (Math.random() * 2 - 1) : 0);
+    }
     src.buffer = buf;
 
     // OfflineAudioContext cannot be polled, so measure through a live one.
@@ -83,14 +93,19 @@ const out = await p.evaluate(async () => {
     return sums.map(v => (v / (total || 1)) * 100);
   }
 
-  const bass = await frame(80);
-  const hf = await frame(9000);
+  const bass = await frame(80, 0.5, 0.02);   // tone over a floor, like music
+  const hf = await frame(9000, 0.5, 0.02);
+
+  // The floor the analyser actually saw, so a failure says which case it was.
+  const sorted = [...bass.db].filter(Number.isFinite).sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
 
   return {
     bassPower: bandShares(bass.db, BINS, SR).pct,
     bassByte: byteDomain(bass.bytes),
     hfPower: bandShares(hf.db, BINS, SR).pct,
     silence: bandShares(new Float32Array(BINS).fill(-Infinity), BINS, SR).pct,
+    floorDb: median,
   };
 });
 
@@ -109,15 +124,22 @@ ck("the FREQ % view renders without throwing",
 
 const f = a => a.map(v => (v === null ? "—" : v.toFixed(1))).join(" / ");
 
+console.log(`  median bin   ${out.floorDb.toFixed(1)} dBFS   ` +
+            `(above the -100 dB byte clamp, as music is)`);
 console.log(`  80 Hz tone   power ${f(out.bassPower)}`);
 console.log(`               byte  ${f(out.bassByte)}   <- what shipped`);
 console.log(`  9 kHz tone   power ${f(out.hfPower)}\n`);
 
-ck("an 80 Hz tone is almost entirely BASS", out.bassPower[0] > 90,
+ck("an 80 Hz tone over a noise floor is still almost all BASS",
+   out.bassPower[0] > 90,
    `BASS ${out.bassPower[0].toFixed(1)}%`);
 ck("the byte domain got that wrong — the bug, reproduced",
-   out.bassByte[0] < 60, `BASS ${out.bassByte[0].toFixed(1)}%`);
-ck("a 9 kHz tone is almost entirely HF", out.hfPower[3] > 90,
+   out.bassByte[0] < 20, `BASS ${out.bassByte[0].toFixed(1)}% (HF ${out.bassByte[3].toFixed(1)}%)`);
+ck("...and it fails by inflating HF, which is the observed shape",
+   out.bassByte[3] > 50, `HF ${out.bassByte[3].toFixed(1)}%`);
+ck("the floor is above the byte clamp, or the case is not the real one",
+   out.floorDb > -95, `${out.floorDb.toFixed(1)} dBFS`);
+ck("a 9 kHz tone over the same floor is almost all HF", out.hfPower[3] > 90,
    `HF ${out.hfPower[3].toFixed(1)}%`);
 ck("shares total 100", Math.abs(out.bassPower.reduce((a, c) => a + c, 0) - 100) < 0.01);
 
