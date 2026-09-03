@@ -94,6 +94,19 @@ const out = await p.evaluate(async () => {
   };
 });
 
+// THE CHECK THAT WOULD HAVE CAUGHT THE DEAD PANEL. A refactor left one
+// reference to a variable that no longer existed, so frame() threw on every
+// tick and the view drew NOTHING — not a placeholder, not an error, just an
+// empty rect, in the demo as well as on real audio. The maths was right the
+// whole time. Drive the actual renderer through the host and watch for a page
+// error, because "the numbers are correct" and "the panel draws" are two
+// different claims.
+await p.evaluate(() => window.__setView("freq_percentages"));
+await p.waitForTimeout(600);
+const drewClean = errs.length === 0;
+ck("the FREQ % view renders without throwing",
+   drewClean, errs.join(" | ") || "no page errors");
+
 const f = a => a.map(v => (v === null ? "—" : v.toFixed(1))).join(" / ");
 
 console.log(`  80 Hz tone   power ${f(out.bassPower)}`);

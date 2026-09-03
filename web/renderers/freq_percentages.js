@@ -142,7 +142,6 @@ export default {
             const { pct: shares, hfOutliers } = bandShares(
                 freqDb, binCount, sampleRate, params.floorDb ?? -85, outlierDb);
 
-            const denom = total || 1;
             const rowH = rect.h / (BANDS.length + 1);
             const labelW = 46;
             const pctW = 44;
