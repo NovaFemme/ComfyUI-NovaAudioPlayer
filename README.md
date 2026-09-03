@@ -61,6 +61,16 @@ shape: `json` for a parser, `text` for reading, `csv_row` for appending to a
 log. It is built from the same numbers the panel draws, so a logged take and
 the screen can never disagree.
 
+### It shows you what it does before you wire anything
+
+Place the node and it is already a player: the chrome, the transport, the view
+pill and a visualiser animating a synthetic signal. Press play and it says
+hello — a four-second voiceover that ships with the pack, analysed by the real
+analyser like any other audio.
+
+Connect an `AUDIO` output and the demo is gone for good. Nothing is fetched or
+played until you ask for it.
+
 ### Downloads
 
 The download arrow offers **WAV**, **FLAC** and **OGG** — everything

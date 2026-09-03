@@ -56,6 +56,17 @@ import { fillDemoSignal } from "./idle-demo.js";
 
 const _graphRegistry = new Map();
 
+// Registry key for the bundled voiceover, one per engine.
+//
+// Deliberately NOT shared between idle nodes the way a take is. Sharing keys on
+// a filename works because those engines share the <audio> element too; an idle
+// engine already owns its own element, and pointing two of them at one registry
+// entry would have the second adopt analysers fed by the first one's element —
+// meters moving to audio coming from somewhere else. Two idle nodes both
+// playing a four-second voiceover is a fine thing to allow.
+const INTRO_KEY = "__nova_intro__";
+let _introSeq = 0;
+
 export function audioUrl(filename) {
     return `/view?filename=${encodeURIComponent(filename)}&type=temp`;
 }
@@ -84,6 +95,11 @@ export class AudioEngine {
         this._peakHold = 0;
         this._peakHoldTime = 0;
         this.peakHoldMs = opts.peakHoldMs ?? 300;
+
+        // The bundled voiceover, played only when someone presses play on an
+        // idle node. Resolved from this module's own URL so it works wherever
+        // ComfyUI mounts the pack's web directory.
+        this.introUrl = new URL("../assets/intro.mp3", import.meta.url).href;
 
         // IDLE: a node that has never run has no file, and it still draws.
         // Without this the player did not exist at all until the first
@@ -173,7 +189,9 @@ export class AudioEngine {
     }
 
     ensureGraph() {
-        if (this.idle) return false;
+        // An idle engine has no graph until the intro is loaded; after that it
+        // is an ordinary source and the normal path applies.
+        if (this.idle && !this.el.src) return false;
         const entry = _graphRegistry.get(this.filename);
         if (entry && entry.analyserL) {
             this._adopt(entry);
@@ -270,9 +288,18 @@ export class AudioEngine {
     get currentTime() { return this.el.currentTime; }
 
     play() {
-        // Nothing to play, and nothing to warn about: an idle player is a
-        // preview of the real one, and its transport is inert by design.
-        if (this.idle) return Promise.resolve();
+        // An idle node plays the pack's own voiceover — a real file through
+        // the real analyser, so the visualisers are showing an actual signal
+        // rather than the synthetic one they animate with. It loads on the
+        // FIRST PRESS and never before: a node dropped into a graph must not
+        // fetch anything, and autoplay policy would refuse it anyway. The
+        // press is the gesture that makes it legal, which is also why this
+        // cannot happen without the user asking for it.
+        if (this.idle && !this.el.src) {
+            this.el.src = this.introUrl;
+            this.el.preload = "auto";
+            this.filename = `${INTRO_KEY}:${++_introSeq}`;
+        }
         this.ensureGraph();
         const ctx = sharedContext();
         if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
@@ -336,7 +363,10 @@ export class AudioEngine {
         // idle-demo.js. Throttled harder than the real path (15 fps against 30)
         // because a graph can hold a dozen idle players and not one of them is
         // showing anything anybody is measuring.
-        if (this.idle) {
+        // Playing the intro is real audio through the real analyser: fall
+        // through to the measurement path. The synthetic demo is only for a
+        // node that is sitting there doing nothing.
+        if (this.idle && !(this.playing && sig.ready)) {
             if (!this.demo) return sig;
             if (now - this._lastUpdate < 66) return sig;
             this._lastUpdate = now;

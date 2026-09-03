@@ -12,6 +12,17 @@ suite, FFT analyzer, RTA analyzer, and the APG artifact meter.
 **`panel_info`** (STRING) — the bench strip's contents, for a display node or a
 database. `panel_format` selects `json`, `text` or `csv_row`.
 
+## A node with no audio yet
+
+A freshly placed node is not blank. It draws the real player and animates a
+synthetic signal so the visualisers show what they do, and **pressing play on
+it plays a four-second voiceover** bundled with the pack — a real file through
+the real analyser, so what you see is an actual measurement.
+
+Nothing loads or plays until you press it. Wire an `AUDIO` in and the demo
+stops for good. `ui.idle_demo: false` in the system config turns the animation
+off.
+
 ## Downloads
 
 WAV, FLAC and OGG, written by `soundfile`. No mp3 — that needed ffmpeg through

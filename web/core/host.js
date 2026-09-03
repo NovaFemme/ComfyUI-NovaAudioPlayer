@@ -316,7 +316,8 @@ export class PlayerHost {
             // An idle node animates too, or the demo would be a still frame.
             // `engine.playing` is false there: nothing is playing, and claiming
             // otherwise would put a running transport on a node with no audio.
-            const demoing = this.engine.idle && this.engine.demo;
+            const demoing = this.engine.idle
+                            && (this.engine.demo || this.engine.playing);
             const animating = this.engine.playing || demoing
                               || this._ripple.alpha > 0;
             if (!animating && !this._dirty) return;
@@ -349,9 +350,11 @@ export class PlayerHost {
         // The badge row carries the file's format when there is a file. With
         // no file it is empty space on the one screen a stranger judges the
         // pack by, so the demo signs itself there instead.
-        if (this.engine.idle && this.engine.demo) {
+        if (this.engine.idle) {
             chrome.drawIdleBadge(ctx, L, palette,
-                                 slogan((this._frameNow || 0) / 1000));
+                                 this.engine.playing
+                                     ? "playing the intro — load an AUDIO for the real thing"
+                                     : slogan((this._frameNow || 0) / 1000));
         } else {
             chrome.drawBadge(ctx, L, palette, this.data);
         }
