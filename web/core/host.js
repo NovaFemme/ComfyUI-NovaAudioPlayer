@@ -23,6 +23,7 @@
  */
 
 import { config } from "./config.js";
+import { slogan } from "./idle-demo.js";
 import { AudioEngine } from "./audio-engine.js";
 import { computeLayout, minimumNodeSize } from "./layout.js";
 import {
@@ -70,10 +71,12 @@ export class PlayerHost {
         this.engine.setVolume(this.state.volume);
         this.engine.setMuted(this.state.muted);
         this.engine.setLooping(this.state.looping);
+        this.engine.demo = config.ui("idle_demo", true) !== false;
 
         this._textScale = textScale();
         this._unsubscribe = config.subscribe(() => {
             this._palette = null;        // force a re-resolve
+            this.engine.demo = config.ui("idle_demo", true) !== false;
 
             // Text scale changes every glyph metric, so anything that cached a
             // measurement or sized a buffer from one is now wrong.
@@ -310,11 +313,16 @@ export class PlayerHost {
                 this._syncRenderScale();
             }
 
-            const animating = this.engine.playing || this._ripple.alpha > 0;
+            // An idle node animates too, or the demo would be a still frame.
+            // `engine.playing` is false there: nothing is playing, and claiming
+            // otherwise would put a running transport on a node with no audio.
+            const demoing = this.engine.idle && this.engine.demo;
+            const animating = this.engine.playing || demoing
+                              || this._ripple.alpha > 0;
             if (!animating && !this._dirty) return;
 
             this._dirty = false;
-            if (this.engine.playing) this._phase += 0.07;
+            if (this.engine.playing || demoing) this._phase += 0.07;
             this._frameNow = now;
             this._draw();
         };
@@ -338,7 +346,15 @@ export class PlayerHost {
         ctx.clearRect(0, 0, this._cssW, this._cssH);
 
         chrome.drawBackground(ctx, L, palette);
-        chrome.drawBadge(ctx, L, palette, this.data);
+        // The badge row carries the file's format when there is a file. With
+        // no file it is empty space on the one screen a stranger judges the
+        // pack by, so the demo signs itself there instead.
+        if (this.engine.idle && this.engine.demo) {
+            chrome.drawIdleBadge(ctx, L, palette,
+                                 slogan((this._frameNow || 0) / 1000));
+        } else {
+            chrome.drawBadge(ctx, L, palette, this.data);
+        }
 
         // -- the visualiser --------------------------------------------
         const renderer = getRenderer(this.state.viewMode);

@@ -52,6 +52,8 @@ function sharedContext() {
  * Survives widget teardown, because the module is never unloaded.  `refs`
  * counts live engines so the graph is only torn down when the last one goes.
  */
+import { fillDemoSignal } from "./idle-demo.js";
+
 const _graphRegistry = new Map();
 
 export function audioUrl(filename) {
@@ -94,6 +96,8 @@ export class AudioEngine {
         // safer than twenty-five null guards. play() refuses early, so nothing
         // reaches it that would throw.
         this.idle = !filename;
+        this.demo = true;            // host turns this off if the user does
+        this._demoStart = 0;
         if (this.idle) {
             this.el = new Audio();
             this.el.preload = "none";
@@ -153,6 +157,21 @@ export class AudioEngine {
      * Build (or adopt) the Web Audio graph for this file.
      * Idempotent, and safe to call on every play event.
      */
+    /** Buffers for the idle demo, shaped exactly like the real analyser's. */
+    _ensureDemoBuffers() {
+        const bins = this.fftSize / 2;
+        const sig = this.sig;
+        if (sig.freq && sig.freq.length === bins) return;
+        sig.freq = new Uint8Array(bins);
+        sig.freqDb = new Float32Array(bins);
+        sig.timeL = new Float32Array(this.fftSize);
+        sig.timeR = new Float32Array(this.fftSize);
+        sig.binCount = bins;
+        sig.sampleRate = 48000;
+        sig.fftSize = this.fftSize;
+        sig.ready = true;
+    }
+
     ensureGraph() {
         if (this.idle) return false;
         const entry = _graphRegistry.get(this.filename);
@@ -312,6 +331,20 @@ export class AudioEngine {
         // The clip LED's hold timer must expire on wall-clock time, not on the
         // analyser tick, or a 1 s hold outlives its welcome at low frame rates.
         sig.clip = (now - this._clipHold) < 1000;
+
+        // An idle node draws synthetic material so the visualisers move — see
+        // idle-demo.js. Throttled harder than the real path (15 fps against 30)
+        // because a graph can hold a dozen idle players and not one of them is
+        // showing anything anybody is measuring.
+        if (this.idle) {
+            if (!this.demo) return sig;
+            if (now - this._lastUpdate < 66) return sig;
+            this._lastUpdate = now;
+            if (!this._demoStart) this._demoStart = now;
+            this._ensureDemoBuffers();
+            fillDemoSignal(sig, (now - this._demoStart) / 1000);
+            return sig;
+        }
 
         if (!sig.ready) return sig;
 

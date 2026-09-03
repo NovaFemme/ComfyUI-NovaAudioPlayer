@@ -79,6 +79,28 @@ export function drawBadge(ctx, L, palette, data) {
 }
 
 /**
+ * The badge row for a node that has no audio yet.
+ *
+ * Same row, same type size, different content: the pack's name and a line that
+ * changes every few seconds. A node sitting in the library is a shop window
+ * before it is a tool, and an empty row there says nothing about what the
+ * thing does.
+ */
+export function drawIdleBadge(ctx, L, palette, text) {
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+
+    ctx.fillStyle = palette.get("text");
+    ctx.font = "10px sans-serif";
+    const name = "NOVA AUDIO PLAYER";
+    ctx.fillText(name, 10, 20);
+
+    ctx.fillStyle = palette.get("text.dim");
+    ctx.font = "10px sans-serif";
+    ctx.fillText(`  ·  ${text}`, 10 + ctx.measureText(name).width, 20);
+}
+
+/**
  * Clip indicator.
  *
  * Lives in the info-badge row, NOT inside the visualisation rect.

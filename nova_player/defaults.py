@@ -298,6 +298,11 @@ DEFAULT_SYSTEM_CONFIG = {
         "default_view_mode": "waveform",
         "peak_hold_ms": 300,
         "settings_button": True,
+        # A node with no audio animates a synthetic signal so the visualisers
+        # show what they are for. Nothing is played — see web/core/idle-demo.js
+        # — and it stops the moment real audio arrives. Off for anyone who
+        # would rather a placed node sat still.
+        "idle_demo": True,
     },
     # Per-renderer parameter values.  The *schema* for these lives beside each
     # renderer in web/renderers/*.js; this file only carries the values, so a
