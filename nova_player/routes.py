@@ -49,7 +49,17 @@ MIME = {
     "ogg":  "audio/ogg",
 }
 
-SOUNDFILE_FORMAT = {"wav": "WAV", "flac": "FLAC", "ogg": "OGG"}
+# (container, subtype). THE SUBTYPE IS NOT INCIDENTAL: an OGG container holds
+# Vorbis-encoded data, and asking libsndfile for OGG with PCM_16 is asking for
+# raw samples inside a compressed container, which it refuses with "Invalid
+# combination of format, subtype and endian" — the error NovaFemme hit. WAV and
+# FLAC both take PCM_16 and happened to work, which is why one wrong constant
+# covered two of three formats.
+SOUNDFILE_FORMAT = {
+    "wav":  ("WAV", "PCM_16"),
+    "flac": ("FLAC", "PCM_16"),
+    "ogg":  ("OGG", "VORBIS"),
+}
 
 
 def _safe_temp_path(filename: str):
@@ -162,10 +172,15 @@ def register_routes() -> bool:
                 text=(f"Converting to {fmt} needs the soundfile package. "
                       f"The original WAV is available with fmt=wav."))
 
+        container, subtype = SOUNDFILE_FORMAT[fmt]
         try:
-            data, sr = sf.read(src_path, dtype="int16", always_2d=True)
+            # float for the Vorbis encoder, int16 for the PCM containers: the
+            # encoder wants headroom, and the PCM paths must not resample the
+            # values they were given.
+            dtype = "float32" if subtype == "VORBIS" else "int16"
+            data, sr = sf.read(src_path, dtype=dtype, always_2d=True)
             buf = io.BytesIO()
-            sf.write(buf, data, sr, format=SOUNDFILE_FORMAT[fmt], subtype="PCM_16")
+            sf.write(buf, data, sr, format=container, subtype=subtype)
         except Exception as e:                                # noqa: BLE001
             logger.warning("[NovaAudioPlayer] soundfile failed for %s: %s", fmt, e)
             return web.Response(status=500, text=f"Could not write {fmt}: {e}")
