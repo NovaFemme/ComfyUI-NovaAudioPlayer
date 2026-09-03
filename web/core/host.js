@@ -23,7 +23,7 @@
  */
 
 import { config } from "./config.js";
-import { slogan } from "./idle-demo.js";
+import { INTRO_LINE, slogan } from "./idle-demo.js";
 import { AudioEngine } from "./audio-engine.js";
 import { computeLayout, minimumNodeSize } from "./layout.js";
 import {
@@ -353,7 +353,7 @@ export class PlayerHost {
         if (this.engine.idle) {
             chrome.drawIdleBadge(ctx, L, palette,
                                  this.engine.playing
-                                     ? "playing the intro — load an AUDIO for the real thing"
+                                     ? INTRO_LINE
                                      : slogan((this._frameNow || 0) / 1000));
         } else {
             chrome.drawBadge(ctx, L, palette, this.data);
@@ -1062,7 +1062,12 @@ export class PlayerHost {
         this.stereo = !!(data.stereo && this.peaks.ch1);
 
         if (!sameFile) {
-            const wasPlaying = this.engine.playing;
+            // Playback carries across a re-render on purpose: the same take
+            // rendered again should keep playing. It must NOT carry across the
+            // intro, though — a graph that starts playing your generation
+            // because the voiceover happened to be running is a node making
+            // decisions about your speakers.
+            const wasPlaying = this.engine.playing && !this.engine.idle;
             this.engine.dispose();
             this.engine = new AudioEngine(data.filename, {
                 duration: data.duration,

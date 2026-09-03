@@ -136,9 +136,14 @@ export function fillDemoSignal(sig, t) {
 // Shown in the badge row while the demo runs. Cycled rather than fixed: the
 // node is a shop window before it is a tool, and a line that changes is read
 // twice.
+// What the voiceover actually says. Shown while it plays, because a caption
+// that disagrees with the audio it captions is worse than no caption: the eye
+// wins, and then the line you recorded is the one nobody read.
+export const INTRO_LINE = "measures the take, enjoy the vibe";
+
 export const SLOGANS = [
     "twelve ways to look at a waveform",
-    "measures the take, not the vibe",
+    INTRO_LINE,
     "your ears are the instrument — this is the tape measure",
     "nothing here is a guess. every number names its threshold",
     "drop an AUDIO in and it stops pretending",

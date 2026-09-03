@@ -33,8 +33,18 @@ import "./madow/index.js";
 const NODE_TYPE = "NovaPlayerNode";
 const WIDGET_NAME = "nova_player_display";
 
-/** node.id -> PlayerHost */
-const hosts = new Map();
+// THE HOST LIVES ON THE NODE, not in a map keyed by node.id.
+//
+// It was `hosts.get(node.id)`, which worked while the host was only ever built
+// in onExecuted — by then the node has its id. Building it in onNodeCreated
+// broke that: LiteGraph assigns the id when the node joins the graph, AFTER
+// onNodeCreated runs, so the idle host was filed under -1 and the lookup on
+// execution missed it. The result was a SECOND host and a second DOM widget:
+// two players stacked in one node, the idle one still animating above the real
+// one.
+//
+// A property on the node cannot drift from the node it belongs to.
+const HOST_KEY = "_novaHost";
 
 // What a node with no audio yet shows: the real player, drawing its idle
 // state. Every renderer already handles `!sig.hasData` with a placeholder, so
@@ -56,7 +66,7 @@ async function fetchPeaks(filename) {
 }
 
 function ensureHost(node, data) {
-    let host = hosts.get(node.id);
+    let host = node[HOST_KEY];
 
     if (host) {
         // A saved workflow now meets an idle host that onNodeCreated built, so
@@ -73,7 +83,7 @@ function ensureHost(node, data) {
     }
 
     host = new PlayerHost(node, data);
-    hosts.set(node.id, host);
+    node[HOST_KEY] = host;
 
     const widget = node.addDOMWidget(WIDGET_NAME, "nova_player", host.element, {
         serialize: true,
@@ -96,7 +106,7 @@ function ensureHost(node, data) {
 
     widget.onRemove = () => {
         host.destroy();
-        hosts.delete(node.id);
+        delete node[HOST_KEY];
     };
 
     const [minW, minH] = host.minimumSize();
