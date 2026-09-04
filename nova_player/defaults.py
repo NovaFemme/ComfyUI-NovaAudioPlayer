@@ -274,8 +274,8 @@ DEFAULT_SYSTEM_CONFIG = {
         "show_tooltips": True,
     },
     "audio_engine": {
-        # What soundfile can write. The lossy formats needed ffmpeg through a
-        # subprocess, which the registry's scanner would not have.
+        # What soundfile can write. The lossy formats needed ffmpeg as an
+        # external binary, which the registry's scanner would not have.
         "supported_formats": ["wav", "flac", "ogg"],
         "default_format": "wav",
         "fft_size": 4096,

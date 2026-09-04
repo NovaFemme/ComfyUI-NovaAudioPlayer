@@ -1,65 +1,51 @@
-"""Comfy registry standards — a grep the release cannot forget to run.
+"""Comfy registry standards — a grep over the files that are actually shipped.
 
-2.2.0 and 2.2.1 were both flagged by the registry's scanner. The two things in
-this package a scanner could plausibly have objected to were a `subprocess`
-call reaching ffmpeg for the lossy download formats, and a 156 KB minified
-vendor blob (web/lib/lame.min.js) that nothing imported. Both are gone.
+History, because it is the whole argument for how this test is written now:
 
-This test exists so neither comes back by accident. It is a grep, not an
-analysis: it cannot prove the package is safe, only that the specific patterns
-the published standards name are absent.
+  2.2.0, 2.2.1   Banned.   A `subprocess` call reached ffmpeg for the lossy
+                           download formats, and a 156 KB minified vendor blob
+                           (web/lib/lame.min.js) sat unimported in the tree.
+  2.3.0, 2.3.2   Flagged.  Both of those were gone. Something still matched.
+
+The first version of this test walked the working tree and skipped a hardcoded
+set of directories — `dev`, `docs`, `presets`, `config` — on the assumption
+that they "are not shipped". **That assumption was wrong.**
+
+    "By default `comfy node publish` packages every file tracked by git."
+    https://docs.comfy.org/registry/publishing
+
+Thirty-seven of this repository's 118 tracked files are `dev/`, and one of them
+is this file: a table of every literal the scanner hunts for, published inside
+the package it is meant to protect. The test passed while shipping the bait.
+
+So the file set is no longer a guess. It is `git ls-files` minus `.comfyignore`,
+which is what the packager itself does, and the first thing checked is that
+this file is not in it.
+
+Comments are scanned too. The old version skipped lines starting with `#` or
+`//` on the reasoning that a line talking *about* a pattern is not the pattern.
+That is true of a parser and false of a grep, and the registry's scanner greps.
 
     https://docs.comfy.org/registry/standards
       - eval and exec are prohibited
       - runtime package installation via subprocess is prohibited
       - obfuscated code is prohibited
 
+It is a grep, not an analysis: it cannot prove the package is safe, only that
+the patterns the published standards name are absent from what ships.
+
 Run:  python3 dev/tests/test_standards.py
 """
 
+import fnmatch
 import os
 import re
+import subprocess  # noqa: S404 - see module docstring; this file never ships
 import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(_HERE, "..", ".."))
-
-# Directories that are not shipped, and this file, which necessarily names
-# every pattern it looks for.
-SKIP_DIRS = {".git", ".trash", "__pycache__", "node_modules", "dev", "docs",
-             "presets", "config"}
-
-PY_FORBIDDEN = [
-    (r"\bimport\s+subprocess\b", "import subprocess"),
-    (r"\bsubprocess\.", "subprocess call"),
-    (r"\bos\.system\s*\(", "os.system"),
-    (r"(?<![\w.])eval\s*\(", "eval()"),
-    (r"(?<![\w.])exec\s*\(", "exec()"),
-    (r"\bpip\s+install\b", "pip install"),
-    (r"\bimport\s+pickle\b", "pickle"),
-]
-
-# JavaScript is scanned too, and this is where 2.3.0 went wrong: the Python
-# rules were checked and the front end was not. Colour parsing used the RegExp
-# object's own matching method -- a regular expression, not code execution --
-# and the scanner, which greps rather than parses, saw a prohibited word.
-#
-# The rule below is therefore deliberately blunt. It forbids a construct that
-# is perfectly safe, because "safe" is not the test being run here: the test is
-# whether a text search finds something it objects to. `str.match(re)` does the
-# same job. The comments explaining all this avoid the word as well -- a
-# comment is text like any other, and one describing the fix would re-trigger
-# the very rule it documents.
-JS_FORBIDDEN = [
-    (r"(?<![\w.])eval\s*\(", "eval()"),
-    (r"\bnew\s+Function\s*\(", "new Function()"),
-    (r"\.e" + r"xec\s*\(", "a regex run through the prohibited method name"),
-]
-
-# A minified bundle is indistinguishable from obfuscation to a scanner, and to
-# a reviewer. The threshold is characters per line averaged over the file:
-# hand-written JavaScript does not average 500.
-MAX_MEAN_LINE = 500
+SELF = os.path.relpath(os.path.abspath(__file__), ROOT).replace(os.sep, "/")
 
 PASS = FAIL = 0
 
@@ -73,50 +59,134 @@ def ck(name, ok, detail=""):
         FAIL += 1
 
 
-def shipped(ext):
-    for base, dirs, files in os.walk(ROOT):
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
-        for fn in files:
-            if fn.endswith(ext):
-                yield os.path.join(base, fn)
+# ---------------------------------------------------------------- file set
 
+def _comfyignore_patterns():
+    path = os.path.join(ROOT, ".comfyignore")
+    if not os.path.exists(path):
+        return []
+    out = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("!"):
+                # Negation is real .gitignore syntax and this matcher does not
+                # implement it. Refuse rather than silently under-ignoring.
+                raise SystemExit(
+                    "test_standards: .comfyignore negation (!) is not supported "
+                    "by this matcher; either drop it or use pathspec here."
+                )
+            out.append(line)
+    return out
+
+
+def _ignored(rel, patterns):
+    for pat in patterns:
+        p = pat.rstrip("/")
+        if pat.endswith("/"):
+            if rel == p or rel.startswith(p + "/"):
+                return True
+        elif fnmatch.fnmatch(rel, p) or rel.startswith(p + "/"):
+            return True
+        elif "/" not in p and fnmatch.fnmatch(os.path.basename(rel), p):
+            return True
+    return False
+
+
+def shipped_files():
+    """Exactly what `comfy node publish` puts in node.zip: git-tracked files,
+    minus .comfyignore. Mirrors comfy_cli.file_utils.zip_files."""
+    raw = subprocess.run(
+        ["git", "ls-files", "-z"], cwd=ROOT, check=True, capture_output=True
+    ).stdout.decode("utf-8")
+    tracked = [p for p in raw.split("\0") if p]
+    patterns = _comfyignore_patterns()
+    return [p for p in tracked if not _ignored(p, patterns)]
+
+
+SHIPPED = shipped_files()
 
 print("registry standards\n")
+print(f"  {len(SHIPPED)} files ship (git-tracked, minus .comfyignore)\n")
 
-for pattern, label in PY_FORBIDDEN:
-    hits = []
-    rx = re.compile(pattern)
-    for path in shipped(".py"):
-        with open(path, "r", encoding="utf-8") as f:
-            for i, line in enumerate(f, 1):
-                # A line that only talks ABOUT the pattern is not the pattern.
-                stripped = line.lstrip()
-                if stripped.startswith("#"):
-                    continue
-                if rx.search(line):
-                    hits.append(f"{os.path.relpath(path, ROOT)}:{i}")
-    ck(f"no {label}", not hits, ", ".join(hits[:3]))
+# This file necessarily contains every forbidden literal. If it ships, the
+# package ships a list of the scanner's own triggers.
+ck("this test file does not ship", SELF not in SHIPPED, "" if SELF not in SHIPPED else SELF)
 
-for pattern, label in JS_FORBIDDEN:
-    hits = []
-    rx = re.compile(pattern)
-    for path in shipped(".js"):
-        with open(path, "r", encoding="utf-8") as f:
-            for i, line in enumerate(f, 1):
-                stripped = line.lstrip()
-                if stripped.startswith("//") or stripped.startswith("*"):
-                    continue
-                if rx.search(line):
-                    hits.append(f"{os.path.relpath(path, ROOT)}:{i}")
-    ck(f"no {label} in JavaScript", not hits, ", ".join(hits[:3]))
+
+def shipped_with(*exts):
+    for rel in SHIPPED:
+        if rel.endswith(exts):
+            yield rel
+
+
+# ---------------------------------------------------------------- patterns
+
+PY_FORBIDDEN = [
+    (r"\bimport\s+subprocess\b", "import subprocess"),
+    (r"\bsubprocess\.", "subprocess call"),
+    (r"\bos\.system\s*\(", "os.system"),
+    (r"(?<![\w.])eval\s*\(", "eval()"),
+    (r"(?<![\w.])exec\s*\(", "exec()"),
+    (r"\bpip\s+install\b", "pip install"),
+    (r"\bimport\s+pickle\b", "pickle"),
+]
+
+# JavaScript is scanned too, and this is where 2.3.0 went wrong the first time:
+# the Python rules were checked and the front end was not. Colour parsing used
+# the RegExp object's own matching method -- a regular expression, not code
+# execution -- and the scanner, which greps rather than parses, saw a
+# prohibited word. `str.match(re)` does the same job.
+#
+# The rules are deliberately blunt. They forbid constructs that are perfectly
+# safe, because "safe" is not the test being run here: the test is whether a
+# text search finds something it objects to.
+JS_FORBIDDEN = [
+    (r"(?<![\w.])eval\s*\(", "eval()"),
+    (r"\bnew\s+Function\s*\(", "new Function()"),
+    (r"\.e" + r"xec\s*\(", "a regex run through the prohibited method name"),
+    (r"\bchild_process\b", "child_process"),
+]
+
+# Prose and comments ship too -- README.md, the node's help pages, every
+# explanatory comment in the source -- and a grep does not know the difference
+# between documentation and code. Naming the word is enough to match, so the
+# comments that explain why the ffmpeg path was removed must not name it.
+TEXT_FORBIDDEN = [
+    (r"\bsubprocess\b", "the word subprocess in shipped text"),
+]
+
+# A minified bundle is indistinguishable from obfuscation to a scanner, and to
+# a reviewer. Characters per line averaged over the file: hand-written
+# JavaScript does not average 500.
+MAX_MEAN_LINE = 500
+
+
+def scan(exts, rules, suffix=""):
+    for pattern, label in rules:
+        rx = re.compile(pattern)
+        hits = []
+        for rel in shipped_with(*exts):
+            with open(os.path.join(ROOT, rel), "r", encoding="utf-8", errors="replace") as f:
+                for i, line in enumerate(f, 1):
+                    if rx.search(line):
+                        hits.append(f"{rel}:{i}")
+        ck(f"no {label}{suffix}", not hits, ", ".join(hits[:3]) + (" …" if len(hits) > 3 else ""))
+
+
+scan((".py",), PY_FORBIDDEN)
+scan((".js", ".mjs"), JS_FORBIDDEN, " in JavaScript")
+scan((".md", ".py", ".js", ".mjs"), TEXT_FORBIDDEN)
 
 blobs = []
-for path in shipped(".js"):
-    with open(path, "r", encoding="utf-8") as f:
+for rel in shipped_with(".js", ".mjs"):
+    with open(os.path.join(ROOT, rel), "r", encoding="utf-8", errors="replace") as f:
         text = f.read()
     lines = text.count("\n") + 1
     if lines and len(text) / lines > MAX_MEAN_LINE:
-        blobs.append(f"{os.path.relpath(path, ROOT)} ({len(text) // lines} chars/line)")
+        blobs.append(f"{rel} ({len(text) // lines} chars/line)")
 ck("no minified or obfuscated JavaScript ships", not blobs, ", ".join(blobs))
 
 print(f"\n{PASS} passed, {FAIL} failed")

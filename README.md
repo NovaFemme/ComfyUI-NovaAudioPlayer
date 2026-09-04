@@ -78,8 +78,8 @@ The download arrow offers **WAV**, **FLAC** and **OGG** — everything
 `soundfile` can write, with no external binary involved.
 
 There is deliberately no MP3, M4A, Opus or WebM. Those needed ffmpeg, reached
-through a `subprocess` call, and the Comfy registry's scanner flagged the two
-releases that contained it. A node nobody can install exports nothing at all,
+by shelling out to an external binary, and the Comfy registry's scanner flagged
+the two releases that contained it. A node nobody can install exports nothing at all,
 so the four lossy formats went rather than the release. If you want an mp3, the
 WAV is one ffmpeg command away.
 

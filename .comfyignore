@@ -1,0 +1,10 @@
+# Files that stay in the repository but must not be published to the Comfy
+# registry. `comfy node publish` packages every git-tracked file by default:
+#   https://docs.comfy.org/registry/publishing
+#
+# dev/ is the test suite and the browser harnesses. It has no business in an
+# installed node pack, and dev/tests/test_standards.py in particular is a table
+# of every literal the registry's scanner searches for -- publishing it means
+# publishing the bait. 2.3.0 and 2.3.2 both shipped it and both came back
+# flagged.
+dev/

@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-novaaudioplayer"
 description = "Three nodes for evaluating ACE-Step music generations. Nova Player: an audio player with twelve live visualisers, a whole-file measurement panel, a theme system you can drive from inside the node, and a panel_info output for logging every take's metrics. Madow Inputs: every ACE-Step generation parameter in one node, with named presets, cross-field validation and a context blob that records exactly what produced a take. Madow Unpack: fans that bundle out into typed outputs."
-version = "2.3.2"
+version = "2.3.3"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 

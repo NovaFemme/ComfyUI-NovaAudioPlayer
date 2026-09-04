@@ -34,10 +34,10 @@ logger = logging.getLogger("NovaAudioPlayer")
 # wav, flac and ogg — everything `soundfile` can write, and nothing else.
 #
 # THE FORMATS THAT ARE NOT HERE. mp3, m4a, opus and webm were produced by
-# shelling out to ffmpeg. The call was argv-list, never shell=True, with the
-# format checked against this table first and the filename resolved inside the
-# temp directory — but the Comfy registry's scanner flagged 2.2.0 and 2.2.1,
-# and `subprocess` is the only thing in this package it plausibly objected to.
+# shelling out to ffmpeg. The call passed an argv list, never a shell string,
+# with the format checked against this table first and the filename resolved
+# inside the temp directory — but the Comfy registry's scanner flagged 2.2.0
+# and 2.2.1, and spawning an external binary was the likeliest objection.
 # A node nobody can install exports nothing at all, so the four lossy formats
 # went rather than the release.
 #
