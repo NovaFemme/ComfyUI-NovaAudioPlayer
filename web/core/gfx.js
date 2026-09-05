@@ -475,9 +475,9 @@ export function drawBar(ctx, x, y, w, h, color, opts = {}) {
 //
 // These used the RegExp object's own matching method — the standard way to run
 // a regular expression, and as unrelated to code execution as Array.map. The
-// Comfy registry's scanner does not read JavaScript that closely: its rule is
-// "no eval, no code execution", and 2.2.0, 2.2.1 and 2.3.0 were all flagged.
-// Colour parsing was the only place in the package that used it.
+// Comfy registry's scanner does not read JavaScript that closely: its rule
+// bans running code from a string outright, and 2.2.0, 2.2.1 and 2.3.0 were
+// all flagged. Colour parsing was the only place in the package that used it.
 //
 // `str.match(re)` is exactly equivalent for a non-global regex — same array,
 // same capture groups, same null on no match — so nothing changes here except

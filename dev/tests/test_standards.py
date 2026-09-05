@@ -154,8 +154,31 @@ JS_FORBIDDEN = [
 # explanatory comment in the source -- and a grep does not know the difference
 # between documentation and code. Naming the word is enough to match, so the
 # comments that explain why the ffmpeg path was removed must not name it.
+# Standalone words, not syntax. `\b` is doing the work: "revalidate" contains
+# "eval" and "execution" contains "exec", and no scanner treats those as the
+# API name or half of npm would be flagged. What matters is the word standing
+# on its own, in prose a grep reads exactly like code.
+#
+# NovaFemme found the first of these by hand after 2.3.3 was flagged: the
+# comment in gfx.js explaining how the prohibited method name was avoided
+# named a *different* prohibited word while doing it. Fixing the mechanism and
+# leaving the word is the same mistake as the subprocess comments, one file
+# further on.
+#
+# base64 is precautionary rather than known: decoding code from base64 is an
+# obfuscation pattern, a comment saying the payload contains none of it is not,
+# and rewording cost one sentence.
 TEXT_FORBIDDEN = [
-    (r"\bsubprocess\b", "the word subprocess in shipped text"),
+    (r"\bsubprocess\b", "the word subprocess"),
+    (r"\beval\b", "the word eval"),
+    (r"\bexec\b", "the word exec"),
+    (r"\bpopen\b", "the word popen"),
+    (r"\bpickle\b", "the word pickle"),
+    (r"\bmarshal\b", "the word marshal"),
+    (r"\bchild_process\b", "the word child_process"),
+    (r"\bbase64\b", "the word base64"),
+    (r"\batob\b|\bbtoa\b", "atob/btoa"),
+    (r"__import__", "__import__"),
 ]
 
 # A minified bundle is indistinguishable from obfuscation to a scanner, and to

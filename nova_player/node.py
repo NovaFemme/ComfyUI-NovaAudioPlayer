@@ -6,10 +6,10 @@ loudness, and hands the front end a tiny payload.  Everything else lives
 elsewhere (audio_io.py for the DSP, routes.py for HTTP, config_manager.py for
 settings).
 
-The `ui` payload stays small on purpose — no peaks, no base64 audio.  Peaks go
-through their own HTTP route so a long file cannot blow the websocket message
-limit, and they are also written to a sidecar JSON so a browser refresh after a
-server restart can still restore the widget.
+The `ui` payload stays small on purpose — no peaks, and no audio inlined as
+text. Peaks go through their own HTTP route so a long file cannot blow the
+websocket message limit, and they are also written to a sidecar JSON so a
+browser refresh after a server restart can still restore the widget.
 """
 
 import os
