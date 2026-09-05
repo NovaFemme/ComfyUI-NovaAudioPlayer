@@ -132,6 +132,16 @@ PY_FORBIDDEN = [
     (r"(?<![\w.])exec\s*\(", "exec()"),
     (r"\bpip\s+install\b", "pip install"),
     (r"\bimport\s+pickle\b", "pickle"),
+    # Added after `nodesafe scan` reported five HIGH / CWE-95 findings in the
+    # shipped package, every one of them a regular expression being prepared
+    # ahead of time. The call shares its name with Python's bytecode builder,
+    # which is half of the standard runtime-execution pair, and a scanner
+    # matching literals cannot tell the two apart. The published standards name
+    # only eval and exec, which is why this rule was missing and why 2.2.0
+    # through 2.3.3 all shipped the pattern.
+    (r"(?<![\w.])compile\s*\(", "compile()"),
+    (r"\bimportlib\.import_module\b", "importlib.import_module"),
+    (r"\bos\.popen\s*\(", "os.popen"),
 ]
 
 # JavaScript is scanned too, and this is where 2.3.0 went wrong the first time:

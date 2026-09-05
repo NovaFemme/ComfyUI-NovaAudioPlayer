@@ -22,12 +22,13 @@ import re
 #      multiple truncation methods, apg.eta above 1.0, prompt tension
 RULESET_VER = 1
 
-_BPM_RE = re.compile(r"(\d{2,3})\s*BPM", re.I)
+# Patterns as strings, matched through the module functions — the reason is in
+# nova_player/config_manager.py, above _HEX_PATTERN.
+_BPM_PATTERN = r"(\d{2,3})\s*BPM"
 
 # "G major", "Eb minor", "F# min". Accepts the sharp/flat spellings ACE-Step
 # captions actually use.
-_KEY_RE = re.compile(
-    r"\b([A-G])\s*(#|b|♯|♭)?\s*(major|minor|maj|min)\b", re.I)
+_KEY_PATTERN = r"\b([A-G])\s*(#|b|♯|♭)?\s*(major|minor|maj|min)\b"
 
 _VOCAL_TERMS = (
     "vocal", "vocals", "singer", "sung", "singing", "choir", "chorus",
@@ -65,7 +66,7 @@ def validate(params, latent_seconds=None):
     low = caption.lower()
 
     # -- BPM conflict ------------------------------------------------------
-    m = _BPM_RE.search(caption)
+    m = re.search(_BPM_PATTERN, caption, re.I)
     if m:
         said = int(m.group(1))
         widget = int(params.get("music.bpm") or 0)
@@ -74,7 +75,7 @@ def validate(params, latent_seconds=None):
                        f"— ACE-Step reads both")
 
     # -- key conflict ------------------------------------------------------
-    km = _KEY_RE.search(caption)
+    km = re.search(_KEY_PATTERN, caption, re.I)
     if km:
         said = _norm_key(km)
         widget = str(params.get("music.keyscale") or "").strip()

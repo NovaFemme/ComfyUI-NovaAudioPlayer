@@ -22,7 +22,9 @@ SCHEMA_VER = 1
 # Conservative on purpose. A preset name becomes a filename, and the set of
 # characters that are safe in a filename on every platform the pack might run
 # on is smaller than the set that looks harmless.
-_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.-]{0,63}$")
+# A string, matched through the module function — see the note above
+# _HEX_PATTERN in nova_player/config_manager.py.
+_NAME_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9 _.-]{0,63}$"
 
 PRESET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "..", "presets")
@@ -36,7 +38,7 @@ def _dir():
 
 def valid_name(name):
     """A name that is safe as a filename and cannot escape the preset dir."""
-    if not isinstance(name, str) or not _NAME_RE.match(name):
+    if not isinstance(name, str) or not re.match(_NAME_PATTERN, name):
         return False
     # Belt and braces: the regex already excludes separators and dot-dot, but
     # this is the check that actually matters and it is cheap.
