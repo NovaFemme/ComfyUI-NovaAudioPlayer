@@ -86,7 +86,7 @@ class NovaPlayerNode:
 
         duration = round(n_samples / sample_rate, 3)
         stereo = n_ch >= 2
-        lufs = compute_lufs(waveform)
+        lufs = compute_lufs(waveform, sample_rate)
 
         # Measured BEFORE save_wav, which clamps to +/-1.0: a generation that
         # overshoots full scale should report the peak it actually produced,
