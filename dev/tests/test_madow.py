@@ -21,6 +21,12 @@ import tempfile
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _PKG = os.path.join(os.path.dirname(_HERE), "..")
 
+# These modules are loaded from a file path, so there is no package around them
+# and `from ..nova_categories import ...` cannot resolve. Every module in the
+# pack falls back to the top-level spelling for exactly this case; the pack root
+# has to be importable for that fallback to find it.
+sys.path.insert(0, os.path.abspath(_PKG))
+
 
 def _load(name, rel):
     spec = importlib.util.spec_from_file_location(name, os.path.join(_PKG, rel))

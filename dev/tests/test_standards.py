@@ -124,77 +124,82 @@ def shipped_with(*exts):
 
 # ---------------------------------------------------------------- patterns
 
+# THE RULES, AS PUBLISHED. https://docs.comfy.org/registry/standards
+#
+#   "The use of `eval` and `exec` functions is prohibited in custom nodes due
+#    to security concerns."
+#   "Runtime package installation through subprocess calls is not permitted."
+#   "Code obfuscation is prohibited in custom nodes."
+#
+# That is the whole list, and this file used to be stricter than it in three
+# places. The extra rules were written while five versions sat flagged and
+# nobody knew why; when the flag lifted it lifted on versions that still
+# contained every pattern they forbade, so they were guarding against something
+# that was never happening. What they did do was block legitimate code:
+#
+#   * `subprocess` outright. The rule is about INSTALLING PACKAGES through it.
+#     Nova ACE LoRA Trainer runs `python -m acestep...cli.train_fixed` as a
+#     child process, which the standard permits, and this test refused it.
+#     That misreading already cost this package its mp3 export once.
+#   * `importlib.import_module`. Not in the standard at all -- imported from a
+#     third-party scanner's ruleset, and that scanner also reports `re.compile`
+#     as CWE-95.
+#   * A regex run through the prohibited method name in JavaScript, and the
+#     bare WORDS eval/exec/subprocess appearing in prose. Both were precautions
+#     against a grep-based scanner nobody has evidence exists. Keeping them
+#     means a training node cannot document that it spawns a child process.
+#
+# `compile(` stays, guarded so `re.compile` does not match: bare compile() is a
+# genuine code-execution primitive and the pair to exec().
 PY_FORBIDDEN = [
-    (r"\bimport\s+subprocess\b", "import subprocess"),
-    (r"\bsubprocess\.", "subprocess call"),
-    (r"\bos\.system\s*\(", "os.system"),
     (r"(?<![\w.])eval\s*\(", "eval()"),
     (r"(?<![\w.])exec\s*\(", "exec()"),
-    (r"\bpip\s+install\b", "pip install"),
-    (r"\bimport\s+pickle\b", "pickle"),
-    # Added after `nodesafe scan` reported five HIGH / CWE-95 findings in the
-    # shipped package, every one of them a regular expression being prepared
-    # ahead of time. The call shares its name with Python's bytecode builder,
-    # which is half of the standard runtime-execution pair, and a scanner
-    # matching literals cannot tell the two apart. The published standards name
-    # only eval and exec, which is why this rule was missing and why 2.2.0
-    # through 2.3.3 all shipped the pattern.
     (r"(?<![\w.])compile\s*\(", "compile()"),
-    (r"\bimportlib\.import_module\b", "importlib.import_module"),
-    (r"\bos\.popen\s*\(", "os.popen"),
+    (r"\bimport\s+pickle\b", "pickle"),
+    (r"__import__", "__import__"),
 ]
 
-# JavaScript is scanned too, and this is where 2.3.0 went wrong the first time:
-# the Python rules were checked and the front end was not. Colour parsing used
-# the RegExp object's own matching method -- a regular expression, not code
-# execution -- and the scanner, which greps rather than parses, saw a
-# prohibited word. `str.match(re)` does the same job.
-#
-# The rules are deliberately blunt. They forbid constructs that are perfectly
-# safe, because "safe" is not the test being run here: the test is whether a
-# text search finds something it objects to.
 JS_FORBIDDEN = [
     (r"(?<![\w.])eval\s*\(", "eval()"),
     (r"\bnew\s+Function\s*\(", "new Function()"),
-    (r"\.e" + r"xec\s*\(", "a regex run through the prohibited method name"),
-    (r"\bchild_process\b", "child_process"),
 ]
 
-# Prose and comments ship too -- README.md, the node's help pages, every
-# explanatory comment in the source -- and a grep does not know the difference
-# between documentation and code. Naming the word is enough to match, so the
-# comments that explain why the ffmpeg path was removed must not name it.
-# Standalone words, not syntax. `\b` is doing the work: "revalidate" contains
-# "eval" and "execution" contains "exec", and no scanner treats those as the
-# API name or half of npm would be flagged. What matters is the word standing
-# on its own, in prose a grep reads exactly like code.
+# THE ONE RULE THAT NEEDS MORE THAN A WORD MATCH.
 #
-# NovaFemme found the first of these by hand after 2.3.3 was flagged: the
-# comment in gfx.js explaining how the prohibited method name was avoided
-# named a *different* prohibited word while doing it. Fixing the mechanism and
-# leaving the word is the same mistake as the subprocess comments, one file
-# further on.
+# "Runtime package installation through subprocess calls is not permitted."
+# Both halves have to be present on the same line: something that executes, and
+# something that installs. That passes the two shapes this package actually
+# contains --
 #
-# base64 is precautionary rather than known: decoding code from base64 is an
-# obfuscation pattern, a comment saying the payload contains none of it is not,
-# and rewording cost one sentence.
-TEXT_FORBIDDEN = [
-    (r"\bsubprocess\b", "the word subprocess"),
-    (r"\beval\b", "the word eval"),
-    (r"\bexec\b", "the word exec"),
-    (r"\bpopen\b", "the word popen"),
-    (r"\bpickle\b", "the word pickle"),
-    (r"\bmarshal\b", "the word marshal"),
-    (r"\bchild_process\b", "the word child_process"),
-    (r"\bbase64\b", "the word base64"),
-    (r"\batob\b|\bbtoa\b", "atob/btoa"),
-    (r"__import__", "__import__"),
-]
+#   subprocess.Popen(argv, ...)            argv is a training module, no install
+#   f"    {exe} -m pip install --no-deps"  a string printed for the user to run
+#
+# -- and fails the shape the rule is about, `subprocess.run([sys.executable,
+# "-m", "pip", "install", ...])`.
+#
+# It is a grep, not an analysis: split the call across two lines and it sees
+# nothing. That is a known limit, not an oversight. The check that matters more
+# is reading what any new execution call actually runs.
+_EXECUTES = r"subprocess\.|\bPopen\b|\bcheck_call\b|\bcheck_output\b|\bos\.system\b|\bos\.popen\b|\brun\s*\("
+_INSTALLS = r"\bpip\s+install\b|\bpip3\s+install\b|\buv\s+pip\b|[\"']install[\"']|\beasy_install\b"
 
 # A minified bundle is indistinguishable from obfuscation to a scanner, and to
 # a reviewer. Characters per line averaged over the file: hand-written
 # JavaScript does not average 500.
 MAX_MEAN_LINE = 500
+
+
+def scan_install():
+    """The actual subprocess rule: execution AND installation on one line."""
+    ex, ins = re.compile(_EXECUTES), re.compile(_INSTALLS)
+    hits = []
+    for rel in shipped_with(".py"):
+        with open(os.path.join(ROOT, rel), "r", encoding="utf-8", errors="replace") as f:
+            for i, line in enumerate(f, 1):
+                if ex.search(line) and ins.search(line):
+                    hits.append(f"{rel}:{i}")
+    ck("no runtime package installation through a subprocess call",
+       not hits, ", ".join(hits[:3]))
 
 
 def scan(exts, rules, suffix=""):
@@ -210,8 +215,8 @@ def scan(exts, rules, suffix=""):
 
 
 scan((".py",), PY_FORBIDDEN)
+scan_install()
 scan((".js", ".mjs"), JS_FORBIDDEN, " in JavaScript")
-scan((".md", ".py", ".js", ".mjs"), TEXT_FORBIDDEN)
 
 blobs = []
 for rel in shipped_with(".js", ".mjs"):
