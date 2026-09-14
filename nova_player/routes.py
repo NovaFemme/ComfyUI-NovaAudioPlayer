@@ -54,12 +54,25 @@ logger = logging.getLogger("NovaAudioPlayer")
 # code change, which is a node-level review lifting rather than anything in the
 # archive.
 #
-# So the feature was given up for nothing, and it can come back. The best route
-# for mp3 is lameenc — a prebuilt wheel that encodes in-process, no external
-# binary and no subprocess at all — which is better than the old path on its
-# own merits rather than as a way round a rule. m4a, opus and webm would still
-# want ffmpeg. Neither is done here; this note exists so the next person does
-# not re-derive the wrong reason from the absence.
+# The formats are staying out anyway, now for reasons that hold up.
+#
+# THIS NODE MEASURES. Its own SAT row reads 0.0000% on a 320k mp3 — the
+# measurement does not fail, it quietly stops meaning anything, and ffmpeg's
+# `astats` agrees (`Flat factor: 0.000000`). A measurement node that hands you
+# a lossy file is handing you a file its own panel cannot honestly read. That is
+# a bad thing for this node in particular to offer.
+#
+# AND EXPORT IS SOMEBODY ELSE'S JOB NOW. When mp3 was first dropped this pack
+# was three nodes. It now has Save Audio FLAC 24-bit and Save Audio WAV
+# PCM16|PCM24|FLOAT32 under Delivery & Metadata, which is where a delivery
+# format belongs. This arrow is for auditioning what you are measuring, not for
+# shipping it.
+#
+# So: wav, flac and ogg, written in-process by soundfile, no external binary and
+# no extra dependency. Anyone who wants an mp3 has ffmpeg one command away from
+# the wav, and the node does not need to be the thing that runs it.
+#
+# dev/tests/test_formats.py holds the table at three.
 MIME = {
     "wav":  "audio/wav",
     "flac": "audio/flac",

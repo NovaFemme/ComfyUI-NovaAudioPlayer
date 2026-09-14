@@ -77,14 +77,16 @@ played until you ask for it.
 The download arrow offers **WAV**, **FLAC** and **OGG** — everything
 `soundfile` can write, with no external binary involved.
 
-There is currently no MP3, M4A, Opus or WebM. Those needed ffmpeg as an
-external binary, and they were dropped during a Comfy registry issue on the
-belief that spawning one was the problem — which turned out to be a misreading
-of the standard, since the rule prohibits runtime *package installation*
-through subprocess calls rather than subprocess itself. They are expected back;
-mp3 will most likely arrive through `lameenc`, which encodes in-process with no
-external binary at all. Until then, the WAV is one ffmpeg command away from
-anything you want.
+There is deliberately no MP3, M4A, Opus or WebM, and there will not be.
+
+This node measures. Its own SAT row reads `0.0000%` on a 320k MP3 — the figure
+does not fail, it quietly stops meaning anything — so a lossy download from the
+measurement node would be a file its own panel cannot honestly read. Delivery
+formats also have their own home now: **Save Audio FLAC 24-bit** and **Save
+Audio WAV PCM16|PCM24|FLOAT32** under Delivery & Metadata. The download arrow is
+for auditioning what you are measuring, not for shipping it.
+
+If you want an mp3, the WAV is one ffmpeg command away.
 
 ### A bench panel that agrees with itself
 

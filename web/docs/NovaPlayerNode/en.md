@@ -26,10 +26,16 @@ off.
 
 ## Downloads
 
-WAV, FLAC and OGG, written by `soundfile` in-process. No mp3 for now — it
-needed ffmpeg as an external binary and was dropped during a registry issue,
-on a reading of the rules that turned out to be wrong. It is expected back.
-Until then the WAV is one ffmpeg command away from anything you want.
+WAV, FLAC and OGG, written by `soundfile` in-process. No lossy formats, by
+decision rather than by accident.
+
+This node measures, and its own SAT row reads `0.0000%` on a 320k mp3 — the
+number does not fail, it stops meaning anything. Offering a lossy download from
+the measurement node would hand you a file its own panel cannot read honestly.
+For delivery use **Save Audio FLAC 24-bit** or **Save Audio WAV
+PCM16|PCM24|FLOAT32**; this arrow is for auditioning what you are measuring.
+
+If you want an mp3, the WAV is one ffmpeg command away.
 
 ## Controls
 

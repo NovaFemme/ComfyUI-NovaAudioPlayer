@@ -44,6 +44,14 @@ table = {m[0]: (m[1], m[2])
 
 ck("the format table was found and parsed", len(table) == 3, str(table))
 
+# The absence of lossy formats is a decision, not an oversight, so it is pinned
+# rather than left to be re-added by someone who reads the gap as a gap. This
+# node measures: SAT reads 0.0000% on a 320k mp3, which does not fail, it stops
+# meaning anything. Delivery belongs to the Save Audio nodes.
+ck("no lossy format is offered",
+   not ({"mp3", "m4a", "opus", "webm", "aac"} & set(table)),
+   ", ".join(sorted({"mp3", "m4a", "opus", "webm", "aac"} & set(table))))
+
 mime = re.search(r"MIME = \{(.*?)\n\}", src, re.S)
 offered = set(re.findall(r'"(\w+)":', mime.group(1) if mime else ""))
 ck("every format the route offers has a writer",
