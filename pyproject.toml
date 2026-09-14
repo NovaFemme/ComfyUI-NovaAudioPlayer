@@ -1,18 +1,30 @@
 [project]
 name = "comfyui-novaaudioplayer"
-description = "Three nodes for evaluating ACE-Step music generations. Nova Player: an audio player with twelve live visualisers, a whole-file measurement panel, a theme system you can drive from inside the node, and a panel_info output for logging every take's metrics. Madow Inputs: every ACE-Step generation parameter in one node, with named presets, cross-field validation and a context blob that records exactly what produced a take. Madow Unpack: fans that bundle out into typed outputs."
-version = "2.3.4"
+description = "An end-to-end audio pipeline for ACE-Step music generations, from generation parameters through mastering to tagged delivery. Generation & Synthesis: Madow Inputs gathers every ACE-Step parameter in one node with named presets and cross-field validation, and Madow Unpack fans that bundle out into typed outputs. Mastering Process: corrective mastering with per-stage rollback and a reproduction fingerprint. Analysis & Validation: Nova Player, an audio player with twelve live visualisers and a whole-file measurement panel, plus a release-safety validator and report viewer. Delivery & Metadata: read tag data from SQLite, write it onto a batch of files, read it back to verify, and save 24-bit FLAC or PCM16/PCM24/float32 WAV. Utility & I/O: single and batch audio loaders, a path/profile manager and a console. LoRA Training: build a labelled dataset from tagged audio, generate ACE-Step training tensors, and run ACE-Step's corrected LoRA training loop as a cancellable child process."
+version = "2.5.0"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 
-# Deliberately empty. Every third-party import in this node is lazy and guarded:
-#   scipy      - only for the BS.1770 K-weighting filter in compute_lufs();
-#                without it the LUFS badge falls back to offset RMS.
-#   soundfile  - only for the non-WAV download paths in routes.py.
-# Both ship with a standard ComfyUI install. Listing them here would make the
-# registry install churn a working environment for features that already
-# degrade gracefully.
-dependencies = []
+# Only genuinely required imports are listed, per the Comfy Registry rule that
+# dependencies be declared rather than installed at runtime.
+#
+#   mutagen  - REQUIRED. Nova Tag Writer and Nova Tag Reader cannot function
+#              without it; there is no degraded mode to fall back to.
+#
+# Deliberately NOT listed:
+#   torch, numpy, scipy, av, torchaudio, aiohttp
+#              - all in ComfyUI's own requirements.txt, so they are present in
+#                any working install. Restating them would only let this package
+#                churn versions ComfyUI already pins.
+#   soundfile  - NOT shipped by ComfyUI, and deliberately still not declared: it
+#                is one of several interchangeable decode backends in the audio
+#                loaders, powers the non-WAV download paths in routes.py, and is
+#                the first choice in the ACE-Step decode shim. Every one of those
+#                falls back to PyAV, which ComfyUI does ship, so declaring
+#                soundfile would make a hard dependency out of a preference.
+dependencies = [
+    "mutagen>=1.45",
+]
 
 classifiers = [
     "Operating System :: OS Independent",

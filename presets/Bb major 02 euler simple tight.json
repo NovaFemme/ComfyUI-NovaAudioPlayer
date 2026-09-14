@@ -1,0 +1,37 @@
+{
+  "schema_ver": 1,
+  "name": "Bb major 02 euler simple tight",
+  "created": "2026-09-12T00:00:00+00:00",
+  "note": "ACE-Step XL SFT variation 02 of 20 for Bb major. Character: tight.",
+  "params": {
+    "apg.eta": 0.6,
+    "apg.norm_threshold": 1.0,
+    "apg.momentum": 0.65,
+    "sched.shift": 3.5,
+    "ksampler.steps": 60,
+    "ksampler.cfg": 1.0,
+    "ksampler.sampler_name": "euler",
+    "ksampler.scheduler": "simple",
+    "ksampler.denoise": 1,
+    "ksampler.seed": 0,
+    "caption.prompt": "Southern blues rock",
+    "music.bpm": 122,
+    "music.duration": 240,
+    "music.timesignature": "4",
+    "music.language": "en",
+    "music.keyscale": "Bb major",
+    "text.cfg_scale": 8.0,
+    "lm.temperature": 0.78,
+    "lm.top_p": 0.88,
+    "lm.top_k": 0,
+    "lm.min_p": 0,
+    "lm.generate_audio_codes": true,
+    "file.prefix": "gen",
+    "file.name": "audio_file_generated",
+    "file.folder": "Audio Generations",
+    "file.separator": "_"
+  },
+  "excludes": [
+    "ksampler.seed"
+  ]
+}

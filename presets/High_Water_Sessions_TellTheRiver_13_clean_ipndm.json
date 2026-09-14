@@ -1,0 +1,37 @@
+{
+  "schema_ver": 1,
+  "name": "High_Water_Sessions_TellTheRiver_13_clean_ipndm",
+  "created": "2026-09-12T00:00:00+00:00",
+  "note": "[B best bet] ipndm at 50 steps, temperature 0.82, the lowest of the safe group. Low temperature is what holds a six minute structure together and protects the clean intro from being skipped.",
+  "params": {
+    "apg.eta": 0.7,
+    "apg.norm_threshold": 1.15,
+    "apg.momentum": 0.6,
+    "sched.shift": 3.0,
+    "ksampler.steps": 50,
+    "ksampler.cfg": 1.0,
+    "ksampler.sampler_name": "ipndm",
+    "ksampler.scheduler": "normal",
+    "ksampler.denoise": 1,
+    "ksampler.seed": 0,
+    "caption.prompt": "Six minute southern blues rock album closer with a heavy swaggering half time groove, opening with a clean chiming descending guitar figure on a bright single coil bridge pickup through a spring reverb tank with no drums, then the full trio crashing in, foreground electric guitar through a rocking wah pedal and a germanium fuzz into a cranked hundred watt stack with natural power tube breakup and controlled feedback, heavy finger vibrato, wide whole step bends, percussive sixteenth note rhythm scratching behind the beat, verses rolling on a single dominant seventh chord with a country rock lilt, choruses lifting on a five six one movement with a borrowed flat seventh, warm round bass playing melodic countermelody instead of roots, loose powerful live drums with a deep tuned floor tom, splashy hand hammered cymbals and a fat backbeat snare, tambourine, warm plainspoken male baritone lead vocal, slightly nasal, drawling and conversational, close miked with short slap echo, shouted double tracked chorus, long extended guitar jam outro with feedback and a slow fade, humid and unhurried turning triumphant, E Mixolydian with blues thirds, vintage analog tape production with real room bleed.",
+    "music.bpm": 96,
+    "music.duration": 365,
+    "music.timesignature": "4",
+    "music.language": "en",
+    "music.keyscale": "E major",
+    "text.cfg_scale": 7.5,
+    "lm.temperature": 0.82,
+    "lm.top_p": 0.9,
+    "lm.top_k": 0,
+    "lm.min_p": 0,
+    "lm.generate_audio_codes": true,
+    "file.prefix": "High_Water_Sessions",
+    "file.name": "High_Water_Sessions_TellTheRiver_13_clean_ipndm",
+    "file.folder": "High Water Sessions",
+    "file.separator": "_"
+  },
+  "excludes": [
+    "ksampler.seed"
+  ]
+}

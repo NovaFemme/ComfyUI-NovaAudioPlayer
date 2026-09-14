@@ -1,0 +1,38 @@
+{
+  "schema_ver": 1,
+  "name": "Southern Blues Rock Variant - A",
+  "created": "2026-09-11T16:38:55+00:00",
+  "note": "",
+  "params": {
+    "apg.eta": 0.5,
+    "apg.norm_threshold": 1.5,
+    "apg.momentum": 0.2,
+    "sched.shift": 3,
+    "ksampler.steps": 65,
+    "ksampler.cfg": 5,
+    "ksampler.sampler_name": "er_sde",
+    "ksampler.scheduler": "linear_quadratic",
+    "ksampler.denoise": 1,
+    "ksampler.seed": 1004733646694220,
+    "caption.prompt": "Southern blues rock with a rolling mid tempo swagger, opening with a clean chiming descending guitar figure on a bright single coil bridge pickup through a spring reverb tank with no drums, doubled an octave up by a second clean guitar, then the full trio entering together, foreground electric guitar through a rocking wah pedal and a germanium fuzz into a cranked hundred watt stack with natural power tube breakup and controlled feedback, heavy finger vibrato, wide whole step bends, percussive sixteenth note rhythm scratching behind the beat, verses rolling on a single dominant seventh chord with a country rock lilt, choruses lifting on a five six one movement with a borrowed flat seventh, warm round bass playing melodic countermelody instead of roots, loose powerful live drums with a deep tuned floor tom and a fat backbeat snare, crisp shimmering cymbal decay with open airy top end on the ride and hi hat, tambourine, warm plainspoken male baritone lead vocal, slightly nasal, drawling and conversational with detailed consonants, close miked with short slap echo, shouted double tracked chorus, extended guitar jam outro with feedback and a slow fade, weary and tender and unhurried, A Mixolydian with blues thirds, vintage analog tape production with real room bleed and a clear detailed top end, A Mixolydian with blues thirds.",
+    "caption.lyrics": "[Intro - clean chiming guitar figure, no drums]\n\n[Intro - full trio enters]\n\n[Verse 1 - rolling, one chord groove]\nShe comes in when I'm going out\nTwo minutes standing in the drive\nHer hands still cold off the register\nMine already stained with dye\n\n[Verse 2 - rolling]\nWe keep the notes up on the door\nMilk, the light bill, and be good\nTwelve years of her handwriting\nI'd know it anywhere I stood\n\n[Chorus - heavy, wah and fuzz]\nTWO SETS OF KEYS AND ONE FRONT DOOR\nSame bed, never the same time\nShe gets the daylight, I get the dark\nAnd we call that doing fine\nTWO SETS OF KEYS AND ONE FRONT DOOR\nKnob worn down to the brass\nNobody writes it in a song\nBut it holds, and it lasts\n\n[Verse 3 - rolling]\nHer mother asks are we happy\nLike it's a thing you sit and choose\nI say the mortgage is current\nAnd the truck's got decent shoes\n\n[Guitar Solo - wah and fuzz, building]\n\n[Bridge - half time, heavy]\nSunday is the one we share\nBoth too wore out to talk\nSo we sit out on the tailgate\nAnd we watch the weather walk\n\n[Chorus - heavy, full band]\nTWO SETS OF KEYS AND ONE FRONT DOOR\nSame bed, never the same time\nShe gets the daylight, I get the dark\nAnd we call that doing fine\n\n[Chorus - heavy, doubled and shouted]\nTWO SETS OF KEYS AND ONE FRONT DOOR\nKnob worn down to the brass\nNobody writes it in a song\nBut it holds, and it lasts\n\n[Outro - extended guitar jam, feedback, slow fade]",
+    "music.bpm": 98,
+    "music.duration": 300,
+    "music.timesignature": "4",
+    "music.language": "en",
+    "music.keyscale": "A major",
+    "text.cfg_scale": 2.5,
+    "lm.temperature": 0.73,
+    "lm.top_p": 0.9,
+    "lm.top_k": 0,
+    "lm.min_p": 0,
+    "lm.generate_audio_codes": true,
+    "file.prefix": "master",
+    "file.name": "Two Sets of Keys",
+    "file.folder": "Take Whatever You Want",
+    "file.separator": "_"
+  },
+  "excludes": [
+    "ksampler.seed"
+  ]
+}

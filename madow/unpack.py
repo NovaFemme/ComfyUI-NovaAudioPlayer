@@ -20,9 +20,11 @@ emits was decided upstream, so there is nothing here that can disagree with
 from .comfy_types import BUNDLE_TYPE, kind_for
 from .params import DEFAULTS, KEYS, OUTPUT_NAMES
 
+from ..nova_categories import GENERATION
+
 
 class MadowUnpack:
-    CATEGORY = "▶️ Nova Audio"
+    CATEGORY = GENERATION
     FUNCTION = "run"
     DESCRIPTION = ("Fan a Madow Inputs bundle out into its typed outputs. "
                    "Place one beside each node you are feeding, or none at all.")

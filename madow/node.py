@@ -32,10 +32,12 @@ from .params import (ARG, DEFAULTS, KEYS, KIND, NON_AUDIO_KEYS, PARAMS,
 from . import presets as preset_store
 from .validate import RULESET_VER, validate
 
+from ..nova_categories import GENERATION
+
 PACK_VERSION = "0.1.0"
 
 class MadowInputs:
-    CATEGORY = "▶️ Nova Audio"
+    CATEGORY = GENERATION
     FUNCTION = "run"
     DESCRIPTION = ("Every ACE-Step generation parameter in one node, with "
                    "named presets, cross-field validation, and a `context` "

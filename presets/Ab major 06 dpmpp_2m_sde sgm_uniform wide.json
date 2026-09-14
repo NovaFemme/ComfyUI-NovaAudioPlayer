@@ -1,0 +1,37 @@
+{
+  "schema_ver": 1,
+  "name": "Ab major 06 dpmpp_2m_sde sgm_uniform wide",
+  "created": "2026-09-12T00:00:00+00:00",
+  "note": "ACE-Step XL SFT variation 06 of 20 for Ab major. Character: wide.",
+  "params": {
+    "apg.eta": 0.75,
+    "apg.norm_threshold": 1.3,
+    "apg.momentum": 0.6,
+    "sched.shift": 3.5,
+    "ksampler.steps": 55,
+    "ksampler.cfg": 1.0,
+    "ksampler.sampler_name": "dpmpp_2m_sde",
+    "ksampler.scheduler": "sgm_uniform",
+    "ksampler.denoise": 1,
+    "ksampler.seed": 0,
+    "caption.prompt": "Southern blues rock",
+    "music.bpm": 122,
+    "music.duration": 240,
+    "music.timesignature": "4",
+    "music.language": "en",
+    "music.keyscale": "Ab major",
+    "text.cfg_scale": 7.5,
+    "lm.temperature": 0.86,
+    "lm.top_p": 0.93,
+    "lm.top_k": 0,
+    "lm.min_p": 0,
+    "lm.generate_audio_codes": true,
+    "file.prefix": "gen",
+    "file.name": "audio_file_generated",
+    "file.folder": "Audio Generations",
+    "file.separator": "_"
+  },
+  "excludes": [
+    "ksampler.seed"
+  ]
+}
