@@ -9,12 +9,11 @@ guarded so the module still imports outside the package.
 
 THE BACKEND THAT IS NOT HERE. Decoding tries soundfile, then torchaudio, then
 PyAV, and stops. An earlier version had a fourth: shelling out to ffprobe and
-ffmpeg. The call passed an argv list, never a shell string, but the Comfy
-registry's scanner flagged this pack at 2.2.0 and 2.2.1 and spawning an external
-binary was the likeliest objection — which is why nova_player/routes.py dropped
-its own ffmpeg path. Reintroducing it here would have re-opened that risk to buy
-almost nothing: PyAV *is* ffmpeg's libraries, linked in rather than spawned, and
-it ships with ComfyUI. Anything ffmpeg could decode, PyAV already decodes.
+ffmpeg. That was left out, and the reason stands on its own regardless of the
+registry argument that once surrounded it: PyAV *is* ffmpeg's libraries, linked
+in rather than spawned, and it ships with ComfyUI. Anything ffmpeg could decode,
+PyAV already decodes, so a fourth backend would buy a process spawn and nothing
+else.
 
 AMD / ROCm notes (tested target: Radeon RX 9070 XT, gfx1201)
 -----------------------------------------------------------

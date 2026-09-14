@@ -275,7 +275,8 @@ DEFAULT_SYSTEM_CONFIG = {
     },
     "audio_engine": {
         # What soundfile can write. The lossy formats needed ffmpeg as an
-        # external binary, which the registry's scanner would not have.
+        # external binary and were dropped on a misreading of the registry
+        # standard — see the note above MIME in routes.py.
         "supported_formats": ["wav", "flac", "ogg"],
         "default_format": "wav",
         "fft_size": 4096,

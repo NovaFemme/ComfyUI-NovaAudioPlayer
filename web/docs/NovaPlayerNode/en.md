@@ -26,9 +26,10 @@ off.
 
 ## Downloads
 
-WAV, FLAC and OGG, written by `soundfile`. No mp3 — that needed ffmpeg as an
-external binary, which the Comfy registry's scanner flagged; the WAV is one
-ffmpeg command away from anything you want.
+WAV, FLAC and OGG, written by `soundfile` in-process. No mp3 for now — it
+needed ffmpeg as an external binary and was dropped during a registry issue,
+on a reading of the rules that turned out to be wrong. It is expected back.
+Until then the WAV is one ffmpeg command away from anything you want.
 
 ## Controls
 

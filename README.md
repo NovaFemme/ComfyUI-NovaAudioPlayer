@@ -77,11 +77,14 @@ played until you ask for it.
 The download arrow offers **WAV**, **FLAC** and **OGG** — everything
 `soundfile` can write, with no external binary involved.
 
-There is deliberately no MP3, M4A, Opus or WebM. Those needed ffmpeg, reached
-by shelling out to an external binary, and the Comfy registry's scanner flagged
-the two releases that contained it. A node nobody can install exports nothing at all,
-so the four lossy formats went rather than the release. If you want an mp3, the
-WAV is one ffmpeg command away.
+There is currently no MP3, M4A, Opus or WebM. Those needed ffmpeg as an
+external binary, and they were dropped during a Comfy registry issue on the
+belief that spawning one was the problem — which turned out to be a misreading
+of the standard, since the rule prohibits runtime *package installation*
+through subprocess calls rather than subprocess itself. They are expected back;
+mp3 will most likely arrive through `lameenc`, which encodes in-process with no
+external binary at all. Until then, the WAV is one ffmpeg command away from
+anything you want.
 
 ### A bench panel that agrees with itself
 

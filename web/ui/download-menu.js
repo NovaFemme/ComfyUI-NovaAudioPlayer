@@ -30,8 +30,8 @@ async function fetchFormat(filename, fmt, extraQuery = "") {
 }
 
 // The three formats soundfile can write. mp3, m4a, opus and webm needed
-// ffmpeg, and the call that spawned it was removed for the registry
-// — see nova_player/routes.py for the whole story.
+// ffmpeg, and the call that spawned it was removed on a misreading of the
+// registry standard — see the note above MIME in nova_player/routes.py.
 const MIME = {
     wav: "audio/wav", flac: "audio/flac", ogg: "audio/ogg",
 };

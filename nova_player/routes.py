@@ -33,16 +33,33 @@ logger = logging.getLogger("NovaAudioPlayer")
 
 # wav, flac and ogg — everything `soundfile` can write, and nothing else.
 #
-# THE FORMATS THAT ARE NOT HERE. mp3, m4a, opus and webm were produced by
-# shelling out to ffmpeg. The call passed an argv list, never a shell string,
-# with the format checked against this table first and the filename resolved
-# inside the temp directory — but the Comfy registry's scanner flagged 2.2.0
-# and 2.2.1, and spawning an external binary was the likeliest objection.
-# A node nobody can install exports nothing at all, so the four lossy formats
-# went rather than the release.
+# THE FORMATS THAT ARE NOT HERE, AND WHY THAT REASON WAS WRONG.
 #
-# Anyone who wants an mp3 has ffmpeg one command away from the wav; the node
-# does not need to be the thing that runs it.
+# mp3, m4a, opus and webm were produced by shelling out to ffmpeg — argv list,
+# never a shell string, format checked against this table first, filename
+# resolved inside the temp directory. They were dropped while 2.2.0 and 2.2.1
+# were banned, on the belief that spawning an external binary was what the
+# registry objected to.
+#
+# It was not. The published rule is precise:
+#
+#     "Runtime package installation through subprocess calls is not permitted."
+#     https://docs.comfy.org/registry/standards
+#
+# That is a prohibition on installing packages, not on subprocess. This call
+# installed nothing, so it never violated the standard. The likelier cause of
+# the ban is the other thing 2.3.0 removed: a 156 KB minified vendor bundle
+# that nothing imported, against a rule that does say "code obfuscation is
+# prohibited". 2.3.0 through 2.3.3 then cleared retroactively with no further
+# code change, which is a node-level review lifting rather than anything in the
+# archive.
+#
+# So the feature was given up for nothing, and it can come back. The best route
+# for mp3 is lameenc — a prebuilt wheel that encodes in-process, no external
+# binary and no subprocess at all — which is better than the old path on its
+# own merits rather than as a way round a rule. m4a, opus and webm would still
+# want ffmpeg. Neither is done here; this note exists so the next person does
+# not re-derive the wrong reason from the absence.
 MIME = {
     "wav":  "audio/wav",
     "flac": "audio/flac",
