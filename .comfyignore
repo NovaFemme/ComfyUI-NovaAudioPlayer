@@ -8,3 +8,13 @@
 # publishing the bait. 2.3.0 and 2.3.2 both shipped it and both came back
 # flagged.
 dev/
+
+# docs/ is the repository's own documentation -- design notes, the technical
+# write-up, and docs/images/ which now holds a screenshot of every node for the
+# README. GitHub renders all of it; nobody installing the pack needs any of it.
+# It was 1.2 MB of the 1.88 MB published for 2.5.0, and the node screenshots
+# would have taken the archive past 9 MB.
+#
+# web/docs/ is a DIFFERENT folder and must keep shipping: it is the per-node
+# help ComfyUI shows inside the app. Only the top-level docs/ is excluded here.
+docs/
