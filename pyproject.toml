@@ -8,8 +8,19 @@ requires-python = ">=3.10"
 # Only genuinely required imports are listed, per the Comfy Registry rule that
 # dependencies be declared rather than installed at runtime.
 #
-#   mutagen  - REQUIRED. Nova Tag Writer and Nova Tag Reader cannot function
-#              without it; there is no degraded mode to fall back to.
+#   mutagen  - Nova Tag Writer and Nova Tag Reader cannot function without it;
+#              there is no degraded mode to fall back to.
+#   pymysql  - the same, for Nova SQL Dump. Pure Python and small, so declaring
+#              it costs an install nothing meaningful.
+#
+# DECLARING IS NOT THE SAME AS BEING PRESENT, which is why neither of these is
+# imported at module scope. Declaring covers the registry and ComfyUI-Manager
+# install paths; it does nothing for the very common one where somebody clones
+# this repository straight into custom_nodes and never runs pip. On that path an
+# undeclared-but-imported package is an ImportError in __init__.py, and an
+# ImportError in __init__.py takes all twenty-six nodes off the menu over one
+# optional feature. Every third-party import in this package is therefore lazy
+# or guarded, and fails in words at the point of use.
 #
 # Deliberately NOT listed:
 #   torch, numpy, scipy, av, torchaudio, aiohttp
@@ -24,6 +35,7 @@ requires-python = ">=3.10"
 #                soundfile would make a hard dependency out of a preference.
 dependencies = [
     "mutagen>=1.45",
+    "pymysql>=1.0",
 ]
 
 classifiers = [
