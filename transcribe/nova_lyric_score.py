@@ -45,7 +45,11 @@ except Exception:
             return f"{bar}\n  {title}\n{bar}"
 
 VERSION = "1.0.0"
-CATEGORY = "Nova Audio Player/Transcription"
+# ANALYSIS, not a string. This line used to hardcode
+# "Nova Audio Player/Transcription", which put this node in a top-level menu
+# of its own, outside the pack's seven groups -- and the import of ANALYSIS
+# three lines up was sitting unused the whole time.
+CATEGORY = ANALYSIS
 
 
 # ---------------------------------------------------------------------------

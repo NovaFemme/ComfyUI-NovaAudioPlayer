@@ -138,5 +138,30 @@ unresolvable = sorted(
 ck("every value is a directly imported class", not unresolvable,
    ", ".join(unresolvable[:4]) + (" …" if len(unresolvable) > 4 else ""))
 
+# --- categories come from nova_categories, not from a string --------------
+#
+# Nova Lyric Score imported ANALYSIS, never used it, and hardcoded
+# "Nova Audio Player/Transcription" instead -- which gave it a top-level menu of
+# its own, outside the pack's seven groups. It went unnoticed long enough to be
+# missing from the hand-written node-menu map, because it was not in the menu
+# anyone was reading.
+hardcoded = []
+for p in sorted(ROOT.rglob("*.py")):
+    rel = p.relative_to(ROOT).as_posix()
+    if rel.startswith("dev/") or "__pycache__" in rel:
+        continue
+    try:
+        t = ast.parse(p.read_text(encoding="utf-8", errors="replace"))
+    except SyntaxError:
+        continue
+    for node in ast.walk(t):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(x, ast.Name) and x.id == "CATEGORY" for x in node.targets):
+            continue
+        if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            hardcoded.append(f"{rel}:{node.lineno} {node.value.value!r}")
+ck("no node hardcodes its menu category", not hardcoded, "; ".join(hardcoded[:3]))
+
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)
