@@ -22,9 +22,11 @@ from .panel_info import audio_sha256, build_panel_info
 from .config_manager import manager
 from .peaks_cache import cache_peaks, write_peaks_sidecar
 
+from ..nova_categories import ANALYSIS
+
 
 class NovaPlayerNode:
-    CATEGORY = "▶️ Nova Audio"
+    CATEGORY = ANALYSIS
     FUNCTION = "run"
 
     # Still an OUTPUT_NODE — it draws the player whether or not panel_info is

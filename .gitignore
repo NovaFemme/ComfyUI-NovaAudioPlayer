@@ -20,3 +20,8 @@ dev/tests/_shots/
 # Replies to the research agent — hand over, then delete. Never committed.
 band-shares-fixed.md
 madow-context-contract.md
+
+# Saved NamePath profiles — runtime user state, same class as config/*.json.
+# They record real database paths, library folders and album names, so they are
+# kept out of the package rather than published with it.
+profiles/

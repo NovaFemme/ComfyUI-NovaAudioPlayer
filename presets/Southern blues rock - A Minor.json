@@ -1,0 +1,38 @@
+{
+  "schema_ver": 1,
+  "name": "Southern blues rock - A Minor",
+  "created": "2026-09-12T03:40:40+00:00",
+  "note": "",
+  "params": {
+    "apg.eta": 0.5,
+    "apg.norm_threshold": 1.5,
+    "apg.momentum": 0.2,
+    "sched.shift": 3,
+    "ksampler.steps": 65,
+    "ksampler.cfg": 5,
+    "ksampler.sampler_name": "euler",
+    "ksampler.scheduler": "linear_quadratic",
+    "ksampler.denoise": 1,
+    "ksampler.seed": 1004733646694220,
+    "caption.prompt": "Six minute southern blues rock album closer with a heavy swaggering half time groove, opening with a clean chiming descending guitar figure on a bright single coil bridge pickup through a spring reverb tank with no drums, then the full trio crashing in, foreground electric guitar through a rocking wah pedal and a germanium fuzz into a cranked hundred watt stack with natural power tube breakup and controlled feedback, heavy finger vibrato, wide whole step bends, percussive sixteenth note rhythm scratching behind the beat, verses rolling on a single dominant seventh chord with a country rock lilt, choruses lifting on a five six one movement with a borrowed flat seventh, warm round bass playing melodic countermelody instead of roots, loose powerful live drums with a deep tuned floor tom, splashy hand hammered cymbals and a fat backbeat snare, tambourine, warm plainspoken male baritone lead vocal, slightly nasal, drawling and conversational, close miked with short slap echo, shouted double tracked chorus, long extended guitar jam outro with feedback and a slow fade, humid and unhurried turning triumphant, E Mixolydian with blues thirds, vintage analog tape production with real room bleed. crazygecko",
+    "caption.lyrics": "[Intro - clean chiming guitar figure, no drums]\n\n[Intro - wah guitar and full trio enter]\n\n[Verse 1 - rolling, one chord groove]\nBeen gone long enough to lose my drawl\nGot it back the second I stepped down\nSame man selling peanuts by the depot\nSame dog asleep on the same hot ground\n\n[Verse 2 - rolling]\nTwelve years and a borrowed suitcase\nNothing in it worth the freight\nReckon nobody's fixing to forgive me\nReckon I'm not fixing to wait\n\n[Chorus - heavy, wah and fuzz]\nTELL THE RIVER I'M COMING\nTell it slow and tell it plain\nBeen a long time gone to yonder\nCome to stand out in the rain\nTELL THE RIVER I'M COMING\nSame clothes and the same crooked name\nEvery road I ever ruined\nRuns back through here all the same\n\n[Verse 3 - rolling]\nAunt Cleo's still got the kettle\nStill won't let a man sit down\nSays the Lord don't keep a ledger\nSays the town keeps one around\n\n[Chorus - heavy, wah and fuzz]\nTELL THE RIVER I'M COMING\nTell it slow and tell it plain\nBeen a long time gone to yonder\nCome to stand out in the rain\nTELL THE RIVER I'M COMING\nSame clothes and the same crooked name\nEvery road I ever ruined\nRuns back through here all the same\n\n[Verse 4 - rolling, quieter]\nMailbox got my name misspelled\nBeen that way for twenty years\nMuch obliged to whoever painted\nAnything at all out here\n\n[Guitar Solo - long, wah and fuzz, full trio, building]\n\n[Bridge - half time, heavy]\nI don't aim to be forgiven\nI aim to be understood\nDifference ain't worth arguing\nWhen the water's up for good\n\n[Chorus - heavy, full band]\nTELL THE RIVER I'M COMING\nTell it slow and tell it plain\nBeen a long time gone to yonder\nCome to stand out in the rain\n\n[Chorus - heavy, doubled and shouted]\nTELL THE RIVER I'M COMING\nSame clothes and the same crooked name\nEvery road I ever ruined\nRuns back through here all the same\n\n[Outro - extended guitar jam, feedback, long slow fade]",
+    "music.bpm": 96,
+    "music.duration": 365,
+    "music.timesignature": "4",
+    "music.language": "en",
+    "music.keyscale": "D major",
+    "text.cfg_scale": 2.5,
+    "lm.temperature": 0.8,
+    "lm.top_p": 0.9,
+    "lm.top_k": 0,
+    "lm.min_p": 0,
+    "lm.generate_audio_codes": true,
+    "file.prefix": "master",
+    "file.name": "Tell the River I'm Coming",
+    "file.folder": "High Water Sessions",
+    "file.separator": "_"
+  },
+  "excludes": [
+    "ksampler.seed"
+  ]
+}

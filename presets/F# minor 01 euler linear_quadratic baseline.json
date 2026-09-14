@@ -1,0 +1,37 @@
+{
+  "schema_ver": 1,
+  "name": "F# minor 01 euler linear_quadratic baseline",
+  "created": "2026-09-12T00:00:00+00:00",
+  "note": "ACE-Step XL SFT variation 01 of 20 for F# minor. Character: baseline.",
+  "params": {
+    "apg.eta": 0.7,
+    "apg.norm_threshold": 1.1,
+    "apg.momentum": 0.6,
+    "sched.shift": 3.0,
+    "ksampler.steps": 50,
+    "ksampler.cfg": 1.0,
+    "ksampler.sampler_name": "euler",
+    "ksampler.scheduler": "linear_quadratic",
+    "ksampler.denoise": 1,
+    "ksampler.seed": 0,
+    "caption.prompt": "Southern blues rock",
+    "music.bpm": 122,
+    "music.duration": 240,
+    "music.timesignature": "4",
+    "music.language": "en",
+    "music.keyscale": "F# minor",
+    "text.cfg_scale": 7.5,
+    "lm.temperature": 0.84,
+    "lm.top_p": 0.9,
+    "lm.top_k": 0,
+    "lm.min_p": 0,
+    "lm.generate_audio_codes": true,
+    "file.prefix": "gen",
+    "file.name": "audio_file_generated",
+    "file.folder": "Audio Generations",
+    "file.separator": "_"
+  },
+  "excludes": [
+    "ksampler.seed"
+  ]
+}
