@@ -46,7 +46,7 @@ release asset rather than committed here — it is 80 MiB, and a file that size
 in the git history would be downloaded by everyone cloning the repository
 forever.
 
-**[Download Southern_Blues_Rock.safetensors →](https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer/releases/latest)**
+**[Download Southern_Blues_Rock.safetensors →](https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer/releases/download/assets-v1/Southern_Blues_Rock.safetensors)**
 
 Put it at:
 

@@ -379,10 +379,11 @@ The third is a **mastering chain**: load a track, master it, read the report in
 the canvas, save it, and then verify the saved file still reproduces the master
 you approved. That one needs no models and no other custom node pack.
 
-The **Southern Blues Rock** LoRA that the second workflow uses is published on
-the [releases page](https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer/releases/latest)
+The **Southern Blues Rock** LoRA that the second workflow uses is published as a
+[release asset](https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer/releases/tag/assets-v1)
 rather than committed here — 80 MiB in the git history would be downloaded by
 everyone cloning the repository, forever.
+[Direct download (80.1 MiB) →](https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer/releases/download/assets-v1/Southern_Blues_Rock.safetensors)
 
 [Model downloads, install paths and the LoRA's checksum →](example_workflows/README.md)
 
