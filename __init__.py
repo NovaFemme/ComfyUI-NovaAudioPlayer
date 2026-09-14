@@ -93,6 +93,35 @@ from .viewers.nova_reports_to_images import (
     NODE_CLASS_MAPPINGS as NOVA_REPORT_TO_IMAGE_MAPPINGS,
     NODE_DISPLAY_NAME_MAPPINGS as NOVA_REPORT_TO_IMAGE_NAMES,
 )
+# Node classes, imported directly so the tables below can be literals.
+from .nova_player.node import NovaPlayerNode
+from .madow.node import MadowInputs
+from .madow.unpack import MadowUnpack
+from .authoring.nova_batch_audio_load import NovaBatchLoadAudio
+from .authoring.nova_console import NovaConsole
+from .authoring.nova_load_audio import NovaLoadAudio
+from .authoring.nova_sqlite_reader import NovaSQLiteReader
+from .authoring.nova_tag_reader import NovaTagReader
+from .authoring.nova_tag_writer import NovaTagWriter
+from .mastering.nova_audio_master import NovaAudioMaster
+from .mastering.nova_final_master_validator import NovaFinalMasterValidator
+from .mastering.nova_master_identity import NovaMasterIdentity
+from .mastering.nova_save_audio_flac24 import NovaAudioSaveFLAC24
+from .mastering.nova_save_audio_wav import NovaAudioSaveWAV
+from .mastering.nova_track_inspector import NovaTrackInspector
+from .training.nova_ace_dataset import NovaACEDatasetBuilder, NovaACEDatasetReview
+from .training.nova_ace_preprocess import NovaACEPreprocess
+from .training.nova_ace_train import NovaACELoRATrainer
+from .transcribe.nova_audio_transcribe import NovaAudioTranscribe
+from .transcribe.nova_lyric_score import NovaLyricScore
+from .utilities.nova_memory_probe import NovaMemoryProbe
+from .utilities.nova_namepath_manager import NovaNamePathManager
+from .utilities.nova_sql_dump import NovaSQLDump
+from .viewers.nova_lyric_report_viewer import NovaLyricReportViewer
+from .viewers.nova_master_report_viewer import NovaMasterReportViewer
+from .viewers.nova_reports_to_images import NovaReportsImages
+from .viewers.nova_track_inspector_report_viewer import NovaTrackInspectorReportViewer
+
 from .madow.routes import register_routes as register_madow_routes
 from .mastering.routes import register_routes as register_master_routes
 from .mastering.routes_final_master_validator import register_routes as register_master_validator_routes
@@ -111,14 +140,97 @@ register_namepath_routes()
 # freshness; see nova_player/web_cache.py for why that guess bites.
 install_web_cache()
 
-NODE_CLASS_MAPPINGS = {**NOVA_PLAYER_MAPPINGS, **MADOW_MAPPINGS,
-                       **MADOW_UNPACK_MAPPINGS, **NOVA_AUDIO_MASTER_MAPPINGS, **NOVA_MASTER_IDENTITY_MAPPINGS, **NOVA_MASTER_VALIDATOR_MAPPINGS, **NOVA_MASTER_REPORT_VIEWER_MAPPINGS, **NOVA_SAVE_AUDIO_FLAC24_MAPPINGS, **NOVA_SAVE_AUDIO_WAV_MAPPINGS,
-                       **NOVA_AUTHORING_MAPPINGS, **NOVA_UTILITIES_MAPPINGS,
-                       **NOVA_TRAINING_MAPPINGS, **NOVA_SQL_DUMP_MAPPINGS, **NOVA_AUDIO_TRANSCRIBE_MAPPINGS, **NOVA_LYRIC_SCORE_MAPPINGS, **NOVA_TRACK_INSPECTOR_MAPPINGS, **NOVA_TRACK_INSPECTOR_REPORT_VIEWER_MAPPINGS, **NOVA_LYRIC_REPORT_VIEWER_MAPPINGS,**NOVA_MEMORY_PROBE_MAPPINGS, **NOVA_REPORT_TO_IMAGE_MAPPINGS}
-NODE_DISPLAY_NAME_MAPPINGS = {**NOVA_PLAYER_NAMES, **MADOW_NAMES,
-                              **MADOW_UNPACK_NAMES, **NOVA_AUDIO_MASTER_NAMES, **NOVA_MASTER_IDENTITY_NAMES, **NOVA_MASTER_VALIDATOR_NAMES, **NOVA_MASTER_REPORT_VIEWER_NAMES, **NOVA_SAVE_AUDIO_FLAC24_NAMES, **NOVA_SAVE_AUDIO_WAV_NAMES,
-                              **NOVA_AUTHORING_NAMES, **NOVA_UTILITIES_NAMES,
-                              **NOVA_TRAINING_NAMES, **NOVA_SQL_DUMP_NAMES, **NOVA_AUDIO_TRANSCRIBE_NAMES, **NOVA_LYRIC_SCORE_NAMES, **NOVA_TRACK_INSPECTOR_NAMES, **NOVA_TRACK_INSPECTOR_REPORT_VIEWER_NAMES, **NOVA_LYRIC_INSPECTOR_REPORT_VIEWER_NAMES,**NOVA_MEMORY_PROBE_NAMES, **NOVA_REPORT_TO_IMAGE_NAMES}
+# ---------------------------------------------------------------------------
+# The node tables, written as literals ON PURPOSE
+# ---------------------------------------------------------------------------
+#
+# These used to be built by merging each module's own dict with ** spreads,
+# which is correct Python and unreadable to a static analyser: the keys only
+# exist once the code has run. The Comfy Registry reads a published pack's node
+# list WITHOUT executing it, found nothing, and ComfyUI-Manager's "Node Pack
+# Info" panel showed "No nodes found - the pack's nodes either could not be
+# parsed, or the pack is a frontend extension only". Twenty-eight nodes,
+# invisible to anyone browsing the registry.
+#
+# Evidence, from four packs' /comfy-nodes endpoints:
+#
+#     comfyui-kjnodes           literal dict, string keys          populated
+#     comfyui-videohelpersuite  re-exported from one module        populated
+#     rgthree-comfy             literal dict, keys are X.NAME      null
+#     comfyui-novaaudioplayer   merged with ** from many modules   null
+#
+# The split falls exactly where a static parser would break: it resolves literal
+# string keys and a plain re-export, and gives up on anything computed. rgthree
+# is the useful one - a very widely used pack with the same symptom, so an empty
+# node list is not evidence of a broken package.
+#
+# The keys are therefore spelled out and the classes imported directly. Each
+# module still owns its own NODE_CLASS_MAPPINGS as the source of truth, and
+# dev/tests/test_registry_nodes.py parses both the way the registry does and
+# fails if they disagree. Adding a node means adding it there and here; the test
+# says so if you forget.
+
+NODE_CLASS_MAPPINGS = {
+    "NovaPlayerNode": NovaPlayerNode,
+    "MadowInputs": MadowInputs,
+    "MadowUnpack": MadowUnpack,
+    "NovaBatchLoadAudio": NovaBatchLoadAudio,
+    "NovaConsole": NovaConsole,
+    "NovaLoadAudio": NovaLoadAudio,
+    "NovaSQLiteReader": NovaSQLiteReader,
+    "NovaTagReader": NovaTagReader,
+    "NovaTagWriter": NovaTagWriter,
+    "NovaAudioMaster": NovaAudioMaster,
+    "NovaFinalMasterValidator": NovaFinalMasterValidator,
+    "NovaMasterIdentity": NovaMasterIdentity,
+    "NovaAudioSaveFLAC24": NovaAudioSaveFLAC24,
+    "NovaAudioSaveWAV": NovaAudioSaveWAV,
+    "NovaTrackInspector": NovaTrackInspector,
+    "NovaACEDatasetBuilder": NovaACEDatasetBuilder,
+    "NovaACEDatasetReview": NovaACEDatasetReview,
+    "NovaACEPreprocess": NovaACEPreprocess,
+    "NovaACELoRATrainer": NovaACELoRATrainer,
+    "NovaAudioTranscribe": NovaAudioTranscribe,
+    "NovaLyricScore": NovaLyricScore,
+    "NovaMemoryProbe": NovaMemoryProbe,
+    "NovaNamePathManager": NovaNamePathManager,
+    "NovaSQLDump": NovaSQLDump,
+    "NovaLyricReportViewer": NovaLyricReportViewer,
+    "NovaMasterReportViewer": NovaMasterReportViewer,
+    "NovaReportsImages": NovaReportsImages,
+    "NovaTrackInspectorReportViewer": NovaTrackInspectorReportViewer,
+}
+
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "NovaPlayerNode": 'Nova Player 🔊',
+    "MadowInputs": 'Madow Inputs 🎚️',
+    "MadowUnpack": 'Madow Unpack ⚪',
+    "NovaBatchLoadAudio": 'Nova Batch Load Audio 🎼',
+    "NovaConsole": 'Nova Console 🖥️',
+    "NovaLoadAudio": 'Nova Load Audio 🔄',
+    "NovaSQLiteReader": 'Nova SQLite Reader 🗃️',
+    "NovaTagReader": 'Nova Tag Reader 🔖',
+    "NovaTagWriter": 'Nova Tag Writer 🏷️',
+    "NovaAudioMaster": 'Nova Audio Master 🧾',
+    "NovaFinalMasterValidator": 'Nova Final Master Validator',
+    "NovaMasterIdentity": 'Nova Master Identity \U0001faaa',
+    "NovaAudioSaveFLAC24": 'Save Audio FLAC 24-bit ⬇️',
+    "NovaAudioSaveWAV": 'Save Audio WAV PCM16|PCM24|FLOAT32 ⬇️',
+    "NovaTrackInspector": 'Nova Track Inspector 🔬',
+    "NovaACEDatasetBuilder": 'Nova ACE Dataset Builder 🧱',
+    "NovaACEDatasetReview": 'Nova ACE Dataset Review 🔍',
+    "NovaACEPreprocess": 'Nova ACE Preprocess 🧮',
+    "NovaACELoRATrainer": 'Nova ACE LoRA Trainer 🎓',
+    "NovaAudioTranscribe": 'Nova Audio Transcribe 🎙️',
+    "NovaLyricScore": 'Nova Lyric Score 📊',
+    "NovaMemoryProbe": 'Nova Memory Probe (RAM/VRAM) 🧠',
+    "NovaNamePathManager": 'Nova NamePath Manager 🧭',
+    "NovaSQLDump": 'Nova SQL Dump 🛢️',
+    "NovaLyricReportViewer": 'Nova Lyric Report 📈',
+    "NovaMasterReportViewer": 'Nova Master Report Viewer 📊',
+    "NovaReportsImages": 'Nova Reports Images 🖼️',
+    "NovaTrackInspectorReportViewer": 'Nova Track Inspector Report 📈',
+}
 
 WEB_DIRECTORY = "./web"
 
