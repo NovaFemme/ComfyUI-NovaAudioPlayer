@@ -371,10 +371,13 @@ take records what produced it.
 
 ## Workflows and LoRAs
 
-Two ready-to-run ACE-Step 1.5 XL SFT workflows live in
-**[`example_workflows/`](example_workflows/)** — prompt and lyrics in, measured
-audio out, built around Madow Inputs and Nova Player. Drag either `.json` onto
-the canvas; the subgraphs are embedded, so nothing else needs importing.
+Three ready-to-run workflows live in
+**[`example_workflows/`](example_workflows/)**. Two generate music with ACE-Step
+1.5 XL SFT — prompt and lyrics in, measured audio out, built around Madow Inputs
+and Nova Player, with the subgraphs embedded so nothing else needs importing.
+The third is a **mastering chain**: load a track, master it, read the report in
+the canvas, save it, and then verify the saved file still reproduces the master
+you approved. That one needs no models and no other custom node pack.
 
 The **Southern Blues Rock** LoRA that the second workflow uses is published on
 the [releases page](https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer/releases/latest)

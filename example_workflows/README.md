@@ -1,27 +1,25 @@
 # Example workflows
 
-Two ACE-Step 1.5 XL SFT workflows for generating music from a prompt and
-lyrics, both built around **Madow Inputs** and **Nova Player**.
+Three workflows: two that generate music with ACE-Step 1.5 XL SFT, and one that
+masters what comes out of them.
 
-Drag either `.json` onto the ComfyUI canvas to load it. Both are
-self-contained — the subgraphs they use are embedded in the file, so nothing
-else needs importing.
+Drag any `.json` onto the ComfyUI canvas to load it.
 
-| Workflow | What it is |
-|---|---|
-| **Ace-Step XL SFT - Prompt and Lyrics to Audio.json** | The base workflow. Prompt and lyrics in, measured audio out. |
-| **Ace-Step XL SFT - Prompt and Lyrics to Audio Incl Lora.json** | The same graph with a LoRA loader in the model chain. |
+| Workflow | What it is | Needs models? |
+|---|---|---|
+| **Ace-Step XL SFT - Prompt and Lyrics to Audio.json** | The base generation workflow. Prompt and lyrics in, measured audio out. | yes |
+| **Ace-Step XL SFT - Prompt and Lyrics to Audio Incl Lora.json** | The same graph with a LoRA loader in the model chain. | yes, plus the LoRA |
+| **Nova Audio Mastering Workflow.json** | Load a finished track, master it, check the master survived the file write, and save it. | no |
 
-Each is organised into three subgraphs — the model/latent chain, the prompt and
-lyrics text, and sampling through to a tiled VAE decode — so the top level stays
-readable. The Nova Player at the end measures whatever comes out.
+---
 
-## What you need
+## The generation workflows
 
-### This pack
-
-`MadowInputs`, `MadowUnpack` and `NovaPlayerNode`, which you already have if you
-are reading this.
+Both are built around **Madow Inputs** and **Nova Player**, and both are
+self-contained — three embedded subgraphs each (the model and latent chain, the
+prompt and lyrics text, and sampling through to a tiled VAE decode), so nothing
+needs importing separately. The Nova Player at the end measures whatever comes
+out.
 
 ### One other custom node
 
@@ -41,7 +39,7 @@ missing. Placed by hand, they go here:
 | [`qwen_4b_ace15.safetensors`](https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files/resolve/main/split_files/text_encoders/qwen_4b_ace15.safetensors) | `models/text_encoders/` |
 | [`ace_1.5_vae.safetensors`](https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files/resolve/main/split_files/vae/ace_1.5_vae.safetensors) | `models/vae/` |
 
-## The LoRA
+### The LoRA
 
 The LoRA workflow expects **Southern Blues Rock**, which is published as a
 release asset rather than committed here — it is 80 MiB, and a file that size
@@ -74,6 +72,38 @@ To verify a download:
 ```bash
 sha256sum Southern_Blues_Rock.safetensors
 ```
+
+---
+
+## The mastering workflow
+
+**Nova Audio Mastering Workflow.json** needs no models and no other custom node
+pack — it is fourteen nodes, eight of them from here, plus two ComfyUI core
+nodes. Point it at an audio file and run it.
+
+The chain it demonstrates is the one the mastering nodes were built for:
+
+1. **Nova Load Audio** brings the track in.
+2. **Nova Audio Master** analyses it and produces a corrected version, with a
+   full `report_json`.
+3. **Nova Master Report Viewer** renders that report in the canvas, so you can
+   read what changed without leaving the graph.
+4. **Nova Master Identity** turns the report into release and archive identity —
+   what source, what settings, what came out.
+5. **Save Audio WAV** writes the file.
+6. **Nova Final Master Validator** answers the question that matters after a
+   write: *did the file you saved still reproduce the master you approved?*
+7. **Nova Player** and **Nova Console** sit across it for listening and logging.
+
+That last step is the point of the workflow. Mastering in memory and saving to
+disk are two different operations, and the validator is what catches a file that
+no longer matches what you signed off.
+
+**Nova NamePath Manager** is included for output paths. Its widgets ship empty —
+fill in your own folders, and consider saving them as a profile so the next
+workflow can reuse them.
+
+---
 
 ## More to come
 
