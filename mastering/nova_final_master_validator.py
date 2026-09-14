@@ -11,7 +11,10 @@ from typing import Any, Dict, List, Tuple
 import torch
 import folder_paths
 
-from ..nova_categories import ANALYSIS
+try:
+    from ..nova_categories import ANALYSIS
+except ImportError:  # imported as a module rather than as part of the pack
+    from nova_categories import ANALYSIS
 
 try:
     from ..analysis import (

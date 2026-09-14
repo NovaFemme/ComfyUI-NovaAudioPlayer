@@ -425,7 +425,7 @@ class NovaACELoRATrainer:
                 }),
                 "output_dir": ("STRING", {
                     "default": "", "multiline": False,
-                    "placeholder": "/home/novaf/Datasets/my_lora/run1",
+                    "placeholder": "~/Datasets/my_lora/run1",
                     "tooltip": "Where the adapter goes. final/ is the finished LoRA; checkpoints/ holds the per-epoch saves.",
                 }),
                 "checkpoint_dir": ("STRING", {

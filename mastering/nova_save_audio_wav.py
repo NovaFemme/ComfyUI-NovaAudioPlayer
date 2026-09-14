@@ -51,7 +51,10 @@ import torch
 
 import folder_paths
 
-from ..nova_categories import DELIVERY
+try:
+    from ..nova_categories import DELIVERY
+except ImportError:  # imported as a module rather than as part of the pack
+    from nova_categories import DELIVERY
 
 VERSION = "1.0.0"
 

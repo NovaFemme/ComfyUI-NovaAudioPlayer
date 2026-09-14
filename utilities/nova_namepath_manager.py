@@ -156,7 +156,7 @@ class NovaNamePathManager:
                 "database_path": ("STRING", {
                     "default": "",
                     "multiline": False,
-                    "placeholder": "/home/novaf/Databases/NovaAudioMastering.db",
+                    "placeholder": "~/Databases/NovaAudioMastering.db",
                     "tooltip": "Full path to the SQLite database.",
                 }),
                 "table_name": ("STRING", {
@@ -176,7 +176,7 @@ class NovaNamePathManager:
                 "folder_string": ("STRING", {
                     "default": "",
                     "multiline": False,
-                    "placeholder": "/home/novaf/Music/Nova Audio Masters/Albums/…",
+                    "placeholder": "~/Music/Nova Audio Masters/Albums/…",
                     "tooltip": "Folder for Nova Batch Load Audio.",
                 }),
                 "file_filter": ("STRING", {

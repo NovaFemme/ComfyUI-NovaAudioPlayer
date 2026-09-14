@@ -5,7 +5,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from ..nova_categories import MASTERING
+try:
+    from ..nova_categories import MASTERING
+except ImportError:  # imported as a module rather than as part of the pack
+    from nova_categories import MASTERING
 
 VERSION = "0.2.5"
 

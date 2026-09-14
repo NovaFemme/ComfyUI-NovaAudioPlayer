@@ -131,7 +131,7 @@ class NovaSQLiteReader:
                 "database_path": ("STRING", {
                     "default": "",
                     "multiline": False,
-                    "placeholder": "/home/novaf/Databases/NovaAudioMastering_test.db",
+                    "placeholder": "~/Databases/NovaAudioMastering_test.db",
                     "tooltip": "Full path to an existing .db file. Leave empty to create a new one below.",
                 }),
                 "table_name": ("STRING", {

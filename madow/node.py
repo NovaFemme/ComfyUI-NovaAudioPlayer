@@ -32,7 +32,10 @@ from .params import (ARG, DEFAULTS, KEYS, KIND, NON_AUDIO_KEYS, PARAMS,
 from . import presets as preset_store
 from .validate import RULESET_VER, validate
 
-from ..nova_categories import GENERATION
+try:
+    from ..nova_categories import GENERATION
+except ImportError:  # imported as a module rather than as part of the pack
+    from nova_categories import GENERATION
 
 PACK_VERSION = "0.1.0"
 

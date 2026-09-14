@@ -16,9 +16,39 @@ to group and query.
 """
 import re
 
-import pymysql
 from aiohttp import web
 from server import PromptServer
+
+# OPTIONAL, AND IT HAS TO BE.
+#
+# __init__.py imports this module to register the node, so a hard `import
+# pymysql` at module scope takes the WHOLE PACK down on any install that does
+# not have it -- every Nova node disappears from the menu with one ImportError
+# in the log. The machine this was written on has pymysql, which is exactly why
+# that would never have shown up here.
+#
+# pymysql is not in ComfyUI's requirements and is not declared in
+# pyproject.toml, because only this one node needs it and the registry rule is
+# to declare what is genuinely required rather than install at runtime. So it
+# degrades the way scipy and soundfile already do in this package: absent
+# until used, and then a message that says what to do.
+try:
+    import pymysql
+except ImportError:                                     # pragma: no cover
+    pymysql = None
+
+
+def _require_pymysql():
+    """Fail at the point of use, in words, rather than at import."""
+    if pymysql is None:
+        raise RuntimeError(
+            "Nova SQL Dump needs the pymysql package, which is not installed. "
+            "Install it yourself and restart ComfyUI (this node installs "
+            "nothing):\n"
+            "    python -m pip install pymysql\n"
+            "Every other Nova node works without it."
+        )
+    return pymysql
 
 try:
     from ..nova_categories import UTILITY_IO
@@ -71,7 +101,8 @@ class NovaSQLDump:
     def initialize_database(host, user, password, database, port=3306):
         """Ensure the database, table and the flow_state / flow_name columns exist."""
         database = _validate_identifier(database)
-        connection = pymysql.connect(host=host, port=port, user=user, password=password, charset="utf8mb4")
+        connection = _require_pymysql().connect(
+            host=host, port=port, user=user, password=password, charset="utf8mb4")
         try:
             with connection.cursor() as cursor:
                 cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{database}` CHARACTER SET utf8mb4")
@@ -124,8 +155,9 @@ class NovaSQLDump:
     @staticmethod
     def insert_snapshot(host, user, password, database, port, node_data_json, flow_id, flow_state, flow_name):
         NovaSQLDump.initialize_database(host, user, password, database, port)
-        connection = pymysql.connect(host=host, port=port, user=user, password=password,
-                                     database=database, charset="utf8mb4")
+        connection = _require_pymysql().connect(
+            host=host, port=port, user=user, password=password,
+            database=database, charset="utf8mb4")
         try:
             with connection.cursor() as cursor:
                 cursor.execute(

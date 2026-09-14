@@ -22,7 +22,10 @@ from .panel_info import audio_sha256, build_panel_info
 from .config_manager import manager
 from .peaks_cache import cache_peaks, write_peaks_sidecar
 
-from ..nova_categories import ANALYSIS
+try:
+    from ..nova_categories import ANALYSIS
+except ImportError:  # imported as a module rather than as part of the pack
+    from nova_categories import ANALYSIS
 
 
 class NovaPlayerNode:

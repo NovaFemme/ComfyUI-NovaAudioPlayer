@@ -20,7 +20,10 @@ emits was decided upstream, so there is nothing here that can disagree with
 from .comfy_types import BUNDLE_TYPE, kind_for
 from .params import DEFAULTS, KEYS, OUTPUT_NAMES
 
-from ..nova_categories import GENERATION
+try:
+    from ..nova_categories import GENERATION
+except ImportError:  # imported as a module rather than as part of the pack
+    from nova_categories import GENERATION
 
 
 class MadowUnpack:

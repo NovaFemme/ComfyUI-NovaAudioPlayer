@@ -82,7 +82,7 @@ class NovaACEPreprocess:
                 "output_dir": ("STRING", {
                     "default": "",
                     "multiline": False,
-                    "placeholder": "/home/novaf/Datasets/my_lora/tensors",
+                    "placeholder": "~/Datasets/my_lora/tensors",
                     "tooltip": "Where the .pt tensors go. Existing tensors are skipped, so a cancelled run resumes.",
                 }),
                 "checkpoint_dir": ("STRING", {
@@ -112,7 +112,7 @@ class NovaACEPreprocess:
                 "acestep_repo_path": ("STRING", {
                     "default": "",
                     "multiline": False,
-                    "placeholder": "/home/novaf/Github/ACE-Step-1.5 (only if not pip-installed)",
+                    "placeholder": "~/Github/ACE-Step-1.5 (only if not pip-installed)",
                     "tooltip": "Path to an ACE-Step clone, prepended to sys.path for the import. Leave empty if the package is installed.",
                 }),
             },

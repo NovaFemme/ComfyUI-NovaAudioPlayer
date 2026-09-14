@@ -99,7 +99,7 @@ class NovaACEDatasetBuilder:
                 "dataset_json_path": ("STRING", {
                     "default": "",
                     "multiline": False,
-                    "placeholder": "/home/novaf/Datasets/my_lora/dataset.json",
+                    "placeholder": "~/Datasets/my_lora/dataset.json",
                     "tooltip": "Where to write the dataset JSON. Parent folders are created.",
                 }),
                 "trigger_word": ("STRING", {
