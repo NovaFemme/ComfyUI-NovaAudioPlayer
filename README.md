@@ -369,6 +369,24 @@ take records what produced it.
 
 ---
 
+## Workflows and LoRAs
+
+Two ready-to-run ACE-Step 1.5 XL SFT workflows live in
+**[`example_workflows/`](example_workflows/)** — prompt and lyrics in, measured
+audio out, built around Madow Inputs and Nova Player. Drag either `.json` onto
+the canvas; the subgraphs are embedded, so nothing else needs importing.
+
+The **Southern Blues Rock** LoRA that the second workflow uses is published on
+the [releases page](https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer/releases/latest)
+rather than committed here — 80 MiB in the git history would be downloaded by
+everyone cloning the repository, forever.
+
+[Model downloads, install paths and the LoRA's checksum →](example_workflows/README.md)
+
+More workflows and LoRAs will be added over time.
+
+---
+
 ## Documentation
 
 Per-node help is built in: right-click any node and choose **Help**.
