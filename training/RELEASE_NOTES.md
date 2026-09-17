@@ -1,14 +1,39 @@
 # Nova ACE LoRA Trainer — release notes for the Registry build
 
+> **Superseded on one point — §24.** This document records the transcription
+> chain as *held back but still registered*, on the reasoning that unregistering
+> would break saved workflows containing those nodes. That reasoning does not
+> apply here: **no published registry version has ever contained them.** 2.3.0,
+> 2.3.2, 2.3.3 and 2.3.4 were each checked by downloading the published archive
+> and reading its `__init__.py`; none registers Transcribe, Lyric Score or Lyric
+> Report. 2.5.0 never reached the registry at all. The only saved workflows that
+> can reference these nodes are local ones on the author's own machine.
+>
+> They are therefore **cut from the 2.6.0 build**, which §24 itself names as the
+> alternative: unregistered in `__init__.py` and excluded by `.comfyignore`. The
+> source stays in the repository. The VRAM diagnosis in §24 stands unchanged and
+> is the reason they are held; only the disposition differs.
+>
+> 2.6.0 registers **25 nodes**, not 28. Counts elsewhere in this document predate
+> that decision.
+
+
 For the agent preparing `comfyui-novaaudioplayer` for the Comfy Registry.
 
 **Scope.** This covers the five nodes in `training/`, plus `install.py`, the
 `web/docs/` documentation tree, the Nova Console slot fix, the report-capture
 feature (§13), the removal of `NovaReportsImages` (§14), and the Nova Track
-Inspector's provisional layer and profile store (§15). The pack registers 28 nodes for release;
-the rest are outside what this document vouches for, and nothing here should be
-read as a review of them. Section 9 lists what the release build will trip over
-regardless.
+Inspector's provisional layer and profile store (§15), the true-peak correction
+(§19), the validator's measured limits (§20), first-run onboarding (§21), the
+`column_set` fix (§22) and node colours by role (§23). The pack registers 28
+nodes; the rest are outside what this document vouches for, and nothing here
+should be read as a review of them.
+
+**Three of those 28 are held back from this release and are not vouched for at
+all.** Nova Audio Transcribe, Nova Lyric Score and Nova Lyric Report still
+register — no code was removed — but they are excluded from this document's
+verification and should not be recommended to users until the VRAM fault in §24
+is closed. Section 9 lists what the release build will trip over regardless.
 
 **State at time of writing.** `pyproject.toml` version `2.6.0`, publisher
 `novafemme`, repo `NovaFemme/ComfyUI-NovaAudioPlayer`, branch `nova-suite`, last
@@ -33,6 +58,12 @@ uncommitted and what must not ship.
 | Registered node count | 30 counted, 29 claimed | **28**, and the description agrees |
 | Node doc coverage | 8 of 28 | **28 of 28 — complete** |
 | Scratch directory | `_to_delete/`, unignored | moved to `.trash/`, both ignored |
+| True peak measurement | band-limited, under-read | Kaiser-windowed polyphase FIR (§19) |
+| Validator archive lookup | filename only | identity picker + content scan (§20) |
+| First-run onboarding | assumed a database the user does not have | documented, example DB ships (§21) |
+| `column_set` preset | matched the wrong column on a name collision | exact-spelling precedence (§22) |
+| Node colours | set by hand, per node | standardised by role, applied by default (§23) |
+| Transcribe / Lyric Score / Lyric Report | shipped and vouched for | **held back — not vouched for (§24)** |
 
 ---
 
@@ -1346,3 +1377,82 @@ overridden the scheme forever.
 publish until they are staged. This is exactly what checklist item 10 exists to
 catch.
 
+---
+
+## 24. Held back from this release — Transcribe, Lyric Score, Lyric Report
+
+Three registered nodes are **excluded from everything this document vouches
+for**:
+
+| Node | Class key | Menu |
+|---|---|---|
+| Nova Audio Transcribe 🎙️ | `NovaAudioTranscribe` | Analysis & Validation |
+| Nova Lyric Score 📊 | `NovaLyricScore` | Analysis & Validation |
+| Nova Lyric Report 📈 | `NovaLyricReportViewer` | Data Viewers |
+
+**They still register.** No class mapping, display name or help page was
+removed, and the pack still registers 28 nodes. Removing them would break every
+saved workflow that contains one, which is a worse outcome than shipping them
+with the fault stated. The decision recorded here is therefore *not vouched
+for*, not *not shipped* — if the intent is to cut them from the build instead,
+that is a code change and this section needs rewriting.
+
+### The fault
+
+Nova Audio Transcribe exhausts VRAM on a 16 GB AMD RX 9070 XT. It reaches
+roughly 98% within seconds of starting and freezes the desktop and the ComfyUI
+interface. It is reproducible, not intermittent.
+
+The ceiling is not the hardware. A third-party transcription node from the
+Comfy Registry, running the same `htdemucs` and `htdemucs_ft` models on the same
+machine with the same or a heavier load, completes with VRAM sitting at about
+45% throughout. Whatever is wrong is in this pack's code path.
+
+Because the same GPU drives the display, an allocation failure presents as a
+desktop freeze rather than a clean Python exception. That is why the symptom
+looks like a hang and not an error.
+
+### What was diagnosed
+
+The exhaustion is in **Whisper**, not in demucs — demucs was the first
+suspicion and was ruled out.
+
+The retry ladder was not working. Each retry failed in about 120 ms, which is
+far too fast to have been a real attempt. The cause: a caught exception's
+`__traceback__` holds a reference to every frame of the failed forward pass, and
+those frames hold the tensors. `torch.cuda.empty_cache()` therefore freed
+nothing, and each lower batch size was attempted against a VRAM pool that was
+still full.
+
+### What was changed, and what is unverified
+
+In the working tree, **not confirmed on hardware**:
+
+- `_reclaim_vram(*held)` — sets `__traceback__ = None`, then `gc.collect()`,
+  `empty_cache()` and `ipc_collect()`. This is the fix for the 120 ms retries.
+- `_vram(tag)` — logs allocated / reserved / free at four points.
+- `_safe_batch(requested, model_name)` — sizes the batch against measured free
+  VRAM with a 1.5 GiB display headroom allowance.
+- The retry ladder is now 8 → 4 → 2 → 1, reclaims between attempts, and breaks
+  immediately on a non-OOM error instead of retrying it three more times.
+- `_reject_placeholder_audio()` — a separate fault found on the way. With
+  `decode_audio` off, a placeholder `torch.zeros(1, 1, 1)` reached the
+  separator and produced a bare `AssertionError` from demucs. It is now
+  rejected with a message naming `decode_audio` as the cause.
+
+**The outstanding evidence is four `VRAM :` log lines from a run after a
+restart.** Until those exist, the fixes are reasoning, not results. That is the
+whole reason these three nodes are held.
+
+### Why the other two go with it
+
+Nova Lyric Score and Nova Lyric Report sit downstream of the transcript. Neither
+has a fault of its own on record, and neither can be exercised without the node
+that produces their input.
+
+### For whoever reviews the package
+
+All three appear in the menu and all three have help pages, so a reviewer will
+find them and try them. Absence of a warning would read as a claim that they
+work. If the release text mentions them at all, it should say the transcription
+chain is present but deferred, with the VRAM fault named.
