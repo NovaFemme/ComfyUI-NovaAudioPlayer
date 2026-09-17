@@ -65,7 +65,7 @@ one does not override the safety logic above.
 | `mastered_audio` | the processed master |
 | `original_audio` | the source, retained so a comparison branch needs no second loader |
 | `report` | the human-readable report |
-| `report_json` | the structured report — feed this to the Report Viewer, Master Identity and Reports Images |
+| `report_json` | the structured report — feed this to the Report Viewer and Master Identity |
 
 ## Provenance
 

@@ -1,6 +1,6 @@
 # Nova Audio Player
 
-**Twenty-eight nodes for making music with ACE-Step in ComfyUI** — generation
+**Twenty-five nodes for making music with ACE-Step in ComfyUI** — generation
 parameters, corrective mastering, measurement you can trust, report viewers,
 delivery, and LoRA training.
 
@@ -47,10 +47,10 @@ Three things are optional and imported only when used:
 - **`scipy`** — used for K-weighting in the LUFS measurement. Without it the
   player still reports loudness with the correct channel summation, but
   unweighted and ungated, so treat the figure as approximate.
-- **`transformers`, `demucs`** — Nova Audio Transcribe only. The node fails when
-  you run it, not when the pack loads.
-- **A separate ACE-Step install** — the four LoRA training nodes drive
-  ACE-Step's own trainer. Nothing is installed at runtime.
+- **A separate ACE-Step install** — the five LoRA training nodes drive
+  ACE-Step's own trainer. Nothing is installed or downloaded at runtime. Run
+  **Nova ACE Setup Check 🩺** first; it reports what is missing without
+  installing anything.
 
 ---
 
@@ -105,8 +105,6 @@ the rest are being filled in.
 | **Nova Player 🔊** | The player: twelve live visualisers, a whole-file measurement panel, a theme system, and a `panel_info` output for logging every take. |
 | **Nova Track Inspector 🔬** | Analyses the whole track over time and tells you where to listen, against a baseline. |
 | **Nova Final Master Validator** | Answers one question: did the file you saved still reproduce the master you approved? |
-| **Nova Audio Transcribe 🎙️** | Speech-to-text over an `AUDIO` input, returning `text` and timestamped `json`. |
-| **Nova Lyric Score 📊** | Scores a transcript against reference lyrics and returns `score`, `grade`, `report_json` and `report_text`. |
 
 ![Nova Player](docs/images/nodes/NovaPlayerNode-waveform.png)
 
@@ -121,9 +119,11 @@ graph to read what just happened.
 |---|---|
 | **Nova Master Report Viewer 📊** | `report_json` from Nova Audio Master |
 | **Nova Track Inspector Report 📈** | `inspection_json` from Nova Track Inspector |
-| **Nova Lyric Report 📈** | Nova Audio Transcribe + Nova Lyric Score together |
 
-Each has several view modes on one widget.
+Each has several view modes on one widget, and **every view exports as a PNG
+from the node's right-click menu** — the image is rasterised from the viewer's
+own live DOM, so it looks exactly like what is on screen rather than being
+redrawn a second time.
 
 **Nova Master Report Viewer** — Dashboard, Compare, Mastering Guide, Technical:
 
@@ -139,12 +139,6 @@ Each has several view modes on one widget.
 ![Inspector report, markers](docs/images/nodes/NovaTrackInspectorReportViewer-markers.png)
 ![Inspector report, technical](docs/images/nodes/NovaTrackInspectorReportViewer-technical.png)
 
-**Nova Lyric Report** — Dashboard, Transcription, and a word-level diff:
-
-![Lyric report, dashboard](docs/images/nodes/NovaLyricReportViewer-dashboard.png)
-![Lyric report, transcription](docs/images/nodes/NovaLyricReportViewer-transcription.png)
-![Lyric report, diff](docs/images/nodes/NovaLyricReportViewer-diff.png)
-
 ### 📦 Delivery & Metadata
 
 | Node | What it does |
@@ -154,21 +148,23 @@ Each has several view modes on one widget.
 | **Nova Tag Writer 🏷️** | Writes a table of metadata onto files, with column mapping, skip rules and a dry-run mode that reports without touching anything. |
 | **Nova Tag Reader 🔖** | Reads tags off a file list into a console report and `tags_json`. |
 | **Nova SQLite Reader 🗃️** | Reads a table out of a SQLite database — columns, `where`, and the option to create a new database. |
-| **Nova Reports Images 🖼️** | Renders one selected report view as a fixed portrait image and saves it. |
 
-![Nova Reports Images](docs/images/nodes/NovaReportsImages.png)
+Report images are no longer a node. Exporting a report view is a right-click
+entry on the viewer itself, which is both fewer nodes to wire and a picture that
+matches the screen exactly.
 
 ### 🎓 LoRA Training
 
-Four nodes that drive ACE-Step's own training pipeline. They need a separate
-ACE-Step install; this pack installs nothing at runtime.
+Five nodes that drive ACE-Step's own training pipeline. They need a separate
+ACE-Step install; this pack installs and downloads nothing at runtime.
 
 | Node | What it does |
 |---|---|
 | **Nova ACE Dataset Builder 🧱** | Turns a batch of tagged audio into the dataset JSON ACE-Step's preprocessor expects. |
 | **Nova ACE Dataset Review 🔍** | Checks a dataset before you spend GPU hours on it. ACE-Step's own docs make manual review mandatory; this is that pass. |
 | **Nova ACE Preprocess 🧮** | Runs ACE-Step's two-pass tensor generation over a Nova dataset. |
-| **Nova ACE LoRA Trainer 🎓** | Runs ACE-Step's LoRA training loop over those tensors. |
+| **Nova ACE LoRA Trainer 🎓** | Runs ACE-Step's LoRA training loop over those tensors, as a cancellable child process. |
+| **Nova ACE Setup Check 🩺** | Answers one question before you queue anything expensive: is this machine ready to preprocess and train? It reports only — it never installs, downloads or spawns anything. |
 
 ![Nova ACE LoRA Trainer](docs/images/nodes/NovaACELoRATrainer.png)
 
@@ -371,15 +367,26 @@ take records what produced it.
 
 ## Workflows and LoRAs
 
-Three ready-to-run workflows live in
-**[`example_workflows/`](example_workflows/)**. Two generate music with ACE-Step
-1.5 XL SFT — prompt and lyrics in, measured audio out, built around Madow Inputs
-and Nova Player, with the subgraphs embedded so nothing else needs importing.
-The third is a **mastering chain**: load a track, master it, read the report in
-the canvas, save it, and then verify the saved file still reproduces the master
-you approved. That one needs no models and no other custom node pack.
+Seven ready-to-run workflows live in **[`example_workflows/`](example_workflows/)**,
+grouped the same way the node menu is. Each one ships twice: a `.json` and a
+`.png` template — drag either onto the canvas and it loads.
 
-The **Southern Blues Rock** LoRA that the second workflow uses is published as a
+| Group | Workflow | Needs models? |
+|---|---|---|
+| **Generation & Synthesis** | Ace-Step XL SFT — Prompt and Lyrics to Audio | ACE-Step 1.5 |
+| | Ace-Step XL SFT — Prompt and Lyrics to Audio Using Lora | ACE-Step 1.5 + the LoRA |
+| **Mastering Process** | Nova Audio Mastering Process | no |
+| | Nova Audio Master Comparison Validation | no |
+| **Delivery & Metadata** | Nova Audio Tag Reader | no |
+| | Nova Audio Tag Writer | no |
+| **LoRA Training** | Nova Ace-Step 1.5 LoRA Pre-Processor And Training | ACE-Step 1.5 |
+
+Five of the seven need no models and no other custom node pack — install this
+and run them. The mastering chain is the one to start with: load a track, master
+it, read the report in the canvas, save it, then verify the saved file still
+reproduces the master you approved.
+
+The **Southern Blues Rock** LoRA is published as a
 [release asset](https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer/releases/tag/assets-v1)
 rather than committed here — 80 MiB in the git history would be downloaded by
 everyone cloning the repository, forever.

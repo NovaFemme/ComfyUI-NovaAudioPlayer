@@ -214,6 +214,43 @@ def check_remote_code_imports(checkpoint_dir: str, variant: str) -> List[str]:
     return missing
 
 
+def install_command(packages: List[str], *, no_deps: bool = True,
+                    index_url: str = "", force: bool = False) -> str:
+    """The right install incantation for THIS environment, as a printable line.
+
+    Nothing here runs anything — the string is for the user to copy. pip is
+    used when the environment has it, and uv otherwise, because a uv-made venv
+    (the common ComfyUI layout now) has no pip inside it at all.
+    """
+    exe = sys.executable
+    uv_venv = importlib.util.find_spec("pip") is None
+    if uv_venv:
+        uv = os.path.join(os.path.dirname(exe), "uv")
+        uv = uv if os.path.exists(uv) else "uv"
+        parts = [uv, "pip", "install", "--python", exe]
+    else:
+        parts = [exe, "-m", "pip", "install"]
+    if no_deps:
+        parts.append("--no-deps")
+    if force:
+        parts.append("--reinstall" if uv_venv else "--force-reinstall")
+    if index_url:
+        parts += ["--index-url", index_url]
+    parts += list(packages)
+
+    # Wrapped to a narrow column: this lands in Nova Console, which does not
+    # wrap, so a long single line just runs off the edge.
+    lines: List[str] = []
+    current = "    "
+    for part in parts:
+        if len(current) + len(part) + 1 > 70 and current.strip():
+            lines.append(current.rstrip() + " \\")
+            current = "        "
+        current += part + " "
+    lines.append(current.rstrip())
+    return "\n".join(lines)
+
+
 def describe_remote_code_requirement(missing: List[str]) -> str:
     """Say exactly what to install, without installing it."""
     packages: List[str] = []
@@ -221,13 +258,7 @@ def describe_remote_code_requirement(missing: List[str]) -> str:
         for package in [REMOTE_CODE_HINTS.get(module, module)] + REMOTE_CODE_EXTRAS.get(module, []):
             if package not in packages:
                 packages.append(package)
-    exe = sys.executable
-    if importlib.util.find_spec("pip") is not None:
-        command = f"    {exe} -m pip install --no-deps " + " ".join(packages)
-    else:
-        uv = os.path.join(os.path.dirname(exe), "uv")
-        uv = uv if os.path.exists(uv) else "uv"
-        command = f"    {uv} pip install --python {exe} --no-deps " + " ".join(packages)
+    command = install_command(packages)
     return (
         "This checkpoint loads through trust_remote_code — transformers runs "
         "the modeling_*.py shipped inside the checkpoint folder, and that file "

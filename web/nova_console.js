@@ -28,25 +28,58 @@ function valueInputIndex(node) {
  *
  * INTERNAL / POTENTIALLY UNSTABLE COMFYUI API.
  *
- * Dragging a link into empty canvas and picking Nova Console from the menu runs
- * source.connectByType() → target.<slot lookup>(). The lookup's first, strict
- * pass compares slot types exactly and rewrites a "*" slot to "0", so the
- * wildcard `value` matches nothing while a same-typed widget-input (e.g. `label`
- * for a STRING link) matches — the link lands there and the mismatched connect
- * then throws.
+ * THE BUG. In the new frontend every widget is also a connectable input, so
+ * Nova Console offers four: the wildcard `value` plus `label` (STRING),
+ * `print_to_server_log` (BOOLEAN) and `max_lines` (INT). Auto-connect picks by
+ * type, and a STRING source is an *exact* match for `label` while the wildcard
+ * is not — so the link lands on `label`, and the graph then fails to execute.
  *
- * WHICH internal resolves the slot varies by ComfyUI/litegraph version:
- *   • current builds:  findConnectByTypeSlot(input, node, slotType, opts)
- *   • older builds:    findInputSlotByType(type, …) / findSlotByType(input, …)
- * The earlier fix only patched findSlotByType, which current builds never call
- * on this path — so it silently did nothing. We now override all three FOR THIS
- * NODE TYPE ONLY (not the shared prototype) and point every INPUT-side lookup at
- * `value`. Output-side lookups and manual drops onto a specific slot use other
- * code paths and are untouched — you can still wire something into `label` by
- * hand.
+ * FOUR DIFFERENT INTERNALS resolve that slot, depending on how the node was
+ * created and on the frontend version. Verified against the frontend 1.45.15
+ * sources (shipped as sourcemaps in comfyui_frontend_package):
+ *
+ *   LinkConnector.connectToNode()        → node.findInputByType(type)?.slot
+ *     Releasing a link on empty canvas and picking Nova Console from the
+ *     search box / context menu. THIS is the path that was still broken:
+ *     NodeSearchBoxPopover.addNode() ends in
+ *     `canvasStore.getCanvas().linkConnector.connectToNode(node, event)`,
+ *     which never touches any of the three below.
+ *
+ *   LGraphNode.connectByType()           → findConnectByTypeSlot(true, …)
+ *     Called on the SOURCE node, which then calls findSlotByType on the target.
+ *
+ *   findSlotByType(input, type, …)       → older builds
+ *   findInputSlotByType(type, …)         → some builds call this directly
+ *
+ * All four are overridden FOR THIS NODE TYPE ONLY — never on the shared
+ * prototype, so no other node's behaviour changes (§6, §9).
+ *
+ * Redirecting is safe rather than merely different: LiteGraph.isValidConnection
+ * rewrites "*" to 0 and returns true when either side is falsy, so a link of any
+ * type is accepted by `value`. The connection succeeds; it just lands on the
+ * slot that can actually receive it.
+ *
+ * Manual drops onto a named slot go through getInputOnPos()/_dropOnInput() and
+ * are untouched — you can still wire something into `label` by hand.
  */
 function preferValueSlot(nodeType) {
   const proto = nodeType.prototype;
+
+  // THE ONE THAT MATTERS for the link-release context menu.
+  // LinkConnector.connectToNode does:  node.findInputByType(type)?.slot
+  // so this must return litegraph's {index, slot} shape, not a bare index.
+  const origFindInputByType = proto.findInputByType;
+  proto.findInputByType = function (type, ...rest) {
+    try {
+      const idx = valueInputIndex(this);
+      if (idx !== -1) return { index: idx, slot: this.inputs[idx] };
+    } catch (err) {
+      console.error("[Nova Console] findInputByType preference failed", err);
+    }
+    return origFindInputByType
+      ? origFindInputByType.apply(this, [type, ...rest])
+      : undefined;
+  };
 
   // Current litegraph: connectByType → target.findConnectByTypeSlot(...).
   // `this` is the target (Nova Console); returns a slot index (number) | null.

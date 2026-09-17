@@ -57,7 +57,12 @@ def _clean(value: Any) -> str:
     return str(value if value is not None else "").strip().strip('"').strip("'")
 
 
-def _join(directory: str, filename: str) -> str:
+def _join(concat_type: str, directory: str, filename: str) -> str:
+    if concat_type == "report":
+        split_name = filename.split(".")
+        split_size = len(split_name)
+        file_ext = f".{split_name[split_size-1]}"
+        filename = filename.replace(file_ext,".json")
     """`directory` + "/" + `filename`, tolerating either side's separators.
 
     Backslashes are normalised to "/" so a pasted Windows path still composes,
@@ -269,11 +274,16 @@ class NovaNamePathManager:
 
         concatenate = bool(values.get("concatenate_filename", False))
         input_filename = _clean(values.get("input_filename"))
+
         report_path = _clean(values.get("report_path"))
         audio_path = _clean(values.get("audio_path"))
+
         if concatenate:
-            report_out = _join(report_path, input_filename)
-            audio_out = _join(audio_path, input_filename)
+            concat_type = "report"
+            report_out = _join(concat_type, report_path, input_filename)
+
+            concat_type = "audio"
+            audio_out = _join(concat_type, audio_path, input_filename)
         else:
             report_out, audio_out = report_path, audio_path
 

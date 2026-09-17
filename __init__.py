@@ -65,14 +65,6 @@ from .utilities import (
     NODE_DISPLAY_NAME_MAPPINGS as NOVA_UTILITIES_NAMES,
     register_routes as register_namepath_routes,
 )
-from .transcribe.nova_audio_transcribe import (
-    NODE_CLASS_MAPPINGS as NOVA_AUDIO_TRANSCRIBE_MAPPINGS,
-    NODE_DISPLAY_NAME_MAPPINGS as NOVA_AUDIO_TRANSCRIBE_NAMES,
-)
-from .transcribe.nova_lyric_score import (
-    NODE_CLASS_MAPPINGS as NOVA_LYRIC_SCORE_MAPPINGS,
-    NODE_DISPLAY_NAME_MAPPINGS as NOVA_LYRIC_SCORE_NAMES,
-)
 from .mastering.nova_track_inspector import (
     NODE_CLASS_MAPPINGS as NOVA_TRACK_INSPECTOR_MAPPINGS,
     NODE_DISPLAY_NAME_MAPPINGS as NOVA_TRACK_INSPECTOR_NAMES,
@@ -81,17 +73,9 @@ from .viewers.nova_track_inspector_report_viewer import (
     NODE_CLASS_MAPPINGS as NOVA_TRACK_INSPECTOR_REPORT_VIEWER_MAPPINGS,
     NODE_DISPLAY_NAME_MAPPINGS as NOVA_TRACK_INSPECTOR_REPORT_VIEWER_NAMES,
 )
-from .viewers.nova_lyric_report_viewer import (
-    NODE_CLASS_MAPPINGS as NOVA_LYRIC_REPORT_VIEWER_MAPPINGS,
-    NODE_DISPLAY_NAME_MAPPINGS as NOVA_LYRIC_INSPECTOR_REPORT_VIEWER_NAMES,
-)
 from .utilities.nova_memory_probe import (
     NODE_CLASS_MAPPINGS as NOVA_MEMORY_PROBE_MAPPINGS,
     NODE_DISPLAY_NAME_MAPPINGS as NOVA_MEMORY_PROBE_NAMES,
-)
-from .viewers.nova_reports_to_images import (
-    NODE_CLASS_MAPPINGS as NOVA_REPORT_TO_IMAGE_MAPPINGS,
-    NODE_DISPLAY_NAME_MAPPINGS as NOVA_REPORT_TO_IMAGE_NAMES,
 )
 # Node classes, imported directly so the tables below can be literals.
 from .nova_player.node import NovaPlayerNode
@@ -112,14 +96,11 @@ from .mastering.nova_track_inspector import NovaTrackInspector
 from .training.nova_ace_dataset import NovaACEDatasetBuilder, NovaACEDatasetReview
 from .training.nova_ace_preprocess import NovaACEPreprocess
 from .training.nova_ace_train import NovaACELoRATrainer
-from .transcribe.nova_audio_transcribe import NovaAudioTranscribe
-from .transcribe.nova_lyric_score import NovaLyricScore
+from .training.nova_ace_check import NovaACESetupCheck
 from .utilities.nova_memory_probe import NovaMemoryProbe
 from .utilities.nova_namepath_manager import NovaNamePathManager
 from .utilities.nova_sql_dump import NovaSQLDump
-from .viewers.nova_lyric_report_viewer import NovaLyricReportViewer
 from .viewers.nova_master_report_viewer import NovaMasterReportViewer
-from .viewers.nova_reports_to_images import NovaReportsImages
 from .viewers.nova_track_inspector_report_viewer import NovaTrackInspectorReportViewer
 
 from .madow.routes import register_routes as register_madow_routes
@@ -127,6 +108,7 @@ from .mastering.routes import register_routes as register_master_routes
 from .mastering.routes_final_master_validator import register_routes as register_master_validator_routes
 from .nova_player.config_manager import manager
 from .nova_player.routes import register_routes
+from .viewers.nova_report_capture import register_routes as register_report_capture_routes
 from .nova_player.web_cache import install as install_web_cache
 
 # Give the user real files to edit by hand on first run.
@@ -136,6 +118,7 @@ register_madow_routes()
 register_master_routes()
 register_master_validator_routes()
 register_namepath_routes()
+register_report_capture_routes()
 # Make the browser revalidate this pack's JS instead of guessing at its
 # freshness; see nova_player/web_cache.py for why that guess bites.
 install_web_cache()
@@ -190,14 +173,11 @@ NODE_CLASS_MAPPINGS = {
     "NovaACEDatasetReview": NovaACEDatasetReview,
     "NovaACEPreprocess": NovaACEPreprocess,
     "NovaACELoRATrainer": NovaACELoRATrainer,
-    "NovaAudioTranscribe": NovaAudioTranscribe,
-    "NovaLyricScore": NovaLyricScore,
+    "NovaACESetupCheck": NovaACESetupCheck,
     "NovaMemoryProbe": NovaMemoryProbe,
     "NovaNamePathManager": NovaNamePathManager,
     "NovaSQLDump": NovaSQLDump,
-    "NovaLyricReportViewer": NovaLyricReportViewer,
     "NovaMasterReportViewer": NovaMasterReportViewer,
-    "NovaReportsImages": NovaReportsImages,
     "NovaTrackInspectorReportViewer": NovaTrackInspectorReportViewer,
 }
 
@@ -221,14 +201,11 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NovaACEDatasetReview": 'Nova ACE Dataset Review 🔍',
     "NovaACEPreprocess": 'Nova ACE Preprocess 🧮',
     "NovaACELoRATrainer": 'Nova ACE LoRA Trainer 🎓',
-    "NovaAudioTranscribe": 'Nova Audio Transcribe 🎙️',
-    "NovaLyricScore": 'Nova Lyric Score 📊',
+    "NovaACESetupCheck": 'Nova ACE Setup Check 🩺',
     "NovaMemoryProbe": 'Nova Memory Probe (RAM/VRAM) 🧠',
     "NovaNamePathManager": 'Nova NamePath Manager 🧭',
     "NovaSQLDump": 'Nova SQL Dump 🛢️',
-    "NovaLyricReportViewer": 'Nova Lyric Report 📈',
     "NovaMasterReportViewer": 'Nova Master Report Viewer 📊',
-    "NovaReportsImages": 'Nova Reports Images 🖼️',
     "NovaTrackInspectorReportViewer": 'Nova Track Inspector Report 📈',
 }
 

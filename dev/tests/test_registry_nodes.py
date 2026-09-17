@@ -74,10 +74,31 @@ def literal_tables(path):
 print("registry node extraction\n")
 
 # --- what the modules declare ----------------------------------------------
+# Only modules that are actually PUBLISHED have to appear in the table. A module
+# excluded by .comfyignore ships in no archive, so a node it declares cannot be
+# missing from a pack nobody receives -- requiring it here would force us either
+# to register a node we are holding back, or to delete finished work to keep a
+# test quiet. Everything that does ship is still checked exactly as strictly.
+def _comfyignored():
+    f = ROOT / ".comfyignore"
+    if not f.exists():
+        return []
+    return [ln.strip().rstrip("/") for ln in f.read_text().splitlines()
+            if ln.strip() and not ln.lstrip().startswith("#")]
+
+import fnmatch
+_IGNORED = _comfyignored()
+
+def _unpublished(rel):
+    return any(rel == i or rel.startswith(i + "/") or fnmatch.fnmatch(rel, i)
+               for i in _IGNORED)
+
 declared = {}
 for p in sorted(ROOT.rglob("*.py")):
     rel = p.relative_to(ROOT).as_posix()
     if rel.startswith("dev/") or "__pycache__" in rel or rel == "__init__.py":
+        continue
+    if rel.startswith(".trash/") or _unpublished(rel):
         continue
     try:
         tables = literal_tables(p)

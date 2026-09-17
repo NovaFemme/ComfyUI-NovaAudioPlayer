@@ -71,6 +71,130 @@ _PIPELINES: Dict[Tuple[str, str, str], Any] = {}
 _SEPARATORS: Dict[Tuple[str, str], Any] = {}
 
 
+def _free_separators() -> None:
+    """Release any cached Demucs models from (V)RAM and empty the CUDA/ROCm cache.
+
+    Whisper-large-v3 and Demucs are both large; keeping both resident on the GPU
+    at once can overcommit VRAM and hang the GPU (driver TDR/reset), especially
+    on new ROCm stacks and with ComfyUI's --disable-smart-memory. We isolate the
+    vocals, then free Demucs before the Whisper model is loaded. Demucs reloads
+    from the on-disk checkpoints on the next run (a few seconds).
+    """
+    _SEPARATORS.clear()
+    gc.collect()
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+
+
+def _vram(tag: str) -> str:
+    """One line of GPU memory, so a report says where the VRAM went.
+
+    'It crashes' and 'that is normal' are both unfalsifiable. A number after
+    each stage is not: if Demucs really was freed, allocated drops back to
+    roughly nothing before Whisper loads, and if it did not, the line says so.
+    """
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return ""
+        free_b, total_b = torch.cuda.mem_get_info()
+        gib = 1024 ** 3
+        return (f"VRAM    : {tag:<22} allocated {torch.cuda.memory_allocated()/gib:5.2f} GiB | "
+                f"reserved {torch.cuda.memory_reserved()/gib:5.2f} GiB | "
+                f"free {free_b/gib:5.2f} of {total_b/gib:5.2f} GiB")
+    except Exception:
+        return ""
+
+
+# Rough cost of one 30 s chunk of Whisper encoder + decoder KV cache, in GiB.
+# The encoder attends over 1500 frames, so the batch dimension multiplies a
+# large activation, not just the weights. Measured against a 16 GiB card that
+# died at batch 8 on large-v3; deliberately pessimistic.
+_CHUNK_GIB = ((".en", 0.35), ("tiny", 0.25), ("base", 0.35), ("small", 0.6),
+              ("medium", 0.95), ("large", 1.6))
+
+# Left for the compositor. A card that draws the desktop cannot be run to the
+# last byte: at ~98% the display server stops responding and the machine locks
+# up, which is worse than an honest OOM because it takes the log with it.
+_DISPLAY_HEADROOM_GIB = 1.5
+
+
+def _safe_batch(requested: int, model_name: str) -> Tuple[int, str]:
+    """Cap batch_size by the VRAM actually free, before the first attempt.
+
+    Opening at batch 8 on a 16 GiB card that also drives a monitor is how you
+    get a desktop freeze rather than a recoverable error. Retrying downwards
+    only helps if the first attempt leaves the machine alive.
+    """
+    requested = max(1, int(requested))
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return requested, ""
+        free_b, _total = torch.cuda.mem_get_info()
+    except Exception:
+        return requested, ""
+
+    gib = 1024 ** 3
+    name = (model_name or "").lower()
+    per_chunk = next((v for k, v in _CHUNK_GIB if k in name), 1.6)
+    usable = (free_b / gib) - _DISPLAY_HEADROOM_GIB
+    cap = max(1, int(usable / per_chunk))
+    if cap >= requested:
+        return requested, ""
+    return cap, (
+        f"Batch   : {requested} would not fit — {free_b/gib:.2f} GiB free, "
+        f"{_DISPLAY_HEADROOM_GIB:.1f} GiB held back for the desktop, "
+        f"~{per_chunk:.2f} GiB per chunk. Starting at {cap}."
+    )
+
+
+def _reclaim_vram(*held) -> None:
+    """Actually give the GPU memory back before retrying after an OOM.
+
+    `torch.cuda.empty_cache()` only returns memory the allocator holds with no
+    live reference. Inside an `except` block the exception's __traceback__
+    pins every frame of the failed forward pass, and those frames still
+    reference the activations and the KV cache that caused the OOM — so the
+    cache call frees almost nothing and the retry starts on a full card.
+    Measured: a batch_size=8 failure left 14.16 GiB allocated, so the
+    batch_size=1 retry died in 120 ms against a card that was already full.
+
+    Drop the tracebacks, collect, then empty the cache.
+    """
+    import gc as _gc
+    for obj in held:
+        try:
+            if isinstance(obj, BaseException):
+                obj.__traceback__ = None
+        except Exception:
+            pass
+    held = ()
+    _gc.collect()
+    try:
+        import torch as _torch
+        if _torch.cuda.is_available():
+            _torch.cuda.empty_cache()
+            _torch.cuda.ipc_collect()
+    except Exception:
+        pass
+
+
+def _is_oom(err) -> bool:
+    """True if an exception (or its message) is a GPU out-of-memory error.
+
+    Covers torch.cuda.OutOfMemoryError (also raised on ROCm) and the
+    'CUDA/HIP out of memory' message text.
+    """
+    if isinstance(err, BaseException) and type(err).__name__ == "OutOfMemoryError":
+        return True
+    return "out of memory" in str(err).lower()
+
+
 # ---------------------------------------------------------------------------
 # Audio + result helpers (kept import-light and unit-testable)
 # ---------------------------------------------------------------------------
@@ -164,12 +288,46 @@ def _get_pipeline(model_id: str, device: str, dtype):
 # ---------------------------------------------------------------------------
 
 def _get_separator(model_name: str, device: str):
+    """Load a Demucs separator, working across Demucs versions.
+
+    Returns (kind, handle):
+      ("api",      Separator)              -> Demucs >= 4.0 high-level API
+      ("lowlevel", (model, apply_model))  -> classic pretrained/apply path,
+                                             available on installs without
+                                             demucs.api (what other Demucs
+                                             nodes use).
+    """
     key = (model_name, "cuda" if device.startswith("cuda") else "cpu")
     sep = _SEPARATORS.get(key)
-    if sep is None:
+    if sep is not None:
+        return sep
+
+    # Preferred: Demucs >= 4.0 high-level API (if this install exposes it).
+    try:
         from demucs.api import Separator
-        sep = Separator(model=model_name, device=key[1], progress=False)
+        sep = ("api", Separator(model=model_name, device=key[1], progress=False))
         _SEPARATORS[key] = sep
+        return sep
+    except Exception:
+        pass  # fall back to the low-level API below
+
+    # Fallback: low-level pretrained + apply. Present on every Demucs that can
+    # separate at all, including installs without demucs.api.
+    try:
+        from demucs.pretrained import get_model
+        from demucs.apply import apply_model
+    except Exception as exc:
+        raise RuntimeError(
+            "Vocal isolation needs a working Demucs: neither demucs.api nor "
+            "demucs.pretrained/apply could be imported. Repair it in ComfyUI's "
+            "Python, e.g. (ROCm-safe):  python -m pip install -U --no-deps demucs"
+        ) from exc
+
+    model = get_model(model_name)
+    model.to(key[1])
+    model.eval()
+    sep = ("lowlevel", (model, apply_model))
+    _SEPARATORS[key] = sep
     return sep
 
 
@@ -177,7 +335,7 @@ def isolate_vocals(audio: Dict[str, Any], model_name: str, device: str) -> Dict[
     """Return a new AUDIO dict holding only the separated vocal stem."""
     import torch
 
-    separator = _get_separator(model_name, device)
+    kind, handle = _get_separator(model_name, device)
     waveform = audio["waveform"]
     sample_rate = int(audio["sample_rate"])
     if not torch.is_tensor(waveform):
@@ -190,9 +348,44 @@ def isolate_vocals(audio: Dict[str, Any], model_name: str, device: str) -> Dict[
     if waveform.shape[0] == 1:        # Demucs expects stereo
         waveform = waveform.repeat(2, 1)
 
-    _origin, stems = separator.separate_tensor(waveform, sample_rate)
-    vocals = stems["vocals"]          # [C, T] at the model's sample rate
-    out_sr = int(getattr(separator, "samplerate", 44100))
+    if kind == "api":
+        separator = handle
+        _origin, stems = separator.separate_tensor(waveform, sample_rate)
+        vocals = stems["vocals"]      # [C, T] at the model's sample rate
+        out_sr = int(getattr(separator, "samplerate", 44100))
+    else:
+        import torchaudio
+
+        model, apply_model = handle
+        dev = "cuda" if device.startswith("cuda") else "cpu"
+        model_sr = int(getattr(model, "samplerate", 44100))
+        want_ch = int(getattr(model, "audio_channels", 2))
+
+        if sample_rate != model_sr:
+            waveform = torchaudio.functional.resample(waveform, sample_rate, model_sr)
+        ch = waveform.shape[0]
+        if ch < want_ch:
+            waveform = waveform.repeat(want_ch, 1)[:want_ch]
+        elif ch > want_ch:
+            waveform = waveform[:want_ch]
+
+        # Match Demucs' own per-mix normalisation (mono reference, scalar mean/std).
+        ref = waveform.mean(0)
+        mean = ref.mean()
+        std = ref.std().clamp_min(1e-8)
+        mix = ((waveform - mean) / std).unsqueeze(0).to(dev)   # [1, C, T]
+
+        sources = apply_model(
+            model, mix, shifts=1, split=True, overlap=0.25,
+            progress=False, device=dev,
+        )[0]                                                    # [S, C, T]
+        sources = sources * std + mean
+
+        names = list(getattr(model, "sources", []))
+        idx = names.index("vocals") if "vocals" in names else -1
+        vocals = sources[idx].detach().cpu()                    # [C, T]
+        out_sr = model_sr
+
     return {"waveform": vocals.unsqueeze(0), "sample_rate": out_sr}
 
 
@@ -200,15 +393,52 @@ def isolate_vocals(audio: Dict[str, Any], model_name: str, device: str) -> Dict[
 # The node
 # ---------------------------------------------------------------------------
 
+def _reject_placeholder_audio(audio) -> None:
+    """Refuse an AUDIO payload that carries no actual audio.
+
+    Nova Batch Load Audio emits a one-sample silent placeholder when
+    decode_audio is off, because tagging works on file paths and decoding a
+    folder of FLACs would cost minutes of CPU for a result nothing reads. Wired
+    straight into this node it reaches Demucs, which fails a reflect-padding
+    sanity check deep inside its own model and reports a bare AssertionError
+    with no hint of the cause. One sentence here is worth more than that stack.
+    """
+    try:
+        waveform = audio["waveform"] if isinstance(audio, dict) else None
+        samples = int(waveform.shape[-1]) if waveform is not None else 0
+        rate = int(audio.get("sample_rate", 0)) if isinstance(audio, dict) else 0
+    except Exception:
+        return                                  # let the normal path report it
+
+    if waveform is None:
+        return
+    if samples < 1024:
+        raise ValueError(
+            "Nova Audio Transcribe received an AUDIO input with "
+            f"{samples} sample(s) — there is nothing to transcribe.\n"
+            "If it is wired to Nova Batch Load Audio, turn decode_audio ON: "
+            "with it off that node's audio output is a one-sample silent "
+            "placeholder, because tagging only needs file paths.\n"
+            "Nova Load Audio always decodes and can be used instead."
+        )
+    if rate <= 0:
+        raise ValueError(
+            f"Nova Audio Transcribe received an AUDIO input with sample_rate {rate}. "
+            "The upstream node did not decode the file."
+        )
+
+
 class NovaAudioTranscribe:
     CATEGORY = CATEGORY
     FUNCTION = "transcribe"
-    RETURN_TYPES = ("STRING", "STRING")
-    RETURN_NAMES = ("text", "json")
+    RETURN_TYPES = ("STRING", "STRING", "AUDIO")
+    RETURN_NAMES = ("text", "json", "audio")
     OUTPUT_NODE = True
     OUTPUT_TOOLTIPS = (
         "The full transcript as plain text.",
         "JSON: transcript, detected language, model, duration and timestamped segments.",
+        "The audio that was transcribed: the isolated vocal stem when vocal_isolation "
+        "is on, otherwise the input audio passed through. Wire to Save Audio / Nova Player.",
     )
     DESCRIPTION = (
         f"Nova Audio Transcribe v{VERSION} — Whisper speech-to-text on an AUDIO input, "
@@ -340,13 +570,37 @@ class NovaAudioTranscribe:
         self._require_deps()
         log: List[str] = [banner(f"NOVA AUDIO TRANSCRIBE v{VERSION}")]
 
+        _reject_placeholder_audio(audio)
+
         dev = _pick_device(device)
 
         if vocal_isolation and vocal_isolation != "off":
             self._require_demucs()
             log.append(f"Vocals  : isolating with Demucs ({vocal_isolation})…")
             print("\n".join(log))
-            audio = isolate_vocals(audio, vocal_isolation, dev)
+            try:
+                audio = isolate_vocals(audio, vocal_isolation, dev)
+            except Exception as exc:
+                # If the GPU can't fit Demucs (common on 16 GB cards that also
+                # drive the display), separate on CPU instead of failing.
+                if dev != "cpu" and _is_oom(exc):
+                    _free_separators()
+                    log.append("Vocals  : GPU out of memory — separating on CPU "
+                               "instead (slower, but frees VRAM for Whisper)…")
+                    print(log[-1])
+                    audio = isolate_vocals(audio, vocal_isolation, "cpu")
+                else:
+                    raise
+            # Free Demucs from VRAM before Whisper loads, so the two big models
+            # don't stack in GPU memory (a common cause of driver resets/TDR on
+            # 16 GB cards, new ROCm builds, and with --disable-smart-memory).
+            before = _vram("with Demucs resident")
+            _free_separators()
+            log.append("Vocals  : done; freed Demucs from VRAM.")
+            for line in (before, _vram("after freeing Demucs")):
+                if line:
+                    log.append(line)
+            print("\n".join(log[-3:]))
 
         array, sr = to_mono_16k(audio)
         duration = round(len(array) / float(sr), 3)
@@ -362,6 +616,10 @@ class NovaAudioTranscribe:
         print("\n".join(log))
 
         pipe = _get_pipeline(model, dev, dtype)
+        line = _vram("Whisper loaded")
+        if line:
+            log.append(line)
+            print(line)
 
         want_word = timestamps == "word"
         want_none = timestamps == "none"
@@ -385,8 +643,8 @@ class NovaAudioTranscribe:
             effective = "sequential" if duration <= 28.0 else "chunked"
         rt = "word" if want_word else (False if want_none else True)
 
-        def _chunked_call(gk):
-            return dict(chunk_length_s=int(chunk_length_s), batch_size=int(batch_size),
+        def _chunked_call(gk, batch=None):
+            return dict(chunk_length_s=int(chunk_length_s), batch_size=int(batch or batch_size),
                         return_timestamps=(rt if rt else True) if want_none else rt,
                         generate_kwargs=gk, ignore_warning=True)
 
@@ -400,6 +658,11 @@ class NovaAudioTranscribe:
 
         def _run(call):
             return pipe(audio_input, **call)
+
+        batch_size, note = _safe_batch(batch_size, model)
+        if note:
+            log.append(note)
+            print(note)
 
         call = _chunked_call(gen_kwargs) if effective == "chunked" else _sequential_call(gen_kwargs)
         log.append(f"Long-form: {effective}" + ("  (auto)" if long_form == "auto" else ""))
@@ -425,8 +688,41 @@ class NovaAudioTranscribe:
                 log.append("Note    : sequential long-form hit Whisper's length limit; "
                            "falling back to chunked.")
                 effective = "chunked"
-                result = _run(_chunked_call(gen_kwargs))
-            elif result is None:
+                try:
+                    result = _run(_chunked_call(gen_kwargs))
+                except Exception as excb:
+                    msg = str(excb); result = None
+            # (c) GPU out of memory -> empty the cache and retry chunked with a
+            # smaller batch (halved, then 1). Lets a 16 GB card finish instead of
+            # dying when Whisper's batched activations don't fit.
+            if result is None and _is_oom(msg):
+                # Release the failed attempt before retrying. Without this the
+                # retry runs against a card the previous failure is still
+                # holding, and batch_size=1 fails as fast as batch_size=8 did.
+                _reclaim_vram(exc, locals().get("exc2"), locals().get("excb"))
+                seen = set()
+                ladder = []
+                for bs in (int(batch_size) // 2, int(batch_size) // 4, 2, 1):
+                    bs = max(1, int(bs))
+                    if bs < int(batch_size) and bs not in seen:
+                        seen.add(bs); ladder.append(bs)
+                for bs in ladder:
+                    log.append(f"Note    : GPU out of memory; retrying chunked with batch_size={bs}.")
+                    line = _vram("before retry")
+                    if line:
+                        log.append(line)
+                    print("\n".join(log[-2:]))
+                    try:
+                        effective = "chunked"
+                        result = _run(_chunked_call(gen_kwargs, batch=bs))
+                        break
+                    except Exception as excc:
+                        oom = _is_oom(excc)
+                        msg = str(excc); result = None
+                        _reclaim_vram(excc)
+                        if not oom:
+                            break
+            if result is None:
                 raise
 
         if isinstance(result, dict) and want_none:
@@ -459,9 +755,13 @@ class NovaAudioTranscribe:
         log.append("")
         log.append(preview or "(no speech detected)")
 
+        # `audio` here is the isolated vocal stem when vocal_isolation was on,
+        # otherwise the untouched input — that's what the AUDIO output carries.
+        audio_out = audio
+
         console = "\n".join(log)
         print(console)
-        return {"ui": {"text": [console]}, "result": (text, json_str)}
+        return {"ui": {"text": [console]}, "result": (text, json_str, audio_out)}
 
 
 NODE_CLASS_MAPPINGS = {"NovaAudioTranscribe": NovaAudioTranscribe}

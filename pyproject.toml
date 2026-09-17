@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-novaaudioplayer"
-description = "Twenty-eight nodes for making music with ACE-Step: generation parameters with presets and validation, corrective mastering with rollback, an audio player with live visualisers and a BS.1770 measurement panel, track inspection, in-canvas report viewers, tagging and SQLite/MySQL delivery, FLAC and WAV export, and LoRA training. Installs nothing at runtime."
-version = "2.5.0"
+description = "Twenty-five nodes for making music with ACE-Step: generation parameters with presets and validation, corrective mastering with rollback and a reproduction fingerprint, an audio player with live visualisers and a BS.1770 measurement panel, track inspection, in-canvas report viewers, tagging and SQLite/MySQL delivery, FLAC and WAV export, and LoRA training. Installs nothing at runtime."
+version = "2.6.0"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
 

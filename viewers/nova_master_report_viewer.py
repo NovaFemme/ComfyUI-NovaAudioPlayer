@@ -25,7 +25,7 @@ class NovaMasterReportViewer:
                 }),
             },
             "optional": {
-                "view_mode": (["Dashboard", "Compare", "Mastering Guide", "Detailed", "Compact", "Technical"], {
+                "view_mode": (["Dashboard", "Compare", "Mastering Guide", "Technical"], {
                     "default": "Dashboard"
                 }),
                 "theme": (["Nova Dark", "Studio", "High Contrast"], {

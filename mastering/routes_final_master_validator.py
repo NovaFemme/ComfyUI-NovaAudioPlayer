@@ -19,7 +19,7 @@ def register_routes() -> bool:
             "ok": True,
             "extension": "ComfyUI-NovaAudioPlayer",
             "component": "NovaFinalMasterValidator",
-            "validator_version": "0.3.0",
+            "validator_version": "0.3.1",
             "validation_schema_version": 1,
             "reference_report_schema_min": 5,
             "reference_report_schema_tested": 10,
@@ -37,7 +37,7 @@ def register_routes() -> bool:
             "audio_passthrough": True,
         })
 
-    logger.info("[NovaFinalMasterValidator] v0.3.0 routes registered under %s", ROUTE_PREFIX)
+    logger.info("[NovaFinalMasterValidator] v0.3.1 routes registered under %s", ROUTE_PREFIX)
     return True
 
 __all__ = ["register_routes", "ROUTE_PREFIX", "PROFILES"]

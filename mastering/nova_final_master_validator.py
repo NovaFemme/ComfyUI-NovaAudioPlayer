@@ -17,6 +17,11 @@ except ImportError:  # imported as a module rather than as part of the pack
     from nova_categories import ANALYSIS
 
 try:
+    from . import nova_master_archive_index as archive_index
+except ImportError:  # imported as a module rather than as part of the pack
+    import nova_master_archive_index as archive_index
+
+try:
     from ..analysis import (
         integrated_lufs, true_peak_db, sample_peak_db, rms_db,
         crest_db, lr_correlation, dc_offset, band_energy_percentages
@@ -27,7 +32,7 @@ except ImportError:
         crest_db, lr_correlation, dc_offset, band_energy_percentages
     )
 
-VERSION = "0.3.0-fix8"
+VERSION = "0.3.1"
 SCHEMA_VERSION = 1
 
 DEFAULT_TOLERANCES = {
@@ -59,6 +64,28 @@ def _canonical_json_sha256(value: Dict[str, Any]) -> str:
 
 
 
+def _resolve_output_relative_dir(path_value: str, default_relative: str = "") -> Path:
+    """Turn a node path widget into a real directory.
+
+    A blank value means ComfyUI's output folder itself (or default_relative
+    under it). An absolute path is taken as given. Anything else is relative to
+    the output folder, tolerating a leading "output/" from older graphs without
+    producing ".../output/output/...".
+    """
+    output_root = Path(folder_paths.get_output_directory()).resolve()
+    path_text = str(path_value or "").strip()
+    if not path_text:
+        return (output_root / default_relative).resolve() if default_relative else output_root
+
+    expanded = Path(os.path.expandvars(os.path.expanduser(path_text)))
+    if expanded.is_absolute():
+        return expanded.resolve()
+    parts = expanded.parts
+    if parts and parts[0].lower() == "output":
+        expanded = Path(*parts[1:]) if len(parts) > 1 else Path()
+    return (output_root / expanded).resolve()
+
+
 def _safe_filename(value: str) -> str:
     value = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value or "").strip())
     return value.strip("._") or "NovaMasterReference"
@@ -78,47 +105,42 @@ def _reference_report_filename(
     filename_value: str = "",
     reference_format: str = "PCM_16",
 ) -> str:
-    # Explicit filename input has highest priority. It may be fed directly
-    # from Nova Master Identity's archival filename output.
-    suffix = _reference_format_suffix(reference_format)
+    """Name the reference report after the archive it belongs to.
 
+    The report is named from the archive stem alone, with no format suffix,
+    so that the report and the mastered WAV share one name:
+
+        Audio/01_J_Nine-Hours-North_1.0_24-48.wav
+        Reports/01_J_Nine-Hours-North_1.0_24-48.json
+
+    The archive name already carries the delivery format (``24-48``), so a
+    separate suffix only added a second widget that had to be set identically
+    at save time and at lookup time, and silently broke the lookup when it
+    was not. ``reference_format`` is kept in the signature because it is still
+    reported in the validation payload, and because older archives named with
+    a ``_PCM16``/``_PCM24``/``_FLOAT32`` suffix are still resolved on load.
+    """
+    # Explicit filename input has highest priority. It may be fed directly
+    # from Nova Master Identity's archival filename output, or discovered
+    # from the upstream Load Audio node during a standalone validation.
     explicit_name = str(filename_value or "").strip()
     if explicit_name:
-        stem = Path(explicit_name).stem
-        return _safe_filename(stem) + f"_{suffix}.json"
+        return _safe_filename(_strip_soundhub_archive_suffix(explicit_name)) + ".json"
 
     identity = report.get("identity", {}) if isinstance(report, dict) else {}
+    archive = report.get("archive", {}) if isinstance(report, dict) else {}
     provenance = report.get("provenance", {}) if isinstance(report, dict) else {}
-    archive_name = identity.get("archive_name")
+    archive_name = archive.get("archive_name") or identity.get("archive_name")
     if archive_name:
-        return _safe_filename(Path(str(archive_name)).stem) + f"_{suffix}.json"
+        return _safe_filename(_strip_soundhub_archive_suffix(str(archive_name))) + ".json"
     report_id = provenance.get("report_id")
     if report_id:
-        return "NovaMasterReference_" + _safe_filename(report_id) + f"_{suffix}.json"
-    return f"NovaMasterReference_{suffix}.json"
+        return "NovaMasterReference_" + _safe_filename(report_id) + ".json"
+    return "NovaMasterReference.json"
 
 
 def _save_reference_report(report: Dict[str, Any], path_value: str, filename_value: str = "", reference_format: str = "PCM_16") -> str:
-    path_text = str(path_value or "").strip()
-    output_root = Path(folder_paths.get_output_directory()).resolve()
-
-    if not path_text:
-        target_dir = output_root
-    else:
-        expanded = Path(os.path.expandvars(os.path.expanduser(path_text)))
-
-        if expanded.is_absolute():
-            target_dir = expanded.resolve()
-        else:
-            # Paths entered in the node are relative to ComfyUI's output folder.
-            # Accept an old-style "output/..." value too, without creating
-            # ".../output/output/...".
-            parts = expanded.parts
-            if parts and parts[0].lower() == "output":
-                expanded = Path(*parts[1:]) if len(parts) > 1 else Path()
-
-            target_dir = (output_root / expanded).resolve()
-
+    target_dir = _resolve_output_relative_dir(path_value)
     target_dir.mkdir(parents=True, exist_ok=True)
     target = target_dir / _reference_report_filename(report, filename_value, reference_format)
     target.write_text(
@@ -129,17 +151,34 @@ def _save_reference_report(report: Dict[str, Any], path_value: str, filename_val
         raise RuntimeError(f"Reference report was not written successfully: {target}")
     return str(target)
 
+_ARCHIVE_EXTENSIONS = (
+    ".wav", ".flac", ".mp3", ".ogg", ".m4a", ".aac",
+    ".aif", ".aiff", ".opus", ".wma", ".json",
+)
 
 
 def _strip_soundhub_archive_suffix(filename: str) -> str:
-    """
-    Convert SoundHub output:
+    """Reduce a file name to the archive stem the report is filed under.
+
+    Drops any directory part, one known audio/report extension, and the
+    SoundHub numbering that a Save Audio node appends:
+
       02_GC_Redline-Masters_Master_24-48_20260907-170906_00001.wav
-    to reference stem:
-      02_GC_Redline-Masters_Master_24-48
+      -> 02_GC_Redline-Masters_Master_24-48
+
+    The extension is matched against a known list rather than taken from
+    ``Path.stem``, because an archive name carries a version number and
+    ``Path("01_J_Track_1.0_24-48").stem`` silently truncates it to
+    ``01_J_Track_1``. That produced a lookup miss on a report that was
+    present, whenever the name was passed without its extension.
     """
-    stem = Path(str(filename or "")).stem
-    return re.sub(r"_\d{8}-\d{6}_\d{5}$", "", stem)
+    name = Path(str(filename or "").strip()).name
+    lowered = name.lower()
+    for extension in _ARCHIVE_EXTENSIONS:
+        if lowered.endswith(extension) and len(name) > len(extension):
+            name = name[: -len(extension)]
+            break
+    return re.sub(r"_\d{8}-\d{6}_\d{5}$", "", name)
 
 
 def _find_upstream_load_audio_filename(prompt: Any, unique_id: Any) -> str:
@@ -211,42 +250,64 @@ def _load_matching_reference_report(path_value: str, candidate_filename: str, re
             "Could not determine the selected candidate WAV filename from the workflow."
         )
 
-    path_text = str(path_value or "").strip()
-    output_root = Path(folder_paths.get_output_directory()).resolve()
+    report_dir = _resolve_output_relative_dir(path_value, "NovaAudioMasters/Reports")
 
-    if not path_text:
-        report_dir = output_root / "NovaAudioMasters" / "Reports"
-    else:
-        expanded = Path(os.path.expandvars(os.path.expanduser(path_text)))
-        if expanded.is_absolute():
-            report_dir = expanded.resolve()
-        else:
-            parts = expanded.parts
-            if parts and parts[0].lower() == "output":
-                expanded = Path(*parts[1:]) if len(parts) > 1 else Path()
-            report_dir = (output_root / expanded).resolve()
+    report_stem = _safe_filename(_strip_soundhub_archive_suffix(candidate_filename))
 
-    report_stem = _strip_soundhub_archive_suffix(candidate_filename)
-    suffix = _reference_format_suffix(reference_format)
+    # Current naming: the report carries the archive stem and nothing else.
+    report_path = report_dir / f"{report_stem}.json"
 
-    report_path = report_dir / f"{_safe_filename(report_stem)}_{suffix}.json"
-
-    # Backward compatibility for reports created before format-specific naming.
-    legacy_report_path = report_dir / f"{_safe_filename(report_stem)}.json"
+    # Archives written by v0.3.0 and earlier appended the reference format.
+    # Try every suffix, not just the one currently selected, so an archive
+    # still resolves when the format widget no longer matches how it was
+    # saved. The report itself states the format it was mastered at.
+    legacy_paths = [
+        report_dir / f"{report_stem}_{s}.json"
+        for s in ("PCM24", "PCM16", "FLOAT32")
+    ]
+    preferred = report_dir / f"{report_stem}_{_reference_format_suffix(reference_format)}.json"
+    if preferred in legacy_paths:
+        legacy_paths.remove(preferred)
+    legacy_paths.insert(0, preferred)
 
     if not report_path.is_file():
-        if legacy_report_path.is_file():
-            report_path = legacy_report_path
+        for legacy in legacy_paths:
+            if legacy.is_file():
+                report_path = legacy
+                break
         else:
+            searched = "\n".join(f"  {c}" for c in [report_dir / f"{report_stem}.json"] + legacy_paths)
             raise FileNotFoundError(
                 "Matching Nova mastering report was not found.\n"
-                f"Candidate WAV: {candidate_filename}\n"
-                f"Selected format: {reference_format}\n"
-                f"Expected report: {report_path}\n"
-                f"Legacy fallback: {legacy_report_path}"
+                f"Candidate file: {candidate_filename}\n"
+                f"Archive stem:   {report_stem}\n"
+                f"Report folder:  {report_dir}\n"
+                f"Looked for:\n{searched}"
             )
 
     return report_path.read_text(encoding="utf-8"), str(report_path)
+
+
+def _archive_identity_line(report: Dict[str, Any]) -> str:
+    """One line naming the archived master by identity, not by file name."""
+    publication = report.get("publication_identity")
+    publication = publication if isinstance(publication, dict) else {}
+    recording = publication.get("recording_identity")
+    recording = recording if isinstance(recording, dict) else {}
+    title = str(recording.get("track_title", "")).strip()
+    if not title:
+        return ("no publication identity in this archive "
+                "(wire identity_json from Nova Master Identity when archiving)")
+    bits = [title]
+    if recording.get("version"):
+        bits.append(f"v{str(recording['version']).strip()}")
+    if recording.get("artist_name"):
+        bits.append(f"by {str(recording['artist_name']).strip()}")
+    if recording.get("isrc"):
+        bits.append(f"ISRC {str(recording['isrc']).strip()}")
+    if publication.get("identity_id"):
+        bits.append(f"id {str(publication['identity_id'])[:8]}")
+    return " | ".join(bits)
 
 
 def _parse_report(report_json: str) -> Dict[str, Any]:
@@ -415,9 +476,9 @@ def _drift_attribution(comparison: Dict[str, Any], fmt: Dict[str, Any]) -> List[
 class NovaFinalMasterValidator:
     CATEGORY = ANALYSIS
     FUNCTION = "validate"
-    RETURN_TYPES = ("AUDIO", "SAMPLE_RATE", "STRING", "STRING", "STRING")
-    RETURN_NAMES = ("candidate_audio", "sample_rate", "validation_report", "validation_json", "verdict")
-    DESCRIPTION = "Nova Final Master Validator v0.3.0: bit-exact and measurement-based reproduction/integrity validation."
+    RETURN_TYPES = ("AUDIO", "SAMPLE_RATE", "STRING", "STRING", "STRING","STRING","STRING")
+    RETURN_NAMES = ("candidate_audio", "sample_rate", "validation_report", "validation_json", "verdict","archive_audio_path","archive_report_path")
+    DESCRIPTION = "Nova Final Master Validator v0.3.1: bit-exact and measurement-based reproduction/integrity validation."
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -434,18 +495,38 @@ class NovaFinalMasterValidator:
                 "tolerance_multiplier": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 5.0, "step": 0.1}),
                 "reference_format": (["PCM_16", "PCM_24", "FLOAT_32"], {
                     "default": "PCM_16",
-                    "tooltip": "Format identity used when naming/saving/fetching the matching mastering report."
+                    "tooltip": "Delivery format recorded in the validation report. Archives written by v0.3.0 and earlier were named with this format, and are still found whatever it is set to, so it no longer has to match to locate a report."
                 }),
                 "save_reference_json": ("BOOLEAN", {"default": False}),
-                "path": ("STRING", {
-                    "default": "NovaAudioMasters/Reports",
-                    "multiline": False,
-                    "tooltip": "Folder relative to ComfyUI/output. Leave blank to save directly in output."
-                }),
-                "filename": ("STRING", {
+                "archive_name": ("STRING", {
                     "default": "",
                     "multiline": False,
-                    "tooltip": "Archival filename used when saving a reference JSON during the mastering workflow."
+                    "tooltip": "Archive name, normally wired from Nova Master Identity. On a mastering pass it names the saved reference JSON. On a validation pass it selects which archived report to load; leave it empty and the candidate's own filename is used instead."
+                }),
+                "report_path": ("STRING", {
+                    "default": "NovaAudioMasters/Reports",
+                    "multiline": False,
+                    "tooltip": "Folder relative to ComfyUI/output. Save location for reference JSON, leave blank to save directly in output."
+                }),
+                "audio_path": ("STRING", {
+                    "default": "NovaAudioMasters/Audio",
+                    "multiline": False,
+                    "tooltip": "Folder relative to ComfyUI/output. Save location for mastered Audio, leave blank to save directly in output."
+                }),
+                "identity_selector": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "tooltip": "Which archived master to validate against, by identity rather than by file name: release title, ISRC, catalog number, identity ID, report ID or master PCM SHA-256. Names in the archive folder are working names and cannot be trusted; this is matched against the identity recorded inside each report."
+                }),
+                "lookup_mode": (["auto", "identity", "content scan", "archive name"], {
+                    "default": "auto",
+                    "tooltip": (
+                        "How the reference archive is found when reference_report_json is empty.\n"
+                        "auto: identity_selector if set, else archive_name, else content scan.\n"
+                        "identity: identity_selector only.\n"
+                        "content scan: ignore every name, measure the candidate and find the archive it matches.\n"
+                        "archive name: the old file-name lookup."
+                    ),
                 }),
             },
             "hidden": {
@@ -454,46 +535,202 @@ class NovaFinalMasterValidator:
             },
         }
 
-    def validate(self, candidate_audio, reference_report_json, tolerance_multiplier=1.0, reference_format="PCM_16", save_reference_json=False, path="", filename="", prompt=None, unique_id=None):
-        supplied_reference_json = str(reference_report_json or "").strip()
-        auto_loaded_reference_path = ""
-        candidate_source_filename = ""
+    def _resolve_reference(self, lookup, report_path, identity_selector, archive_name,
+                           reference_format, candidate_metrics, candidate_duration,
+                           candidate_pcm_sha256, prompt, unique_id):
+        """Find the archived reference report, recording how it was found.
 
-        if not supplied_reference_json:
-            candidate_source_filename = _find_upstream_load_audio_filename(prompt, unique_id)
-            supplied_reference_json, auto_loaded_reference_path = _load_matching_reference_report(
-                path,
-                candidate_source_filename,
-                reference_format,
+        File names in an archive folder are working names: the same master is
+        routinely stored under several of them, and a release title bears no
+        relation to whatever the render engine suggested. So a name is only
+        ever used when explicitly asked for. `lookup` is filled in as a side
+        effect so the validation report can state exactly which archive was
+        chosen and why.
+        """
+        mode = str(lookup.get("mode") or "auto").strip().lower()
+        selector = str(identity_selector or "").strip()
+        wired_name = str(archive_name or "").strip()
+
+        def index_folder():
+            report_dir = _resolve_output_relative_dir(report_path, "NovaAudioMasters/Reports")
+            index = archive_index.build_index(report_dir, _reference_metrics)
+            lookup["archive_folder"] = index["report_dir"]
+            lookup["archive_count"] = len(index["entries"])
+            lookup["duplicate_count"] = index.get("duplicate_count", 0)
+            if index.get("error"):
+                raise FileNotFoundError(index["error"])
+            if not index["entries"]:
+                raise FileNotFoundError(
+                    f"No Nova mastering reports found in {index['report_dir']}\n"
+                    f"({index['file_count']} JSON file(s) present, none usable as a reference)."
+                )
+            return index
+
+        def by_identity():
+            index = index_folder()
+            found = archive_index.find_by_identity(index, selector)
+            matches = found["matches"]
+            if not matches:
+                known = sorted({
+                    e["identity"]["track_title"] or e["filename"] for e in index["entries"]
+                })[:12]
+                raise FileNotFoundError(
+                    f"No archived master matches identity {selector!r}.\n"
+                    f"Folder: {index['report_dir']}\n"
+                    f"Archives available: {len(index['entries'])}\n"
+                    "Known identities (first 12):\n" + "\n".join(f"  {k}" for k in known)
+                )
+            if len(matches) > 1:
+                raise ValueError(
+                    f"Identity {selector!r} matches {len(matches)} archived masters:\n"
+                    + "\n".join(f"  {archive_index.describe_entry(m)}" for m in matches)
+                    + "\nUse a more specific identity, such as the ISRC or identity ID."
+                )
+            entry = matches[0]
+            lookup.update(resolved_by=f"identity ({found['match_kind']} match)",
+                          matched_archive=entry["filename"],
+                          matched_description=archive_index.describe_entry(entry),
+                          match_score=100.0)
+            return Path(entry["path"]).read_text(encoding="utf-8"), entry["path"]
+
+        def by_content():
+            index = index_folder()
+            result = archive_index.match_by_content(
+                index, candidate_metrics, candidate_duration, candidate_pcm_sha256
             )
-            print(
-                "[NovaFinalMasterValidator] Auto-loaded matching reference JSON: "
-                f"{auto_loaded_reference_path}"
+            if not result.get("entry"):
+                raise FileNotFoundError(result.get("reason", "no archive matched"))
+            if result["ambiguous"]:
+                rows = "\n".join(
+                    f"  {c['score']:6.2f}  Δdur {c['duration_delta']:+7.3f}s  "
+                    f"{c['track_title'] or c['filename']}"
+                    for c in result["candidates"]
+                )
+                raise ValueError(
+                    "Content scan could not identify this audio with confidence.\n"
+                    f"{result['reason']}.\nClosest archives:\n{rows}\n"
+                    "Set identity_selector to choose deliberately."
+                )
+            entry = result["entry"]
+            lookup.update(
+                resolved_by=f"content scan ({result['method']})",
+                matched_archive=entry["filename"],
+                matched_description=archive_index.describe_entry(entry),
+                match_score=round(float(result["score"]), 2),
+                match_margin=round(float(result["margin"]), 2),
+                runner_up=(result["runner_up"] or {}).get("filename", ""),
+                runner_up_score=(round(float(result["runner_up_score"]), 2)
+                                 if result.get("runner_up_score") is not None else None),
+                candidates=result["candidates"],
+                match_reason=result["reason"],
             )
+            return Path(entry["path"]).read_text(encoding="utf-8"), entry["path"]
 
-        report = _parse_report(supplied_reference_json)
+        def by_name():
+            name = wired_name
+            if not name:
+                name = _find_upstream_load_audio_filename(prompt, unique_id)
+                lookup["candidate_source_filename"] = name
+            text, path = _load_matching_reference_report(report_path, name, reference_format)
+            lookup.update(resolved_by=f"archive name ({name})", matched_archive=Path(path).name)
+            return text, path
 
-        saved_reference_path = ""
-        if bool(save_reference_json):
-            save_filename = filename or candidate_source_filename
-            saved_reference_path = _save_reference_report(report, path, save_filename, reference_format)
-            print(f"[NovaFinalMasterValidator] Saved reference JSON: {saved_reference_path}")
+        if mode == "identity":
+            if not selector:
+                raise ValueError(
+                    "lookup_mode is 'identity' but identity_selector is empty. "
+                    "Enter a release title, ISRC, catalog number or identity ID."
+                )
+            return by_identity()
+        if mode == "content scan":
+            return by_content()
+        if mode == "archive name":
+            return by_name()
 
+        # auto: deliberate choice first, wired name second, measurement last.
+        if selector:
+            return by_identity()
+        if wired_name:
+            return by_name()
+        return by_content()
+
+    def validate(self, candidate_audio, reference_report_json, tolerance_multiplier=1.0,
+                 reference_format="PCM_16", save_reference_json=False, archive_name="",
+                 report_path="", audio_path="", identity_selector="", lookup_mode="auto",
+                 prompt=None, unique_id=None):
+        # The candidate is measured BEFORE the reference is chosen, because
+        # identifying which archive a suspect file belongs to is itself a
+        # measurement problem. Nothing below reads the candidate's filename or
+        # its embedded metadata.
         waveform = candidate_audio["waveform"]
         sr = int(candidate_audio["sample_rate"])
         if waveform.dim() == 2:
             waveform = waveform.unsqueeze(0)
         if waveform.shape[0] != 1:
-            raise ValueError("Nova Final Master Validator v0.3.0 accepts one candidate track per node.")
+            raise ValueError(f"Nova Final Master Validator v{VERSION} accepts one candidate track per node.")
         x = waveform[0].float().contiguous()
 
-        ref = _reference_metrics(report)
         cand = _measure(x, sr)
+        candidate_hash = _pcm_sha256(x)
+        candidate_duration = float(x.shape[-1] / sr)
+
+        supplied_reference_json = str(reference_report_json or "").strip()
+        auto_loaded_reference_path = ""
+        candidate_source_filename = ""
+        lookup = {
+            "mode": str(lookup_mode or "auto"),
+            "resolved_by": "connected input" if supplied_reference_json else "",
+            "identity_selector": str(identity_selector or "").strip(),
+        }
+
+        if not supplied_reference_json:
+            supplied_reference_json, auto_loaded_reference_path = self._resolve_reference(
+                lookup=lookup,
+                report_path=report_path,
+                identity_selector=identity_selector,
+                archive_name=archive_name,
+                reference_format=reference_format,
+                candidate_metrics=cand,
+                candidate_duration=candidate_duration,
+                candidate_pcm_sha256=candidate_hash,
+                prompt=prompt,
+                unique_id=unique_id,
+            )
+            candidate_source_filename = lookup.get("candidate_source_filename", "")
+            print(
+                "[NovaFinalMasterValidator] Reference resolved by "
+                f"{lookup['resolved_by']}: {auto_loaded_reference_path}"
+            )
+
+        report = _parse_report(supplied_reference_json)
+
+        # Prefer the archive's own identity for naming, falling back to the
+        # wired archive_name. A working file name is the last resort, never
+        # the first.
+        archived_identity = report.get("archive", {}) if isinstance(report.get("archive"), dict) else {}
+        save_filename = (
+            str(archive_name or "").strip()
+            or str(archived_identity.get("archive_name", "")).strip()
+            or candidate_source_filename
+        )
+        archive_stem = _safe_filename(_strip_soundhub_archive_suffix(save_filename)) if save_filename else ""
+        saved_reference_path = ""
+        # Planned archive locations, relative to ComfyUI/output, matching the
+        # names _save_reference_report actually writes. These leave the node on
+        # archive_report_path / archive_audio_path so a Save Audio node can be
+        # driven from the same name the report is filed under.
+        report_file_name = Path(report_path) / f"{archive_stem}.json" if archive_stem else ""
+        audio_file_name = Path(audio_path) / f"{archive_stem}.wav" if archive_stem else ""
+
+        if bool(save_reference_json):
+            saved_reference_path = _save_reference_report(report, report_path, save_filename, reference_format)
+            print(f"[NovaFinalMasterValidator] Saved reference JSON: {saved_reference_path}")
+
+        ref = _reference_metrics(report)
         tol = _tolerances(report, tolerance_multiplier)
         comparison, confidence = _compare(ref, cand, tol)
         fmt = _format_validation(report, x, sr)
 
-        candidate_hash = _pcm_sha256(x)
         reference_hash = str(report.get("identity", {}).get("master_pcm_sha256", ""))
         exact = bool(reference_hash) and candidate_hash == reference_hash
 
@@ -521,6 +758,24 @@ class NovaFinalMasterValidator:
             confidence = min(confidence, 84.0)
 
         drift = _drift_attribution(comparison, fmt)
+
+        # A reference produced with mastering bypassed describes the untouched
+        # input, so matching it proves the file is unaltered, not that it is the
+        # master. Say so rather than letting a 100/100 BIT_EXACT imply otherwise.
+        ref_provenance = report.get("provenance", {}) if isinstance(report, dict) else {}
+        reference_warnings = []
+        if bool(ref_provenance.get("mastering_bypassed")) or str(report.get("mode", "")).strip().lower() == "off":
+            reference_warnings.append(
+                "Reference report was produced with mastering bypassed (mode Off). It "
+                "describes the unprocessed audio, so a match confirms the candidate is "
+                "unaltered, not that it reproduces a master."
+            )
+        if not isinstance(report.get("validation_reference"), dict):
+            reference_warnings.append(
+                "Reference report carries no validation_reference block, so default "
+                "tolerances were used instead of the tolerances recorded at mastering time."
+            )
+
         reference_report_id = report.get("provenance", {}).get("report_id", "")
         reference_fp = report.get("identity", {}).get("reproduction_fingerprint_sha256", "")
         created = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -535,16 +790,17 @@ class NovaFinalMasterValidator:
                 "auto_loaded": bool(auto_loaded_reference_path),
                 "auto_loaded_path": auto_loaded_reference_path,
                 "candidate_source_filename": candidate_source_filename,
+                "lookup": lookup,
                 "save_enabled": bool(save_reference_json),
                 "saved_path": saved_reference_path,
                 "reference_format": reference_format,
                 "format_suffix": _reference_format_suffix(reference_format),
                 "filename": _reference_report_filename(
                     report,
-                    filename or candidate_source_filename,
+                    archive_name or candidate_source_filename,
                     reference_format
                 ) if bool(save_reference_json) else "",
-                "source_filename_input": str(filename or ""),
+                "source_filename_input": str(archive_name or ""),
             },
             "reference": {
                 "report_id": reference_report_id,
@@ -553,6 +809,7 @@ class NovaFinalMasterValidator:
                 "master_pcm_sha256": reference_hash,
                 "reproduction_fingerprint_sha256": reference_fp,
                 "release_status": report.get("release", {}).get("status", ""),
+                "reference_warnings": reference_warnings,
                 "release_confidence": report.get("release", {}).get("confidence"),
                 "metrics": ref,
                 "tolerances": tol,
@@ -588,8 +845,16 @@ class NovaFinalMasterValidator:
             f"REFERENCE REPORT: {reference_report_id or '[no report id]'}",
             f"REFERENCE MASTER: Nova Audio Master {report.get('master_version','unknown')} | Release {report.get('release',{}).get('status','unknown')}",
             f"REFERENCE FORMAT: {reference_format} [{_reference_format_suffix(reference_format)}]",
+            f"REFERENCE FOUND BY: {lookup.get('resolved_by') or 'connected input'}"
+            + (f" | {lookup['matched_description']}" if lookup.get("matched_description") else "")
+            + (f" | match {lookup['match_score']:.2f}" if isinstance(lookup.get("match_score"), (int, float)) else "")
+            + (f", runner-up {lookup['runner_up_score']:.2f} (margin {lookup['match_margin']:.2f})"
+               if lookup.get("runner_up_score") is not None else ""),
             f"REFERENCE JSON SOURCE: {auto_loaded_reference_path if auto_loaded_reference_path else 'connected input'}",
-            f"REFERENCE JSON ARCHIVE: {saved_reference_path if saved_reference_path else 'not saved'}",
+            f"REFERENCE JSON ARCHIVE: {saved_reference_path if saved_reference_path else 'not saved (save_reference_json is off)'}",
+            f"REFERENCE AUDIO ARCHIVE: {audio_file_name or 'no archive name available'} (written by the Save Audio node, not by this node)",
+            "",
+            f"ARCHIVE IDENTITY: {_archive_identity_line(report)}",
             "",
             f"IDENTITY: PCM SHA-256 {'EXACT' if exact else 'DIFFERENT'}",
             f"FORMAT: Sample Rate {fmt['sample_rate_hz']['reference']}->{fmt['sample_rate_hz']['candidate']} [{fmt['sample_rate_hz']['status']}] | "
@@ -612,12 +877,15 @@ class NovaFinalMasterValidator:
             lines.append(f"- {k.upper()}: {q['reference']:.3f}% -> {q['candidate']:.3f}% | Δ {q['delta']:+.3f} pp | Tol ±{q['tolerance']:.3f} [{q['status']}]")
         if drift:
             lines += ["", "DRIFT ATTRIBUTION:"] + [f"- {n}" for n in drift]
+        if reference_warnings:
+            lines += ["", "REFERENCE WARNINGS:"] + [f"- {n}" for n in reference_warnings]
         lines += [
             "",
             f"RESULT: {verdict} | Confidence {confidence:.2f}/100",
             f"VALIDATION SHA-256: {payload['validation_payload_sha256']}",
         ]
-        return candidate_audio, sr, "\n".join(lines), json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False), verdict
+
+        return candidate_audio, sr, "\n".join(lines), json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False), verdict, audio_file_name, report_file_name
 
 NODE_CLASS_MAPPINGS = {"NovaFinalMasterValidator": NovaFinalMasterValidator}
 NODE_DISPLAY_NAME_MAPPINGS = {"NovaFinalMasterValidator": "Nova Final Master Validator"}

@@ -10,7 +10,7 @@ try:
 except ImportError:  # imported as a module rather than as part of the pack
     from nova_categories import MASTERING
 
-VERSION = "0.2.5"
+VERSION = "0.2.6"
 
 def _sha(value: Dict[str, Any]) -> str:
     raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
@@ -23,12 +23,82 @@ def _clean(value: str) -> str:
     value = re.sub(r"-+", "-", value)
     return value.strip(" .-_") or "Unknown"
 
+_OVERRIDABLE_FIELDS = (
+    "artist_name", "track_title", "artist_initials", "track_number", "version",
+    "album_title", "catalog_number", "isrc", "publisher", "label",
+    "mastering_engineer", "mastering_company", "copyright_owner", "release_year",
+    "composer", "producer", "mix_engineer", "project_name", "territory",
+    "language", "explicit_flag", "upc_ean", "work_id", "client_reference", "notes",
+    "target_bit_depth", "target_sample_rate",
+)
+
+_INT_LIMITS = {"track_number": (1, 999), "release_year": (1900, 2200)}
+
+# These are combo widgets: only these exact strings are legal, so a database
+# value is reduced to its digits and checked ("24-bit" -> "24") rather than
+# trusted. An unrecognised value leaves the widget alone.
+_CHOICE_LIMITS = {
+    "target_bit_depth": ("24", "16"),
+    "target_sample_rate": ("48000", "44100", "96000"),
+}
+
+
+def _parse_fields(value: str) -> Dict[str, Any]:
+    """Read the wired field payload, tolerating an empty or blank socket."""
+    text = str(value or "").strip()
+    if not text:
+        return {}
+    try:
+        parsed = json.loads(text)
+    except Exception as exc:
+        raise ValueError(
+            "Nova Master Identity: identity_fields_json is not valid JSON "
+            f"({exc}). Wire it from Nova SQLite Reader's identity_json output "
+            "with column_set set to 'identity'."
+        ) from exc
+    if not isinstance(parsed, dict):
+        raise ValueError(
+            "Nova Master Identity: identity_fields_json must be a JSON object "
+            "of field name to value."
+        )
+    return parsed
+
+
+def _coerce_field(name: str, value: Any) -> Any:
+    """Bring a database value into the shape the widget expects.
+
+    Returns None when the value carries nothing usable, so the widget keeps
+    whatever it already had.
+    """
+    if value is None:
+        return None
+    if name == "explicit_flag":
+        if isinstance(value, bool):
+            return value
+        text = str(value).strip().lower()
+        if not text:
+            return None
+        return text in ("1", "true", "yes", "y", "on", "explicit")
+    if name in _INT_LIMITS:
+        try:
+            number = int(str(value).strip())
+        except (TypeError, ValueError):
+            return None
+        low, high = _INT_LIMITS[name]
+        return max(low, min(high, number))
+    if name in _CHOICE_LIMITS:
+        digits = re.sub(r"[^0-9]", "", str(value))
+        return digits if digits in _CHOICE_LIMITS[name] else None
+    text = str(value).strip()
+    return text or None
+
+
 class NovaMasterIdentity:
     CATEGORY = MASTERING
     FUNCTION = "enrich"
     RETURN_TYPES = ("STRING", "STRING", "STRING")
     RETURN_NAMES = ("identity_json", "fingerprint_json", "archive_name")
-    DESCRIPTION = "Nova Master Identity v0.2.5: publishing, catalogue and mastering provenance."
+    DESCRIPTION = "Nova Master Identity v0.2.6: publishing, catalogue and mastering provenance."
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -64,6 +134,19 @@ class NovaMasterIdentity:
                 "notes": ("STRING", {"multiline": True, "default": ""}),
                 "target_bit_depth": (["24", "16"], {"default": "24"}),
                 "target_sample_rate": (["48000", "44100", "96000"], {"default": "48000"}),
+                "identity_fields_json": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "tooltip": (
+                        "Field values from a database, normally wired from Nova SQLite "
+                        "Reader's identity_json output with its column_set set to "
+                        "'identity'. Every field it carries replaces the widget below "
+                        "it, so the catalogue stays the single source of truth and "
+                        "nothing has to be retyped after a browser reset. Blank values "
+                        "are ignored, and fields it does not mention keep whatever the "
+                        "widgets say."
+                    ),
+                }),
             },
         }
 
@@ -74,7 +157,53 @@ class NovaMasterIdentity:
                release_year=2026, composer="", producer="", mix_engineer="",
                project_name="", territory="", language="", explicit_flag=False,
                upc_ean="", work_id="", client_reference="", notes="",
-               target_bit_depth="24", target_sample_rate="48000"):
+               target_bit_depth="24", target_sample_rate="48000",
+               identity_fields_json=""):
+
+        # A database row, when one is wired in, outranks the widgets. Widget
+        # values live in the workflow JSON and are lost to a browser reset or a
+        # reloaded graph; the catalogue is not, which is the whole point of
+        # wiring it. Only non-empty values override, so a blank cell never
+        # silently clears a field that was filled in by hand.
+        applied = {}
+        for name, value in _parse_fields(identity_fields_json).items():
+            if name not in _OVERRIDABLE_FIELDS:
+                continue
+            coerced = _coerce_field(name, value)
+            if coerced is not None:
+                applied[name] = coerced
+
+        artist_name = applied.get("artist_name", artist_name)
+        track_title = applied.get("track_title", track_title)
+        artist_initials = applied.get("artist_initials", artist_initials)
+        track_number = applied.get("track_number", track_number)
+        version = applied.get("version", version)
+        album_title = applied.get("album_title", album_title)
+        catalog_number = applied.get("catalog_number", catalog_number)
+        isrc = applied.get("isrc", isrc)
+        publisher = applied.get("publisher", publisher)
+        label = applied.get("label", label)
+        mastering_engineer = applied.get("mastering_engineer", mastering_engineer)
+        mastering_company = applied.get("mastering_company", mastering_company)
+        copyright_owner = applied.get("copyright_owner", copyright_owner)
+        release_year = applied.get("release_year", release_year)
+        composer = applied.get("composer", composer)
+        producer = applied.get("producer", producer)
+        mix_engineer = applied.get("mix_engineer", mix_engineer)
+        project_name = applied.get("project_name", project_name)
+        territory = applied.get("territory", territory)
+        language = applied.get("language", language)
+        explicit_flag = applied.get("explicit_flag", explicit_flag)
+        upc_ean = applied.get("upc_ean", upc_ean)
+        work_id = applied.get("work_id", work_id)
+        client_reference = applied.get("client_reference", client_reference)
+        notes = applied.get("notes", notes)
+        target_bit_depth = applied.get("target_bit_depth", target_bit_depth)
+        target_sample_rate = applied.get("target_sample_rate", target_sample_rate)
+
+        if applied:
+            print("[Nova Master Identity] from database: "
+                  + ", ".join(f"{k}={v!r}" for k, v in sorted(applied.items())))
 
         try:
             master = json.loads(report_json)

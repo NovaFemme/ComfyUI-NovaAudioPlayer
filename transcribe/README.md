@@ -1,12 +1,15 @@
 # Nova Audio Transcribe 🎙️
 
 Standalone speech-to-text node for the Nova pack. Takes a ComfyUI **AUDIO**
-input and returns the transcript as **text** and as **JSON** (with timestamps).
+input and returns the transcript as **text** and as **JSON** (with timestamps),
+plus the audio it actually transcribed.
 
 ## Inputs / outputs
 - **audio** (AUDIO) → any audio signal (Load Audio, a decoder node, etc.).
-- Outputs: **text** (STRING) and **json** (STRING: transcript, language, model,
-  duration, and timestamped `segments`).
+- Outputs: **text** (STRING), **json** (STRING: transcript, language, model,
+  duration, and timestamped `segments`), and **audio** (AUDIO: the isolated
+  vocal stem when `vocal_isolation` is on, otherwise the input passed through —
+  wire it to a save node to keep the acapella).
 
 ## Engine (accuracy first)
 OpenAI **Whisper** via Hugging Face `transformers` (pure PyTorch), default

@@ -18,3 +18,28 @@ dev/
 # web/docs/ is a DIFFERENT folder and must keep shipping: it is the per-node
 # help ComfyUI shows inside the app. Only the top-level docs/ is excluded here.
 docs/
+
+# Transcription and lyric scoring are held back from this release. The code
+# stays in the repository -- it is finished work and comes back in a later
+# version -- but it is not registered in __init__.py and is not published, so
+# the archive carries no module for a node that does not exist. Holding them
+# back also takes `transformers` and `demucs` out of the shipped tree entirely,
+# which are the pack's only heavyweight optional imports.
+transcribe/
+viewers/nova_lyric_report_viewer.py
+web/nova_lyric_report_viewer.js
+web/docs/NovaAudioTranscribe/
+web/docs/NovaLyricScore/
+web/docs/NovaLyricReportViewer/
+
+# The workflow PNGs are drag-to-load templates: each one embeds the same graph
+# its .json sibling holds, so publishing both ships every workflow twice. They
+# are 4.8 MB of a 7.5 MB archive. The .json files DO ship -- an installed pack
+# still has every workflow -- and the PNGs stay in git so GitHub can show them.
+example_workflows/*/*.png
+
+# training/RELEASE_NOTES.md is a handover document written for whoever prepares
+# the next registry build -- it opens "For the agent preparing ..." and narrates
+# revisions, including nodes held back from this release. It is working material,
+# not user documentation, and the same reasoning that keeps docs/ out keeps it out.
+training/RELEASE_NOTES.md

@@ -13,6 +13,7 @@ node_modules/
 
 # Scratch for code moved aside; the sandbox cannot delete, so it lands here.
 .trash/
+_to_delete/
 
 # Screenshots written by the browser suites.
 dev/tests/_shots/
@@ -25,3 +26,4 @@ madow-context-contract.md
 # They record real database paths, library folders and album names, so they are
 # kept out of the package rather than published with it.
 profiles/
+presets/Eb minor 14 gradient_estimation beta aggressive.json

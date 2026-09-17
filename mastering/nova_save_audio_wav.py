@@ -45,7 +45,7 @@ ROCm box where torchaudio's encoders are unavailable.
 import os
 import struct
 from datetime import datetime
-
+from pathlib import Path
 import numpy as np
 import torch
 
@@ -143,7 +143,7 @@ class NovaAudioSaveWAV:
         return {
             "required": {
                 "audio": ("AUDIO", {"tooltip": "The audio to save."}),
-                "filename_prefix": ("STRING", {
+                "file_path": ("STRING", {
                     "default": "NovaAudio",
                     "tooltip": "The prefix for the file to save. Subfolders are supported."
                 }),
@@ -151,13 +151,11 @@ class NovaAudioSaveWAV:
                     "default": "wav",
                     "tooltip": "WAV only in this build — written directly, without TorchCodec."
                 }),
-                "filename_mode": (["exact (overwrite)", "prefix + encoding + timestamp"], {
+                "filename_mode": (["exact (overwrite)", "appends number e.g. 00001"], {
                     "default": "exact (overwrite)",
                     "tooltip": (
-                        "exact (overwrite): filename_prefix IS the path and file name to "
-                        "write; an existing file is replaced and the log says so.\n"
-                        "prefix + encoding + timestamp: appends _PCM24_<timestamp>_00001.wav "
-                        "to the prefix and never overwrites."
+                        "exact (overwrite): file_path is the path and file name that will be overridden \n"
+                        "Appends number: appends new number e.g. _00001.wav"
                     ),
                 }),
                 "reload_after_save": ("BOOLEAN", {
@@ -424,7 +422,7 @@ class NovaAudioSaveWAV:
         self,
         audio,
         sample_rate=0,
-        filename_prefix="NovaAudio",
+        file_path="",
         filename_mode="exact (overwrite)",
         reload_after_save=False,
         format="wav",
@@ -444,38 +442,27 @@ class NovaAudioSaveWAV:
         requested_rate = int(sample_rate or 0) or None
         waveform, sample_rate = self._extract_waveform(audio, requested_rate)
 
-        filename_prefix = (filename_prefix or "NovaAudio") + self.prefix_append
-        normalized_prefix = filename_prefix.replace("\\", "/")
-        subfolder = os.path.dirname(normalized_prefix)
-        base_prefix = os.path.basename(normalized_prefix) or "NovaAudio"
+        #input filepath e.g. /audio/master/myaudio.wav
+        save_file_path = Path(file_path)
+        if save_file_path.parts[0] != "output":
+            full_path = Path("output") / save_file_path
+        else:
+            full_path = save_file_path
 
-        full_output_folder = (
-            os.path.join(self.output_dir, subfolder)
-            if subfolder
-            else self.output_dir
-        )
-        os.makedirs(full_output_folder, exist_ok=True)
+        save_file_dir = full_path.parent
+        save_file_name = full_path.name
+        save_file_stem = full_path.stem
+        save_file_ext = full_path.suffix
+
+        os.makedirs(save_file_dir, exist_ok=True)
 
         replaced = False
         if filename_mode.startswith("exact"):
-            # filename_prefix IS the file to write. The upstream path already
-            # carries ".wav"; only add one when it does not, and never decorate
-            # the stem — that decoration is exactly what made
-            # "…_Master_24-48.wav" land as "…_Master_24-48.wav_PCM24_<stamp>_00001.wav".
-            file = base_prefix
-            if not file.lower().endswith(".wav"):
-                file += ".wav"
-            full_path = os.path.join(full_output_folder, file)
-            replaced = os.path.exists(full_path)
+            replaced = os.path.exists(save_file_path)
         else:
-            current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-            encoding_suffix = self._encoding_suffix(wav_encoding)
-            filename_base = f"{base_prefix}_{encoding_suffix}_{current_time}"
-
             counter = 1
             while True:
-                file = f"{filename_base}_{counter:05}.wav"
-                full_path = os.path.join(full_output_folder, file)
+                full_path = Path(f"{save_file_dir / save_file_stem}_{counter:05}.wav")
                 if not os.path.exists(full_path):
                     break
                 counter += 1
@@ -529,8 +516,8 @@ class NovaAudioSaveWAV:
             )
 
         result = {
-            "filename": file,
-            "subfolder": subfolder,
+            "filename": save_file_name,
+            "subfolder": save_file_dir,
             "type": self.type,
             "format": "wav",
             "wav_encoding": wav_encoding,

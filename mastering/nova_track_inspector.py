@@ -18,6 +18,12 @@ SCHEMA_VERSION = 2
 EPS = 1e-12
 
 
+try:
+    from . import nova_inspector_profiles as _profiles
+except ImportError:                       # direct execution / test harness
+    import nova_inspector_profiles as _profiles
+
+
 def _db(v: float) -> float:
     return 20.0 * math.log10(max(float(v), EPS))
 
@@ -209,6 +215,118 @@ def _window_features(x: np.ndarray, sr: int, start: int, end: int, prev_signatur
     }, signature
 
 
+def _performance_consistency(mono, sr, repeat_allowance, block_s=10.0):
+    """Does the track stay the same performance from beginning to end?
+
+    This asks a different question from everything else in this module. The rest
+    of the node measures deviation from the track's OWN median, which a track
+    that is uniformly wrong passes perfectly. This measures whether the material
+    at the end belongs to the same performance as the material at the start.
+
+    The feature is a 24-band energy vector over 200-6000 Hz, mean-removed and
+    L2-normalised per block, so it describes timbre - WHO is playing and singing -
+    rather than level. Two performances at the same loudness separate; the same
+    performance at two loudnesses does not.
+
+    REPEAT ALLOWANCE. A deliberate 40 s repeating intro and a 40 s artifact both
+    sit away from the track's baseline, so duration alone cannot separate them.
+    What does separate them is behaviour WITHIN the excursion: a musical section
+    is self-similar while it lasts, an artifact is incoherent within itself. The
+    excursion clock therefore runs slower the more the material repeats.
+
+    Thresholds for these numbers were measured on six masters the author
+    approved; they are provisional and the node treats them as such.
+    """
+    nfft = 4096 if sr >= 32000 else 2048
+    hop = nfft // 2
+    if len(mono) < nfft * 4:
+        return None
+    freqs = np.fft.rfftfreq(nfft, 1.0 / sr)
+    edges = np.linspace(200.0, 6000.0, 25)
+    masks = [(freqs >= edges[i]) & (freqs < edges[i + 1]) for i in range(24)]
+    if not any(m.any() for m in masks):
+        return None
+    win = np.hanning(nfft).astype(np.float64)
+
+    per_block = max(1, int(round(block_s * sr / hop)))
+    vectors, starts = [], []
+    frame = 0
+    acc = []
+    for st in range(0, len(mono) - nfft, hop):
+        power = np.square(np.abs(np.fft.rfft(mono[st:st + nfft] * win))) + EPS
+        acc.append(np.asarray([power[m].sum() for m in masks], dtype=np.float64))
+        frame += 1
+        if frame % per_block == 0:
+            v = np.log(np.mean(np.stack(acc, axis=0), axis=0) + EPS)
+            v -= v.mean()
+            n = np.linalg.norm(v)
+            if n > EPS:
+                vectors.append(v / n)
+                starts.append((frame - per_block) * hop / sr)
+            acc = []
+    if len(vectors) < 4:
+        return None
+    T = np.stack(vectors)
+    n_blocks = len(T)
+
+    def centroid(a, b):
+        v = T[a:b].mean(axis=0)
+        return v / (np.linalg.norm(v) + EPS)
+
+    third = max(2, n_blocks // 3)
+    head_tail = 1.0 - float(np.dot(centroid(0, third), centroid(n_blocks - third, n_blocks)))
+
+    d = np.asarray([1.0 - float(np.dot(T[i], T[i + 1])) for i in range(n_blocks - 1)])
+    med, sc = _robust_center_scale(d, floor=1e-4)
+    z = (d - med) / max(sc, 1e-6)
+    k = int(np.argmax(z)) if len(z) else 0
+    step_z = float(z[k]) if len(z) else 0.0
+    step_at = float(starts[min(k + 1, n_blocks - 1)])
+
+    ref = np.median(T, axis=0)
+    ref = ref / (np.linalg.norm(ref) + EPS)
+    dist = np.asarray([1.0 - float(np.dot(ref, v)) for v in T])
+    dmed, dsc = _robust_center_scale(dist, floor=1e-4)
+    away = dist > dmed + 3.0 * max(dsc, 1e-6)
+
+    longest = 0.0
+    longest_at = 0.0
+    i = 0
+    runs = []
+    while i < n_blocks:
+        if not away[i]:
+            i += 1
+            continue
+        j = i
+        while j + 1 < n_blocks and away[j + 1]:
+            j += 1
+        # internal self-similarity of this run: 1.0 means it simply repeats
+        if j > i:
+            sims = [float(np.dot(T[a], T[a + 1])) for a in range(i, j)]
+            internal = float(np.clip(np.mean(sims), 0.0, 1.0))
+        else:
+            internal = 0.0
+        raw = (j - i + 1) * block_s
+        effective = raw * (1.0 - float(np.clip(repeat_allowance, 0.0, 1.0)) * internal)
+        runs.append({"start_seconds": float(starts[i]), "raw_seconds": raw,
+                     "effective_seconds": round(effective, 1),
+                     "repetition": round(internal, 3)})
+        if effective > longest:
+            longest, longest_at = effective, float(starts[i])
+        i = j + 1
+
+    return {
+        "head_vs_tail": round(head_tail, 4),
+        "timbre_step_z": round(step_z, 2),
+        "timbre_step_at_seconds": round(step_at, 1),
+        "longest_excursion_seconds": round(longest, 1),
+        "longest_excursion_at_seconds": round(longest_at, 1),
+        "excursion_runs": runs,
+        "blocks": n_blocks,
+        "block_seconds": block_s,
+    }
+
+
 def _severity(score):
     return "CRITICAL" if score >= 90 else "WARNING" if score >= 72 else "REVIEW" if score >= 50 else "INFO"
 
@@ -270,9 +388,129 @@ class NovaTrackInspector:
             "analysis_resolution": (["Normal", "Fine", "Fast"], {"default": "Normal"}),
             "marker_sensitivity": ("FLOAT", {"default": 60.0, "min": 0.0, "max": 100.0, "step": 1.0}),
             "coherence_sensitivity": ("FLOAT", {"default": 60.0, "min": 0.0, "max": 100.0, "step": 1.0}),
+            # ----------------------------------------------------------------
+            # PROVISIONAL CONTROLS - appended, never inserted.
+            # ComfyUI serialises widget values positionally, so a widget added
+            # anywhere but the end shifts every later value and scrambles saved
+            # workflows. These are all new, so they all go here.
+            #
+            # Every default below is either measured from the six masters the
+            # author approved, or set deliberately low because the measure is
+            # not yet validated. Each is recorded in the JSON with the result.
+            # ----------------------------------------------------------------
+            "consistency_threshold": ("FLOAT", {
+                "default": 0.075, "min": 0.0, "max": 0.5, "step": 0.001, "round": False,
+                "tooltip": "Start-vs-end timbre difference that counts as a performer change. "
+                           "LOWER FLAGS MORE TRACKS. Six approved masters measured 0.018-0.058, so "
+                           "0.075 leaves them headroom while still catching known-bad takes at "
+                           "0.090 and above. NOTE: a deliberately explosive track can legitimately "
+                           "exceed this - No Gods No Mercy measures 0.213 - so expect an occasional "
+                           "REVIEW on dramatic material until per-profile thresholds exist."}),
+            "consistency_weight": ("FLOAT", {
+                "default": 0.35, "min": 0.0, "max": 1.0, "step": 0.05,
+                "tooltip": "How much a start-vs-end difference moves the score. HIGHER PENALISES "
+                           "tracks that end sounding like a different performance. 0 reports it "
+                           "without scoring it."}),
+            "excursion_seconds": ("FLOAT", {
+                "default": 10.0, "min": 0.0, "max": 120.0, "step": 5.0,
+                "tooltip": "Longest the track may sit away from its own baseline before flagging. "
+                           "LOWER IS MORE SENSITIVE. No approved master exceeded 10 s."}),
+            "excursion_weight": ("FLOAT", {
+                "default": 0.35, "min": 0.0, "max": 1.0, "step": 0.05,
+                "tooltip": "How much a sustained excursion moves the score. HIGHER PENALISES "
+                           "sections that do not belong to the rest of the track."}),
+            "repeat_allowance": ("FLOAT", {
+                "default": 0.70, "min": 0.0, "max": 1.0, "step": 0.05,
+                "tooltip": "Credit given to a section that repeats itself, so deliberate intros and "
+                           "loops are not mistaken for artifacts. At 0.70 only 30%% of repeating "
+                           "time counts, so a 33 s repeating intro reads as 10 s and passes. "
+                           "0.00 treats a repeating intro as an artifact; 1.00 never penalises "
+                           "repetition."}),
+            "step_z_threshold": ("FLOAT", {
+                "default": 9.0, "min": 0.0, "max": 20.0, "step": 0.1,
+                "tooltip": "Size of a single timbre jump that counts as an event, in robust "
+                           "standard deviations. LOWER FLAGS MORE. Approved masters legitimately "
+                           "reached 8.5, so below that you will flag real musical sections."}),
+            "step_weight": ("FLOAT", {
+                "default": 0.20, "min": 0.0, "max": 1.0, "step": 0.05,
+                "tooltip": "How much a single jump moves the score. Deliberately lower than the "
+                           "others: jump size on its own misclassified approved masters."}),
+            "loudness_weight": ("FLOAT", {
+                "default": 0.25, "min": 0.0, "max": 1.0, "step": 0.05,
+                "tooltip": "How much dynamic extremes - very high crest, large level jumps - move "
+                           "the score. LOW BY DEFAULT because wide dynamics are a stylistic "
+                           "choice, not a fault. Raise it only if you want the report to argue "
+                           "with deliberately explosive tracks."}),
+            "provisional_authority": ("FLOAT", {
+                "default": 0.30, "min": 0.0, "max": 1.0, "step": 0.05,
+                "tooltip": "How far UNVALIDATED measures may push the verdict. 0.00 comment only - "
+                           "0.30 may reach REVIEW - 0.70 may reach POOR - 1.00 may reach REJECT. "
+                           "Raise it as your own listening validates these measures."}),
+            "weight_profile": (_profiles.combo_choices(), {
+                "default": _profiles.NONE_LABEL,
+                "tooltip": "Load the nine controls above from a saved profile. The list is Madow's "
+                           "profile names, so the two stay in step. '— none —' uses the values set "
+                           "on this node. A profile may override one control or all nine; anything "
+                           "it does not mention keeps the value shown above. Different material "
+                           "needs different thresholds - a deliberately explosive track and a "
+                           "steady one cannot share one number."}),
+            "save_weights_to_profile": ("BOOLEAN", {
+                "default": False, "label_on": "save on next run", "label_off": "read only",
+                "tooltip": "Writes the nine values above into the selected profile when the node "
+                           "runs, then behaves normally. Off by default: a run should not change "
+                           "your saved settings unless you ask it to. Does nothing when the "
+                           "profile is '— none —'."}),
         }}
 
-    def inspect(self, audio, analysis_resolution="Normal", marker_sensitivity=60.0, coherence_sensitivity=60.0):
+    def inspect(self, audio, analysis_resolution="Normal", marker_sensitivity=60.0,
+                coherence_sensitivity=60.0, consistency_threshold=0.075,
+                consistency_weight=0.35, excursion_seconds=10.0, excursion_weight=0.35,
+                repeat_allowance=0.70, step_z_threshold=9.0, step_weight=0.20,
+                loudness_weight=0.25, provisional_authority=0.30,
+                weight_profile=None, save_weights_to_profile=False):
+        # A profile overrides only the controls it names; everything else keeps
+        # the value on the node. Applied before anything is measured, so the
+        # settings recorded in the report are the ones actually used.
+        _controls = {
+            "consistency_threshold": consistency_threshold,
+            "consistency_weight": consistency_weight,
+            "excursion_seconds": excursion_seconds,
+            "excursion_weight": excursion_weight,
+            "repeat_allowance": repeat_allowance,
+            "step_z_threshold": step_z_threshold,
+            "step_weight": step_weight,
+            "loudness_weight": loudness_weight,
+            "provisional_authority": provisional_authority,
+        }
+        _profile_name = weight_profile if weight_profile else _profiles.NONE_LABEL
+        _from_profile = _profiles.load(_profile_name)
+        _controls.update(_from_profile)
+        consistency_threshold = _controls["consistency_threshold"]
+        consistency_weight = _controls["consistency_weight"]
+        excursion_seconds = _controls["excursion_seconds"]
+        excursion_weight = _controls["excursion_weight"]
+        repeat_allowance = _controls["repeat_allowance"]
+        step_z_threshold = _controls["step_z_threshold"]
+        step_weight = _controls["step_weight"]
+        loudness_weight = _controls["loudness_weight"]
+        provisional_authority = _controls["provisional_authority"]
+
+        _profile_saved = False
+        if save_weights_to_profile and _profile_name != _profiles.NONE_LABEL:
+            # Saves what is on the NODE, not what the profile just supplied, so
+            # "load, adjust, save" round-trips the way a user expects.
+            _profile_saved = _profiles.save(_profile_name, {
+                "consistency_threshold": consistency_threshold,
+                "consistency_weight": consistency_weight,
+                "excursion_seconds": excursion_seconds,
+                "excursion_weight": excursion_weight,
+                "repeat_allowance": repeat_allowance,
+                "step_z_threshold": step_z_threshold,
+                "step_weight": step_weight,
+                "loudness_weight": loudness_weight,
+                "provisional_authority": provisional_authority,
+            })
+
         wf = audio["waveform"]
         sr = int(audio["sample_rate"])
         if wf.dim() == 2:
@@ -619,6 +857,85 @@ class NovaTrackInspector:
         if hard_failures >= 2:
             score = min(score, 55.0)
 
+        # ------------------------------------------------------------------
+        # PROVISIONAL LAYER
+        #
+        # These measures are not validated. They separated a small set of known
+        # material and nothing more, so they are allowed to influence the score
+        # in proportion to `provisional_authority` and are never allowed to
+        # condemn a track on their own. Everything they find is reported with an
+        # explicit note asking for confirmation, which is how they earn - or
+        # lose - the right to a larger say later.
+        # ------------------------------------------------------------------
+        perf = _performance_consistency(x.mean(axis=0), sr, repeat_allowance)
+        provisional_notes = []
+        prov = 0.0
+
+        def _over(value, threshold):
+            """How far past a threshold, as a fraction of it, capped at 1."""
+            t = max(float(threshold), 1e-6)
+            return float(np.clip((float(value) - t) / t, 0.0, 1.0))
+
+        if perf:
+            if perf["head_vs_tail"] > consistency_threshold:
+                w = _over(perf["head_vs_tail"], consistency_threshold) * float(consistency_weight)
+                prov += w
+                provisional_notes.append({
+                    "measure": "start_vs_end_timbre",
+                    "value": perf["head_vs_tail"],
+                    "threshold": float(consistency_threshold),
+                    "confidence": "PROVISIONAL",
+                    "comment": ("The last third of this track does not sound like the first third. "
+                                "This can be a performer or voice change. Please confirm by ear - "
+                                "this measure is not yet validated."),
+                })
+            if perf["longest_excursion_seconds"] > excursion_seconds:
+                w = _over(perf["longest_excursion_seconds"], excursion_seconds) * float(excursion_weight)
+                prov += w
+                provisional_notes.append({
+                    "measure": "sustained_excursion",
+                    "value": perf["longest_excursion_seconds"],
+                    "threshold": float(excursion_seconds),
+                    "at_seconds": perf["longest_excursion_at_seconds"],
+                    "confidence": "PROVISIONAL",
+                    "comment": ("A section here does not belong with the rest of the track, after "
+                                "allowing for repetition. Listen from this timestamp."),
+                })
+            if perf["timbre_step_z"] > step_z_threshold:
+                w = _over(perf["timbre_step_z"], step_z_threshold) * float(step_weight)
+                prov += w
+                provisional_notes.append({
+                    "measure": "timbre_step",
+                    "value": perf["timbre_step_z"],
+                    "threshold": float(step_z_threshold),
+                    "at_seconds": perf["timbre_step_at_seconds"],
+                    "confidence": "PROVISIONAL",
+                    "comment": ("A single large change in character at this timestamp. Note that "
+                                "real music does this legitimately - approved masters reached 8.5 - "
+                                "so treat it as a place to listen, not a fault."),
+                })
+
+        # Dynamic extremes. Deliberately weak by default: wide dynamics are a
+        # stylistic choice and several approved tracks are deliberately explosive.
+        crest_vals = np.asarray([pt["crest_db"] for pt in timeline], dtype=np.float64)
+        crest_spread = float(np.percentile(crest_vals, 95) - np.percentile(crest_vals, 5))
+        if crest_spread > 12.0:
+            w = _over(crest_spread, 12.0) * float(loudness_weight)
+            prov += w
+            provisional_notes.append({
+                "measure": "dynamic_spread",
+                "value": round(crest_spread, 1),
+                "threshold": 12.0,
+                "confidence": "PROVISIONAL",
+                "comment": ("Crest varies widely across the track. This is characteristic of "
+                            "deliberately explosive material as much as of a fault."),
+            })
+
+        authority = float(np.clip(provisional_authority, 0.0, 1.0))
+        prov = float(np.clip(prov, 0.0, 1.0))
+        provisional_penalty = prov * authority * 45.0
+        score = float(np.clip(score - provisional_penalty, 0.0, 100.0))
+
         warning_count = sum(m["severity"] == "WARNING" and not m.get("observation") for m in markers)
         critical_count = sum(m["severity"] == "CRITICAL" and not m.get("observation") for m in markers)
         review_count = sum(m["severity"] == "REVIEW" and not m.get("observation") for m in markers)
@@ -633,6 +950,19 @@ class NovaTrackInspector:
             verdict = "GOOD"
         else:
             verdict = "EXCELLENT"
+        # A provisional measure may never be the sole reason a track fails.
+        # `provisional_authority` sets the worst verdict it is allowed to reach:
+        # comment-only, REVIEW, POOR, then REJECT at full authority.
+        if provisional_notes and provisional_penalty > 0:
+            ceiling = ("EXCELLENT" if authority < 0.05 else
+                       "REVIEW" if authority < 0.50 else
+                       "POOR" if authority < 0.90 else "REJECT")
+            order = ["EXCELLENT", "GOOD", "REVIEW", "POOR", "REJECT"]
+            hard = [m for m in markers
+                    if m["severity"] == "CRITICAL" and not m.get("observation")]
+            if not hard and order.index(verdict) > order.index(ceiling):
+                verdict = ceiling
+
         grade = _grade(score)
 
         mono = x.mean(axis=0)
@@ -675,6 +1005,31 @@ class NovaTrackInspector:
             },
             "summary": {
                 "track_integrity_score": score,
+                "provisional": {
+                    "note": ("These measures are not validated. They are reported so they can be "
+                             "confirmed or rejected by listening, and their influence is limited "
+                             "by provisional_authority."),
+                    "authority": authority,
+                    "penalty_applied": round(provisional_penalty, 2),
+                    "findings": provisional_notes,
+                    "measures": perf or {},
+                    "profile": {
+                        "name": _profile_name,
+                        "applied": sorted(_from_profile.keys()),
+                        "saved_this_run": bool(_profile_saved),
+                    },
+                    "settings": {
+                        "consistency_threshold": float(consistency_threshold),
+                        "consistency_weight": float(consistency_weight),
+                        "excursion_seconds": float(excursion_seconds),
+                        "excursion_weight": float(excursion_weight),
+                        "repeat_allowance": float(repeat_allowance),
+                        "step_z_threshold": float(step_z_threshold),
+                        "step_weight": float(step_weight),
+                        "loudness_weight": float(loudness_weight),
+                        "provisional_authority": float(provisional_authority),
+                    },
+                },
                 "grade": grade,
                 "verdict": verdict,
                 "noise_likelihood_percent": noise,

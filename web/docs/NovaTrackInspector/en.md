@@ -77,3 +77,99 @@ motion, spectral-motion coherence, jitter, band independence, spectral travel,
 dynamic stability over time, vocal intelligibility masking risk — **is not
 implemented in v0.2.0.** It is listed here so nobody reads the score as covering
 it.
+
+---
+
+## The provisional layer (new in 2.6.0)
+
+Everything above this line is a measured fact about the file. What follows is
+**not validated**, and the node says so rather than hiding it.
+
+### Why it exists
+
+The score used to answer one question: *is this track the same as itself
+throughout?* Around 72% of the weight sat on measures that start at 100 and only
+fall when something **changes** — coherence, spectral consistency, level
+continuity, structural integrity.
+
+A track that is uniformly wrong is perfectly consistent. That is why a washed-out
+generation could score an A: nothing in it changed, so nothing was penalised.
+
+The provisional layer asks a different question — *does the end of this track
+belong with the beginning?* — which a uniformly wrong track fails.
+
+### What it measures
+
+**Start-vs-end timbre.** A 24-band energy profile over 200–6000 Hz, normalised so
+it describes character rather than loudness, compared between the first and last
+third. Six approved masters measured 0.018–0.058.
+
+**Sustained excursion.** How long the track sits away from its own baseline, after
+the repeat allowance. No approved master exceeded one 10-second block.
+
+**Timbre step.** The largest single jump, with its timestamp. Treat this as a
+place to listen, not a fault — approved masters legitimately reached 8.5.
+
+**Dynamic spread.** Crest variation across the track. Weak by default: wide
+dynamics are a stylistic choice.
+
+### The controls
+
+| Control | Default | Direction |
+|---|---|---|
+| `consistency_threshold` | 0.075 | Lower flags more |
+| `consistency_weight` | 0.35 | Higher penalises tracks that end different |
+| `excursion_seconds` | 10.0 | Lower is more sensitive |
+| `excursion_weight` | 0.35 | Higher penalises sections that don't belong |
+| `repeat_allowance` | 0.70 | Higher forgives deliberate repetition |
+| `step_z_threshold` | 9.0 | Lower flags more |
+| `step_weight` | 0.20 | Deliberately low — step size alone misclassifies |
+| `loudness_weight` | 0.25 | Higher argues with explosive tracks |
+| `provisional_authority` | 0.30 | How far unvalidated measures may push the verdict |
+
+`provisional_authority` is the one that matters. At **0.00** these measures only
+comment. At **0.30**, the default, they can colour a report REVIEW and no worse.
+At **0.70** they may reach POOR, and at **1.00** REJECT. Raise it as your own
+listening validates them — not before.
+
+Nothing here can fail a track on its own at the default. That is deliberate: an
+unproven measure with veto power is what produced the original bug, in both
+directions.
+
+### Live tuning
+
+Every control is on the node, so you can move one and re-run to see the verdict
+move, rather than staring at a fixed report. The values used are written into the
+report JSON with the result, so a saved report records the dial positions that
+produced it.
+
+### Profiles
+
+`weight_profile` lists the same names as Madow's profile dropdown. Selecting one
+loads its saved controls; `— none —` uses the values on the node. A profile may
+override one control or all nine — anything it does not mention keeps the node's
+value.
+
+The weights are stored in `profiles/track_inspector/<name>.json`, **not** inside
+the Madow preset. Madow rebuilds a preset file from six fixed keys when it saves,
+so anything extra stored there is silently dropped the next time you press Save
+in Madow. Sharing the names without sharing the file avoids that.
+
+`save_weights_to_profile` writes the node's current values into the selected
+profile on the next run. Off by default — a run should not change your saved
+settings unless you ask.
+
+**Why profiles are necessary, not a convenience.** No single threshold works
+across material. A deliberately explosive track measured 0.213 on start-vs-end
+timbre — higher than takes that were rejected as broken. A threshold that clears
+it would miss most genuine faults. Different material needs different numbers.
+
+### Honest limits
+
+- **Start-vs-end timbre cannot separate dramatic tracks from broken ones.** It
+  flags a legitimately explosive master. Per-profile thresholds are the fix.
+- **`loudness_weight` measures crest spread**, which is not the same as a peak
+  crest reading from a meter with direction and rate of change. It does not yet
+  capture what such a meter sees.
+- **Thresholds come from six mastered tracks**, not from generated takes. They
+  are a starting point, not a calibration.

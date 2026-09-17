@@ -5,6 +5,28 @@ settings, what master and what report belong together.
 
 Feed it `report_json` from **Nova Audio Master**.
 
+## Filling the fields from a database
+
+Widget values live in the workflow JSON, which means a browser reset or a
+reloaded graph can take them with it — and retyping a catalogue by hand is both
+tedious and a good way to file the wrong ISRC.
+
+Wire **Nova SQLite Reader** (`column_set` = `identity`, `where` narrowed to one
+song) into the `identity_fields_json` input instead. Every field the payload
+carries replaces the widget of the same name, and the console prints exactly
+which ones came from the database:
+
+```
+[Nova Master Identity] from database: album_title='High Water Sessions',
+  artist_name='crazy gecko', release_year=2026, track_number=5,
+  track_title='Nine Hours North'
+```
+
+Fields the payload does not mention keep whatever the widgets say, and blank
+values are ignored rather than applied — so `mastering_company`,
+`target_bit_depth` and anything else you set here survives. Leave the input
+unwired and the node behaves exactly as before.
+
 ## It does not touch the audio
 
 This is the part worth being clear about, because the widgets read like export
