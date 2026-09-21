@@ -334,6 +334,9 @@ class NovaSQLiteReader:
     def IS_CHANGED(cls, database_path, table_name, columns, where,
                    new_database_folder, new_database_name, column_set="custom",
                    value_column="", **kwargs):
+        print("\n⚠️ [comfyui-novaaudioplayer] WARNING: 'Nova SQLite Reader' is DEPRECATED.")
+        print("Please replace it with the new 'Nova Dynamic SQLite Browser' workflow components.\n")
+
         # Re-run whenever the file changes on disk, not just when a widget moves.
         try:
             path = (database_path or "").strip()
@@ -516,4 +519,4 @@ class NovaSQLiteReader:
 
 
 NODE_CLASS_MAPPINGS = {"NovaSQLiteReader": NovaSQLiteReader}
-NODE_DISPLAY_NAME_MAPPINGS = {"NovaSQLiteReader": "Nova SQLite Reader 🗃️"}
+NODE_DISPLAY_NAME_MAPPINGS = {"NovaSQLiteReader": "Nova SQLite Reader 🗃️ [DEPRECATED]"}

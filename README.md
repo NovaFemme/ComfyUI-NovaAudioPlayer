@@ -147,7 +147,14 @@ redrawn a second time.
 | **Save Audio WAV PCM16\|PCM24\|FLOAT32 ⬇️** | Writes RIFF/WAVE at 16-bit PCM, 24-bit PCM or 32-bit float. |
 | **Nova Tag Writer 🏷️** | Writes a table of metadata onto files, with column mapping, skip rules and a dry-run mode that reports without touching anything. |
 | **Nova Tag Reader 🔖** | Reads tags off a file list into a console report and `tags_json`. |
-| **Nova SQLite Reader 🗃️** | Reads a table out of a SQLite database — columns, `where`, and the option to create a new database. |
+| **Nova SQLite Reader 🗃️ [DEPRECATED]** | Reads a table out of a SQLite database — columns, `where`, and the option to create a new database. |
+| **Nova Dynamic SQLite Browser 📁** | Pick a database, table and columns. Outputs the rows. |
+| **Nova SQLite Row Iterator & Splitter 📦** | Loops through the rows and outputs each column of the current row. |
+| **Nova SQLite Single Row Filter 🔍** | Outputs each column of one selected row, with no loop. |
+
+# Nova SQLite Nodes for ComfyUI
+
+![Nova Dynamic SQLite Browser](docs/images/nodes/NovaSQLiteBrowserNode.png)
 
 Report images are no longer a node. Exporting a report view is a right-click
 entry on the viewer itself, which is both fewer nodes to wire and a picture that

@@ -87,6 +87,9 @@ from .authoring.nova_load_audio import NovaLoadAudio
 from .authoring.nova_sqlite_reader import NovaSQLiteReader
 from .authoring.nova_tag_reader import NovaTagReader
 from .authoring.nova_tag_writer import NovaTagWriter
+from .authoring.nova_sqlite_browser import NovaSQLiteBrowserNode
+from .authoring.nova_sqlite_browser import NovaSQLiteSingleRowNode
+from .authoring.nova_sqlite_browser import NovaSQLiteRowIteratorNode
 from .mastering.nova_audio_master import NovaAudioMaster
 from .mastering.nova_final_master_validator import NovaFinalMasterValidator
 from .mastering.nova_master_identity import NovaMasterIdentity
@@ -152,7 +155,9 @@ install_web_cache()
 # dev/tests/test_registry_nodes.py parses both the way the registry does and
 # fails if they disagree. Adding a node means adding it there and here; the test
 # says so if you forget.
-
+# ---------------------------------------------------------------------------
+# The node tables, written as literals ON PURPOSE
+# ---------------------------------------------------------------------------
 NODE_CLASS_MAPPINGS = {
     "NovaPlayerNode": NovaPlayerNode,
     "MadowInputs": MadowInputs,
@@ -179,6 +184,9 @@ NODE_CLASS_MAPPINGS = {
     "NovaSQLDump": NovaSQLDump,
     "NovaMasterReportViewer": NovaMasterReportViewer,
     "NovaTrackInspectorReportViewer": NovaTrackInspectorReportViewer,
+    "NovaSQLiteBrowserNode": NovaSQLiteBrowserNode,
+    "NovaSQLiteSingleRowNode": NovaSQLiteSingleRowNode,
+    "NovaSQLiteRowIteratorNode": NovaSQLiteRowIteratorNode,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -188,7 +196,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NovaBatchLoadAudio": 'Nova Batch Load Audio 🎼',
     "NovaConsole": 'Nova Console 🖥️',
     "NovaLoadAudio": 'Nova Load Audio 🔄',
-    "NovaSQLiteReader": 'Nova SQLite Reader 🗃️',
+    "NovaSQLiteReader": 'Nova SQLite Reader 🗃️ [DEPRECATED]',
     "NovaTagReader": 'Nova Tag Reader 🔖',
     "NovaTagWriter": 'Nova Tag Writer 🏷️',
     "NovaAudioMaster": 'Nova Audio Master 🧾',
@@ -207,6 +215,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NovaSQLDump": 'Nova SQL Dump 🛢️',
     "NovaMasterReportViewer": 'Nova Master Report Viewer 📊',
     "NovaTrackInspectorReportViewer": 'Nova Track Inspector Report 📈',
+    "NovaSQLiteBrowserNode": "Nova Dynamic SQLite Browser 📁",
+    "NovaSQLiteSingleRowNode": "Nova SQLite Single Row Filter 🔍",
+    "NovaSQLiteRowIteratorNode": "Nova SQLite Row Iterator & Splitter 📦",
 }
 
 WEB_DIRECTORY = "./web"
