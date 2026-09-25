@@ -59,9 +59,22 @@ export function readParams(node) {
 export function buildPresetBar(node) {
     const root = document.createElement("div");
     root.className = "madow-presets";
+    // TWO ELEMENTS, NOT ONE, AND THE REASON IS MEASUREMENT.
+    //
+    // ComfyUI pins a DOM widget's own element to the height the widget reports,
+    // so that element can never say how tall its content actually wants to be:
+    // ask it and you get back the number you just gave it. The controls
+    // therefore sit in an inner body whose height is free, and `measure()`
+    // reads that. The node can then size itself from a real number instead of
+    // the constant 54 it used to assume — a constant that was wrong the moment
+    // the save form opened, or a message wrapped, or the node was narrow enough
+    // to push the buttons onto a second row.
     root.innerHTML = `
         <style>
         .madow-presets {
+            width: 100%; box-sizing: border-box; overflow: visible;
+        }
+        .madow-presets__body {
             display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
             padding: 6px 8px; box-sizing: border-box; width: 100%;
             font: 11px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -88,6 +101,12 @@ export function buildPresetBar(node) {
             flex: 1 1 100%; display: flex; gap: 6px; align-items: center;
             flex-wrap: wrap;
         }
+        /* The display:flex above beats the browser's own [hidden]{display:none},
+           which is a UA rule and loses to any author rule. Without this line the
+           save form is on screen permanently: form.hidden = true sets the
+           attribute, the element stays visible, and the two extra rows it adds
+           are the ones hanging off the bottom of the node. */
+        .madow-presets__form[hidden] { display: none; }
         .madow-presets__form input {
             background: #1b1e2b; color: inherit; border: 1px solid #ffffff24;
             border-radius: 4px; padding: 3px 5px; font: inherit; min-width: 0;
@@ -95,19 +114,22 @@ export function buildPresetBar(node) {
         .madow-presets__form input[name="preset"] { flex: 2 1 120px; }
         .madow-presets__form input[name="note"]   { flex: 3 1 140px; }
         </style>
-        <select title="Load a preset into the widgets below"></select>
-        <button data-act="save" title="Save the current values as a preset">Save as</button>
-        <button data-act="new" title="Clear the loaded preset name">New</button>
-        <button data-act="del" class="danger" title="Delete the selected preset">Delete</button>
-        <div class="madow-presets__form" hidden>
-            <input name="preset" type="text" placeholder="Preset name" maxlength="64">
-            <input name="note" type="text" placeholder="Note (optional)" maxlength="200">
-            <button data-act="confirm">Save</button>
-            <button data-act="cancel">Cancel</button>
+        <div class="madow-presets__body">
+            <select title="Load a preset into the widgets below"></select>
+            <button data-act="save" title="Save the current values as a preset">Save as</button>
+            <button data-act="new" title="Clear the loaded preset name">New</button>
+            <button data-act="del" class="danger" title="Delete the selected preset">Delete</button>
+            <div class="madow-presets__form" hidden>
+                <input name="preset" type="text" placeholder="Preset name" maxlength="64">
+                <input name="note" type="text" placeholder="Note (optional)" maxlength="200">
+                <button data-act="confirm">Save</button>
+                <button data-act="cancel">Cancel</button>
+            </div>
+            <div class="madow-presets__msg"></div>
         </div>
-        <div class="madow-presets__msg"></div>
     `;
 
+    const body = root.querySelector(".madow-presets__body");
     const select = root.querySelector("select");
     const msg = root.querySelector(".madow-presets__msg");
     const say = (text, isErr = false) => {
@@ -283,5 +305,18 @@ export function buildPresetBar(node) {
         }
     });
 
-    return { element: root, refresh, load };
+    /**
+     * The height the controls actually need, in layout pixels.
+     *
+     * `offsetHeight`, not `getBoundingClientRect()`: the canvas scales DOM
+     * widgets with a CSS transform, so the rect is multiplied by the current
+     * zoom and would tell the node to be twice as tall at 2x. offsetHeight is
+     * pre-transform and is the number the node's own coordinate space wants.
+     *
+     * Returns 0 while the element is detached or the node is collapsed, which
+     * the caller reads as "no new information" rather than "zero tall".
+     */
+    const measure = () => body.offsetHeight || 0;
+
+    return { element: root, body, refresh, load, measure };
 }
