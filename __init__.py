@@ -90,6 +90,7 @@ from .authoring.nova_tag_writer import NovaTagWriter
 from .authoring.nova_sqlite_browser import NovaSQLiteBrowserNode
 from .authoring.nova_sqlite_browser import NovaSQLiteSingleRowNode
 from .authoring.nova_sqlite_browser import NovaSQLiteRowIteratorNode
+from .authoring.nova_sqlite_browser import NovaSQLiteWhereFilterNode
 from .mastering.nova_audio_master import NovaAudioMaster
 from .mastering.nova_final_master_validator import NovaFinalMasterValidator
 from .mastering.nova_master_identity import NovaMasterIdentity
@@ -103,6 +104,7 @@ from .training.nova_ace_check import NovaACESetupCheck
 from .utilities.nova_memory_probe import NovaMemoryProbe
 from .utilities.nova_namepath_manager import NovaNamePathManager
 from .utilities.nova_sql_dump import NovaSQLDump
+from .utilities.nova_flowpulse import NovaFlowPulseNode
 from .viewers.nova_master_report_viewer import NovaMasterReportViewer
 from .viewers.nova_track_inspector_report_viewer import NovaTrackInspectorReportViewer
 
@@ -182,11 +184,13 @@ NODE_CLASS_MAPPINGS = {
     "NovaMemoryProbe": NovaMemoryProbe,
     "NovaNamePathManager": NovaNamePathManager,
     "NovaSQLDump": NovaSQLDump,
+    "NovaFlowPulseNode": NovaFlowPulseNode,
     "NovaMasterReportViewer": NovaMasterReportViewer,
     "NovaTrackInspectorReportViewer": NovaTrackInspectorReportViewer,
     "NovaSQLiteBrowserNode": NovaSQLiteBrowserNode,
     "NovaSQLiteSingleRowNode": NovaSQLiteSingleRowNode,
     "NovaSQLiteRowIteratorNode": NovaSQLiteRowIteratorNode,
+    "NovaSQLiteWhereFilterNode": NovaSQLiteWhereFilterNode,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -213,11 +217,13 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NovaMemoryProbe": 'Nova Memory Probe (RAM/VRAM) 🧠',
     "NovaNamePathManager": 'Nova NamePath Manager 🧭',
     "NovaSQLDump": 'Nova SQL Dump 🛢️',
+    "NovaFlowPulseNode": "Nova FlowPulse 💓",
     "NovaMasterReportViewer": 'Nova Master Report Viewer 📊',
     "NovaTrackInspectorReportViewer": 'Nova Track Inspector Report 📈',
     "NovaSQLiteBrowserNode": "Nova Dynamic SQLite Browser 📁",
     "NovaSQLiteSingleRowNode": "Nova SQLite Single Row Filter 🔍",
     "NovaSQLiteRowIteratorNode": "Nova SQLite Row Iterator & Splitter 📦",
+    "NovaSQLiteWhereFilterNode": "Nova SQLite Data Table & Filter 🔎",
 }
 
 WEB_DIRECTORY = "./web"
