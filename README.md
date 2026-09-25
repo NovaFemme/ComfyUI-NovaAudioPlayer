@@ -68,7 +68,7 @@ the rest are being filled in.
 | **Nova Console 🖥️** | Prints whatever you wire into it, in the node. The debugging node you end up using constantly. |
 | **Nova Memory Probe (RAM/VRAM) 🧠** | Reports host RAM and device VRAM at that point in the graph, with deltas since the probe's previous run. Read-only — it never unloads or frees anything. |
 | **Nova NamePath Manager 🧭** | Holds every path a delivery workflow needs in one node and stores the whole set as a named profile. |
-| **Nova SQL Dump 🛢️** | Writes a table to MySQL. Storage is a toggle, so the node can sit in a graph switched off. |
+| **Nova SQL Dump 🛢️** | Logs every run to a **local** MariaDB/MySQL, as temporary logging storage. **No authentication, local only:** it writes as a password-less account that can only add rows to one table. Moving the data to your own database and protecting it is your responsibility; the [help page](web/docs/NovaSQLDump/en.md) shows how. One-time setup: `utilities/nova_sql_dump_setup.sql`. |
 
 ![Nova Load Audio](docs/images/nodes/NovaLoadAudio.png)
 ![Nova Batch Load Audio](docs/images/nodes/NovaBatchLoadAudio.png)

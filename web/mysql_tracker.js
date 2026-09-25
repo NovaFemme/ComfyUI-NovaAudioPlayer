@@ -49,12 +49,11 @@ async function sendFlow(flowState, flowId, snapshot) {
     const enabled = widgetVal(node, "enable_storage", true);
     if (enabled === false) return;                       // logging switched off
 
+    // Data only. The server decides where and as whom it writes (127.0.0.1,
+    // the password-less insert-only nova_logger account); nothing sent from
+    // here can change that. See utilities/nova_sql_dump.py.
     const payload = {
         enable_storage: enabled !== false,
-        host: widgetVal(node, "host", "127.0.0.1:3306") || "127.0.0.1:3306",
-        user: widgetVal(node, "user", "root") || "root",
-        password: widgetVal(node, "password", ""),
-        database: widgetVal(node, "database", "comfyui_db") || "comfyui_db",
         flow_name: widgetVal(node, "flow_name", ""),
         flow_id: flowId,
         flow_state: flowState,
