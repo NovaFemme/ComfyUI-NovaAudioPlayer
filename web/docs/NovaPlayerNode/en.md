@@ -1,11 +1,12 @@
 # ComfyUI-NovaAudioPlayer
 
-An audio player node with twelve live visualisers, a whole-file measurement
+An audio player node with thirteen live visualisers, a whole-file measurement
 strip computed in Python, and a theme system you can drive from inside the node.
 
 The views: waveform, spectrum/EQ, analyzer (goniometer + phase correlation),
 spectrogram, combined, peak/RMS, L/R correlation, frequency bands, combined
-suite, FFT analyzer, RTA analyzer, and the APG artifact meter.
+suite, FFT analyzer, RTA analyzer, the APG artifact meter, and Halo (a
+decorative burst ring, display only).
 
 ## Output
 

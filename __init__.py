@@ -1,7 +1,7 @@
 """
 ComfyUI-NovaAudioPlayer — a Nova Audio node pack.
 
-Nova Player: an audio player node with twelve live visualisers.
+Nova Player: an audio player node with thirteen live visualisers.
 Madow Inputs: every ACE-Step generation parameter in one node.
 Madow Unpack: fans a Madow bundle out into typed outputs.
 

@@ -73,7 +73,9 @@ for (const [name, text] of CLAIMS) {
 
 // The README's table of views is the other place the number lives, implicitly.
 const readme = read("README.md");
-const table = readme.match(/\|\s*\|\s*\|\n\|---\|---\|\n((?:\|.*\|\n)+)/);
+// Anchored to the section heading: the table grew a third (screenshot)
+// column, and a shape-only match silently stopped finding it.
+const table = readme.match(/views, one button[\s\S]*?\n\|[^\n]*\|\n\|(?:---\|)+\n((?:\|.*\|\n)+)/i);
 if (table) {
   const rows = table[1].trim().split("\n").length;
   ck("the README's view table has one row per renderer", rows === N,

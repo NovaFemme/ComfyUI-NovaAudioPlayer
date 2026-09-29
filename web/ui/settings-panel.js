@@ -122,6 +122,12 @@ const ROLE_LABELS = {
     "spectrogram.bg": "Background",
     "spectrogram.grid": "Frequency lines",
     "spectrogram.label": "Frequency labels",
+    "halo.bg": "Background",
+    "halo.core": "Ring core",
+    "halo.bubble.a": "Bubble 1",
+    "halo.bubble.b": "Bubble 2",
+    "halo.bubble.c": "Bubble 3",
+    "halo.bubble.d": "Bubble 4",
 };
 
 function roleLabel(role) {

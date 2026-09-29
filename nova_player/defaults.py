@@ -152,6 +152,14 @@ DEFAULT_COLOR_CONFIG = {
                 "bench.value":           "#dfe4f5",
                 "bench.warn":            "#ff8a5c",
 
+                # -- halo (decorative burst ring) ------------------------
+                "halo.bg":               "#05030dff",
+                "halo.core":             "#fff4d8",
+                "halo.bubble.a":         "#29c6e0",
+                "halo.bubble.b":         "#3ecf5c",
+                "halo.bubble.c":         "#e0304f",
+                "halo.bubble.d":         "#f5d020",
+
                 # -- control hints ---------------------------------------
                 "tooltip.bg":            "#0b0d18f5",
                 "tooltip.border":        "#ffffff26",
@@ -172,6 +180,7 @@ DEFAULT_COLOR_CONFIG = {
                 "mode.fft_analyzer":     "#0f5f6f",
                 "mode.rta_analyzer":     "#5a2d6f",
                 "mode.projected_guidance": "#1f4f7f",
+                "mode.halo":             "#8a1f5f",
 
                 # -- settings panel (HTML, styled from these tokens) -----
                 "panel.bg":              "#12101acc",
@@ -192,6 +201,15 @@ DEFAULT_COLOR_CONFIG = {
                     [200, "#ff8c00"],
                     [230, "#ffdc00"],
                     [255, "#ffffff"],
+                ],
+                "halo": [
+                    [0,   "#3a0a6e"],
+                    [60,  "#9b1aa8"],
+                    [110, "#e0207a"],
+                    [155, "#ff3b2f"],
+                    [195, "#ff8a1a"],
+                    [230, "#ffe03a"],
+                    [255, "#fffbe8"],
                 ],
             },
         },
@@ -223,6 +241,8 @@ DEFAULT_COLOR_CONFIG = {
                 "mode.analyzer":         "#1f4f7a",
                 "mode.spectrogram":      "#2b3f7a",
                 "mode.combined":         "#155e63",
+                "halo.bg":               "#01060cff",
+                "halo.core":             "#e0f6ff",
                 "panel.accent":          "#38bdf8",
             },
             "ramps": {
@@ -232,6 +252,14 @@ DEFAULT_COLOR_CONFIG = {
                     [110, "#0b6d8f"],
                     [170, "#22d3a7"],
                     [215, "#a8f0d8"],
+                    [255, "#ffffff"],
+                ],
+                "halo": [
+                    [0,   "#0a1f5e"],
+                    [70,  "#1560b0"],
+                    [130, "#1fa6d6"],
+                    [185, "#22d3a7"],
+                    [230, "#a8f0d8"],
                     [255, "#ffffff"],
                 ],
             },

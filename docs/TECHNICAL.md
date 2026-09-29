@@ -55,7 +55,7 @@ web/
     _template.js         copy this to add a view mode (not imported)
     waveform.js  spectrum.js  analyzer.js  spectrogram.js  combined.js
     peak_rms.js  lr_correlation.js  freq_percentages.js  combined_suite.js
-    fft_analyzer.js  rta_analyzer.js  projected_guidance.js
+    fft_analyzer.js  rta_analyzer.js  projected_guidance.js  halo.js
   ui/
     chrome.js            transport, meter, scrub, pills, hover glow, hit testing
     bench-panel.js       the whole-file statistics strip

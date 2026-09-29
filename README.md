@@ -102,7 +102,7 @@ the rest are being filled in.
 
 | Node | What it does |
 |---|---|
-| **Nova Player 🔊** | The player: twelve live visualisers, a whole-file measurement panel, a theme system, and a `panel_info` output for logging every take. |
+| **Nova Player 🔊** | The player: thirteen live visualisers, a whole-file measurement panel, a theme system, and a `panel_info` output for logging every take. |
 | **Nova Track Inspector 🔬** | Analyses the whole track over time and tells you where to listen, against a baseline. |
 | **Nova Final Master Validator** | Answers one question: did the file you saved still reproduce the master you approved? |
 
@@ -181,7 +181,7 @@ ACE-Step install; this pack installs and downloads nothing at runtime.
 
 Drop **Nova Player 🔊** into a workflow and connect any `AUDIO` output.
 
-### Twelve views, one button
+### Thirteen views, one button
 
 Cycle them with the pill in the transport row. Every view is a separate module
 and every one is themeable.
@@ -200,6 +200,7 @@ and every one is themeable.
 | **FFT Analyzer** | High-resolution spectrum with peak hold | ![](docs/images/nodes/NovaPlayerNode-fft.png) |
 | **RTA Analyzer** | 1/3-octave real-time analyser | ![](docs/images/nodes/NovaPlayerNode-rta.png) |
 | **APG Meter** | Artifact metrics for tuning generation settings | ![](docs/images/nodes/NovaPlayerNode-apg.png) |
+| **Halo** | Decorative burst ring with drifting bubbles — display only, not a measurement | ![](docs/images/nodes/NovaPlayerNode-halo.png) |
 
 ### Loudness, measured properly
 

@@ -31,6 +31,7 @@ import combined_suite from "./combined_suite.js";
 import fft_analyzer from "./fft_analyzer.js";
 import rta_analyzer from "./rta_analyzer.js";
 import projected_guidance from "./projected_guidance.js";
+import halo from "./halo.js";
 
 /** Cycle order of the view button. */
 export const RENDERERS = [
@@ -45,7 +46,8 @@ export const RENDERERS = [
     combined_suite,
     fft_analyzer,
     rta_analyzer,
-    projected_guidance
+    projected_guidance,
+    halo
 ];
 
 export const RENDERER_IDS = RENDERERS.map(r => r.id);

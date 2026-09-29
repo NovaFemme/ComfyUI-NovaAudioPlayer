@@ -55,6 +55,7 @@ that already holds that colour makes them fail for no reason:
 | `tooltiptest.mjs` | Control hints: wording, the rest delay, and that they never escape the node |
 | `test_panel_info.py` | The `panel_info` output mirrors the bench strip, in all three formats |
 | `doccheck.mjs` | Every documented visualiser count matches `registry.js` (no browser needed) |
+| `halotest.mjs` | Halo renderer drawn with node-canvas: roles resolve, frame-rate independence, silence decay, batching; writes preview PNGs (`npm i --no-save canvas` first) |
 | `tiertest.mjs` | Hint precedence: a level fault suppresses generation-stage hypotheses |
 | `invariants.mjs` | Cross-path inequalities between the meter and the Python bench |
 | `test_madow.py` | Madow: parameter table, validation, hashing, presets, and the Inputs/Unpack split |

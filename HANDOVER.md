@@ -45,7 +45,7 @@ tunable by number rather than by ear alone.
 
 **Shipped and working** (confirmed running in ComfyUI):
 
-- 12 renderers, all registered and drawing
+- 13 renderers, all registered and drawing
 - Bench strip (whole-file stats), toggled and resizable
 - APG artifact meter with a freeze-reference workflow
 - Theme system: 101 colour roles in the base theme, per-node vs per-theme scope
