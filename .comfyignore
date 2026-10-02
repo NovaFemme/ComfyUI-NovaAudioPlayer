@@ -43,13 +43,3 @@ example_workflows/*/*.png
 # revisions, including nodes held back from this release. It is working material,
 # not user documentation, and the same reasoning that keeps docs/ out keeps it out.
 training/RELEASE_NOTES.md
-
-# web/harness-zoom.html is the owner's working test page: the player inside a
-# card laid out the way Nodes 2.0 lays out a node, with enough of the backend
-# stubbed that it runs on its own. It imports ./core/host.js, so it only works
-# from inside web/ -- which is why it lives here rather than in dev/. It stays
-# in git and on the owner's machine, and is kept out of the published package:
-# a page under web/ is served to anyone who asks for it.
-# (dev/harness-zoom.html is a different, older page that allcontrols.mjs and
-# zoomtest.mjs load from the dev server; both are kept.)
-web/harness-zoom.html
