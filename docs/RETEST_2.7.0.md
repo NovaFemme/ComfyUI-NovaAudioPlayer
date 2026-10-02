@@ -59,6 +59,10 @@ Four commits followed the first hand-back, each from a finding in the test agent
 
 **Fixed node colours removed (owner's decision, 3 Oct; test report R-3).** `web/config/nova_node_colours.js` coloured 25 of the 31 node types by role, as class-level colours, on by default. In Classic those 25 kept green, purple, olive, teal or brown bodies whatever the theme, while the six newer nodes followed it. Theme Studio's "Theme colours" did not clear them, because it clears the colour on each node and these sat on the node class. The file, its "Colour nodes by role" setting and `docs/node-colours.md` are gone, so the theme governs all 31 nodes in both renderers. A colour a user picks by hand on a node is untouched. Classic label legibility (R-2) should be rechecked on this build.
 
+**Regression pass findings R-1 and R-2 (`7e56214`).** R-1: with `Comfy.VueNodes.Enabled` off the renderer now reads `v1`, and Theme Studio re-applies when the setting is switched on an open page, so the Nodes 2.0 stylesheet no longer stays behind in Classic. R-2: in Classic under Glass or Frosted, widgets get the same field wash as Nodes 2.0 fields and widget names take the primary text colour, so the name on an empty text field or a switched-off toggle can be read over the wallpaper. Checked by the developer in Classic on frontend 1.53.6; to be retested on the owner's machine.
+
+**Open, for the owner (R-4):** with ComfyUI's palette set to Dark (Default), Theme Studio's wallpaper and see-through bodies stay on and its panel still shows Midnight / Glass. The owner's suggestion is one Enabled / Disabled switch in place of the "Theme colours" / "Own colours" buttons. Not built; the behaviour needs confirming first.
+
 **Seen on the owner's machine after `a2c3317`:** `novaTheme.renderer()` returns `{"mode":"v2","how":"setting Comfy.VueNodes.Enabled"}`, the `nova-theme-studio-v2` stylesheet is present, and Nova Master Identity shows a box on every text field with readable labels.
 
 **Not explained:** the misdetection never happened on the developer's test server, on the same frontend version.
