@@ -859,7 +859,10 @@ def _install_hook():
     print(f"{LOG} Execution hook installed")
 
 
-_install_hook()
+# Not installed at import. The hook goes in the first time a FlowPulse node is
+# on the canvas (its panel calls /nova_flowpulse/poll) or runs (profile()), so
+# someone who installs the pack and never places the node keeps an unpatched
+# server.
 
 
 # ---------------------------------------------------------------------------
