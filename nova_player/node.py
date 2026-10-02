@@ -50,7 +50,6 @@ class NovaPlayerNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "audio": ("AUDIO",),
                 "panel_format": (cls.PANEL_FORMATS, {
                     "default": "json",
                     "tooltip": "Shape of the panel_info output. "
@@ -61,6 +60,17 @@ class NovaPlayerNode:
                 }),
             },
             "optional": {
+                # Optional, because the node says so everywhere else: its badge
+                # reads "optional", the README says a player with nothing wired
+                # shows its idle view, and a freshly placed node already draws
+                # the whole player. Declared under "required" it made any
+                # workflow holding an unwired player fail validation. Saved
+                # workflows keep their link: the frontend matches inputs by name.
+                "audio": ("AUDIO", {
+                    "tooltip": "The audio to play and measure. Leave it unwired "
+                               "and the player stays in its idle view; panel_info "
+                               "is then empty.",
+                }),
                 # Opaque. Copied into panel_info verbatim and never parsed, so
                 # this node's signature stays decoupled from whatever generator
                 # feeds it — ACE-Step's parameter set will keep changing, and
@@ -83,7 +93,12 @@ class NovaPlayerNode:
 
     # panel_format defaults here too, so a workflow saved before this widget
     # existed still executes instead of raising on a missing argument.
-    def run(self, audio, panel_format="json", context=""):
+    def run(self, audio=None, panel_format="json", context=""):
+        # Nothing wired. Not an error: return an empty panel_info and no
+        # payload, which leaves the front end's idle player exactly as it is.
+        if audio is None:
+            return {"ui": {"nova_player": []}, "result": ("",)}
+
         waveform = audio["waveform"]
         sample_rate = int(audio["sample_rate"])
 
