@@ -945,36 +945,51 @@ PROFILE_TARGETS = {
 }
 
 def _smooth_band(freqs, lo, hi, edge):
-    w=torch.zeros_like(freqs); core=(freqs>=lo)&(freqs<=hi); w[core]=1.0
+    w=torch.zeros_like(freqs)
+    core=(freqs>=lo)&(freqs<=hi)
+    w[core]=1.0
     if edge>0:
         left=(freqs>=max(0.0,lo-edge))&(freqs<lo)
         if torch.any(left):
-            t=(freqs[left]-(lo-edge))/edge; w[left]=0.5-0.5*torch.cos(math.pi*t)
+            t=(freqs[left]-(lo-edge))/edge
+            w[left]=0.5-0.5*torch.cos(math.pi*t)
         right=(freqs>hi)&(freqs<=hi+edge)
         if torch.any(right):
-            t=(freqs[right]-hi)/edge; w[right]=0.5+0.5*torch.cos(math.pi*t)
+            t=(freqs[right]-hi)/edge
+            w[right]=0.5+0.5*torch.cos(math.pi*t)
     return w
 
 def _apply_tonal_eq(x,sr,hpf,eq):
-    n=x.shape[-1]; spec=torch.fft.rfft(x.float(),dim=-1); freqs=torch.fft.rfftfreq(n,d=1.0/sr).to(x.device); gain=torch.ones_like(freqs)
+    n=x.shape[-1]
+    spec=torch.fft.rfft(x.float(),dim=-1)
+    freqs=torch.fft.rfftfreq(n,d=1.0/sr).to(x.device)
+    gain=torch.ones_like(freqs)
     if hpf>0:
-        f=torch.clamp(freqs,min=1.0); hp=1.0/torch.sqrt(1.0+(float(hpf)/f)**8); hp[0]=0.0; gain*=hp
+        f=torch.clamp(freqs,min=1.0)
+        hp=1.0/torch.sqrt(1.0+(float(hpf)/f)**8)
+        hp[0]=0.0
+        gain*=hp
     defs={"bass":(20,250,35),"mid":(250,2000,180),"presence":(2000,6000,450),"hf":(6000,min(sr/2-1,20000),900)}
     for k,(lo,hi,edge) in defs.items():
         db=float(eq.get(k,0.0))
         if abs(db)<1e-7: continue
-        shape=_smooth_band(freqs,lo,hi,edge); g=_db_to_gain(db); gain*=1.0+(g-1.0)*shape
+        shape=_smooth_band(freqs,lo,hi,edge)
+        g=_db_to_gain(db)
+        gain*=1.0+(g-1.0)*shape
     return torch.fft.irfft(spec*gain.unsqueeze(0),n=n,dim=-1)
 
 def _derive_auto_eq(bands,profile,s):
-    target=PROFILE_TARGETS[profile]["bands"]; cfg={"bass":(0.16,5.0),"mid":(0.10,3.0),"presence":(0.11,3.0),"hf":(0.10,2.5)}; out={}
+    target=PROFILE_TARGETS[profile]["bands"]
+    cfg={"bass":(0.16,5.0),"mid":(0.10,3.0),"presence":(0.11,3.0),"hf":(0.10,2.5)}
+    out={}
     for k,(scale,cap) in cfg.items(): out[k]=max(-cap,min(cap,(target[k]-bands[k])*scale))*s
     return out
 
 def _manual_eq(bass,lowmid,mid,pres,air): return {"bass":float(bass),"mid":float(mid)+0.55*float(lowmid),"presence":float(pres),"hf":float(air)}
 
 def _tonal_error(b,profile):
-    t=PROFILE_TARGETS[profile]["bands"]; return abs(b["bass"]-t["bass"])*1.25+abs(b["mid"]-t["mid"])+abs(b["presence"]-t["presence"])+abs(b["hf"]-t["hf"])*0.75
+    t=PROFILE_TARGETS[profile]["bands"]
+    return abs(b["bass"]-t["bass"])*1.25+abs(b["mid"]-t["mid"])+abs(b["presence"]-t["presence"])+abs(b["hf"]-t["hf"])*0.75
 
 def _derive_auto_width(corr,profile,s):
     lo,hi=PROFILE_TARGETS[profile]["corr"]
@@ -984,10 +999,26 @@ def _derive_auto_width(corr,profile,s):
 
 def _apply_fd_width(x,sr,mono_below,width):
     if x.shape[0]<2: return x
-    l,r=x[0].float(),x[1].float(); mid=(l+r)*0.5; side=(l-r)*0.5; n=x.shape[-1]; ss=torch.fft.rfft(side); f=torch.fft.rfftfreq(n,d=1.0/sr).to(x.device)
-    a=max(20.0,mono_below*0.70); b=max(a+1.0,mono_below*1.35); t=torch.clamp((f-a)/(b-a),0.0,1.0); low=0.5-0.5*torch.cos(math.pi*t)
-    m=torch.ones_like(f); m*=1.0+(width-1.0)*0.35*_smooth_band(f,250,2000,250); m*=1.0+(width-1.0)*0.80*_smooth_band(f,2000,6000,500); m*=1.0+(width-1.0)*_smooth_band(f,6000,min(sr/2-1,20000),900); m*=low
-    so=torch.fft.irfft(ss*m,n=n); y=x.clone().float(); y[0]=mid+so; y[1]=mid-so; return y
+    l,r=x[0].float(),x[1].float()
+    mid=(l+r)*0.5
+    side=(l-r)*0.5
+    n=x.shape[-1]
+    ss=torch.fft.rfft(side)
+    f=torch.fft.rfftfreq(n,d=1.0/sr).to(x.device)
+    a=max(20.0,mono_below*0.70)
+    b=max(a+1.0,mono_below*1.35)
+    t=torch.clamp((f-a)/(b-a),0.0,1.0)
+    low=0.5-0.5*torch.cos(math.pi*t)
+    m=torch.ones_like(f)
+    m*=1.0+(width-1.0)*0.35*_smooth_band(f,250,2000,250)
+    m*=1.0+(width-1.0)*0.80*_smooth_band(f,2000,6000,500)
+    m*=1.0+(width-1.0)*_smooth_band(f,6000,min(sr/2-1,20000),900)
+    m*=low
+    so=torch.fft.irfft(ss*m,n=n)
+    y=x.clone().float()
+    y[0]=mid+so
+    y[1]=mid-so
+    return y
 
 def _stereo_class(c,profile):
     lo,hi=PROFILE_TARGETS[profile]["corr"]
@@ -1040,9 +1071,14 @@ class NovaAudioMaster:
                target_true_peak_dbtp, target_crest_db, high_pass_hz, bass_db,
                low_mid_db, mid_db, presence_db, air_db, stereo_width_percent,
                mono_below_hz):
-        waveform=audio["waveform"]; sr=int(audio["sample_rate"])
+        waveform=audio["waveform"]
+        sr=int(audio["sample_rate"])
         if waveform.dim()==2: waveform=waveform.unsqueeze(0)
-        original=waveform.clone(); outs=[]; reports=[]; json_reports=[]; s=max(0.0,min(1.0,float(strength)/100.0))
+        original=waveform.clone()
+        outs=[]
+        reports=[]
+        json_reports=[]
+        s=max(0.0,min(1.0,float(strength)/100.0))
         for b in range(waveform.shape[0]):
             x=waveform[b].float().clone()
             before={"lufs":integrated_lufs(x,sr),"tp":true_peak_db(x,sr),"sp":sample_peak_db(x),"rms":rms_db(x),"crest":crest_db(x),"corr":lr_correlation(x),"dc":dc_offset(x),"bands":band_energy_percentages(x,sr)}
@@ -1143,14 +1179,31 @@ class NovaAudioMaster:
                     f"RELEASE: OBSERVATION_ONLY\n"
                     f"- No HPF, EQ, stereo, dynamics, loudness trim, limiter, or other mastering DSP was applied."
                 )
-                reports.append(report); json_reports.append(rd); outs.append(y)
+                reports.append(report)
+                json_reports.append(rd)
+                outs.append(y)
                 continue
-            auto=_derive_auto_eq(before["bands"],profile,s); man=_manual_eq(bass_db,low_mid_db,mid_db,presence_db,air_db)
+            auto=_derive_auto_eq(before["bands"],profile,s)
+            man=_manual_eq(bass_db,low_mid_db,mid_db,presence_db,air_db)
             eq=auto if mode=="Auto" else ({k:auto[k]+man[k] for k in auto} if mode=="Assist" else man)
             eq={"bass":max(-6,min(6,eq["bass"])),"mid":max(-4,min(4,eq["mid"])),"presence":max(-4,min(4,eq["presence"])),"hf":max(-3,min(3,eq["hf"]))}
-            err0=_tonal_error(before["bands"],profile); ec=_apply_tonal_eq(x,sr,high_pass_hz,eq); eb=band_energy_percentages(ec,sr); err1=_tonal_error(eb,profile); tonal_rb=err1>err0+0.25; y=x.clone() if tonal_rb else ec
-            corr0=lr_correlation(y); aw=_derive_auto_width(corr0,profile,s); mw=float(stereo_width_percent)/100.0; width=aw if mode=="Auto" else (aw*mw if mode=="Assist" else mw); width=max(0.65,min(1.45,width))
-            sc=_apply_fd_width(y,sr,float(mono_below_hz),width); corr1=lr_correlation(sc); lo,hi=PROFILE_TARGETS[profile]["corr"]; d0=0 if lo<=corr0<=hi else min(abs(corr0-lo),abs(corr0-hi)); d1=0 if lo<=corr1<=hi else min(abs(corr1-lo),abs(corr1-hi)); stereo_rb=corr1<0.05 or d1>d0+0.01
+            err0=_tonal_error(before["bands"],profile)
+            ec=_apply_tonal_eq(x,sr,high_pass_hz,eq)
+            eb=band_energy_percentages(ec,sr)
+            err1=_tonal_error(eb,profile)
+            tonal_rb=err1>err0+0.25
+            y=x.clone() if tonal_rb else ec
+            corr0=lr_correlation(y)
+            aw=_derive_auto_width(corr0,profile,s)
+            mw=float(stereo_width_percent)/100.0
+            width=aw if mode=="Auto" else (aw*mw if mode=="Assist" else mw)
+            width=max(0.65,min(1.45,width))
+            sc=_apply_fd_width(y,sr,float(mono_below_hz),width)
+            corr1=lr_correlation(sc)
+            lo,hi=PROFILE_TARGETS[profile]["corr"]
+            d0=0 if lo<=corr0<=hi else min(abs(corr0-lo),abs(corr0-hi))
+            d1=0 if lo<=corr1<=hi else min(abs(corr1-lo),abs(corr1-hi))
+            stereo_rb=corr1<0.05 or d1>d0+0.01
             if not stereo_rb:y=sc
             dynamics_before={"lufs":integrated_lufs(y,sr),"rms":rms_db(y),"crest":crest_db(y)}
             adaptive_crest=_adaptive_safe_crest_target(
@@ -1180,12 +1233,22 @@ class NovaAudioMaster:
                 adaptive_crest["adaptive_target_db"],
                 crest_convergence_pct,
             )
-            pre=integrated_lufs(y,sr); trim=max(-2.0,min(4.0,float(target_lufs)-pre)); y=y*_db_to_gain(trim) if abs(trim)>1e-8 else y; y,limiter_gr=_true_peak_limit(y,sr,float(target_true_peak_dbtp))
+            pre=integrated_lufs(y,sr)
+            trim=max(-2.0,min(4.0,float(target_lufs)-pre))
+            y=y*_db_to_gain(trim) if abs(trim)>1e-8 else y
+            y,limiter_gr=_true_peak_limit(y,sr,float(target_true_peak_dbtp))
             after={"lufs":integrated_lufs(y,sr),"tp":true_peak_db(y,sr),"sp":sample_peak_db(y),"rms":rms_db(y),"crest":crest_db(y),"corr":lr_correlation(y),"dc":dc_offset(y),"bands":band_energy_percentages(y,sr)}
-            effects={}; targets=PROFILE_TARGETS[profile]["bands"]
+            effects={}
+            targets=PROFILE_TARGETS[profile]["bands"]
             for k in ("bass","mid","presence","hf"):
-                req=float(eq[k]); delta=float(after["bands"][k]-before["bands"][k]); status="ROLLED_BACK" if tonal_rb else ("NOT_REQUESTED" if abs(req)<0.05 else ("EFFECTIVE" if ((req<0 and delta<=-0.20) or (req>0 and delta>=0.20)) else "INEFFECTIVE")); effects[k]={"requested_db":req,"source_percent":float(before["bands"][k]),"output_percent":float(after["bands"][k]),"measured_delta_percent":delta,"target_percent":float(targets[k]),"status":status}
-            cdelta=float(after["corr"]-before["corr"]); stereo_status="ROLLED_BACK" if stereo_rb else ("NOT_REQUESTED" if abs(width-1.0)<0.01 else ("INEFFECTIVE" if abs(cdelta)<0.005 else "EFFECTIVE")); src_class=_stereo_class(before["corr"],profile); out_class=_stereo_class(after["corr"],profile)
+                req=float(eq[k])
+                delta=float(after["bands"][k]-before["bands"][k])
+                status="ROLLED_BACK" if tonal_rb else ("NOT_REQUESTED" if abs(req)<0.05 else ("EFFECTIVE" if ((req<0 and delta<=-0.20) or (req>0 and delta>=0.20)) else "INEFFECTIVE"))
+                effects[k]={"requested_db":req,"source_percent":float(before["bands"][k]),"output_percent":float(after["bands"][k]),"measured_delta_percent":delta,"target_percent":float(targets[k]),"status":status}
+            cdelta=float(after["corr"]-before["corr"])
+            stereo_status="ROLLED_BACK" if stereo_rb else ("NOT_REQUESTED" if abs(width-1.0)<0.01 else ("INEFFECTIVE" if abs(cdelta)<0.005 else "EFFECTIVE"))
+            src_class=_stereo_class(before["corr"],profile)
+            out_class=_stereo_class(after["corr"],profile)
             legacy_crest_s,legacy_crest_n,legacy_crest_score=_crest_classification(profile,after["crest"])
             legacy_loud_s,legacy_loud_n,legacy_loud_score=_loudness_classification(after["lufs"],target_lufs,after["tp"],target_true_peak_dbtp)
             peak_s,peak_n,peak_score=_peak_classification(after["tp"],target_true_peak_dbtp)
@@ -1272,7 +1335,9 @@ class NovaAudioMaster:
             settings={"strength":float(strength),"target_lufs":float(target_lufs),"target_true_peak_dbtp":float(target_true_peak_dbtp),"target_crest_db":float(target_crest_db),"high_pass_hz":float(high_pass_hz),"bass_db":float(bass_db),"low_mid_db":float(low_mid_db),"mid_db":float(mid_db),"presence_db":float(presence_db),"air_db":float(air_db),"stereo_width_percent":float(stereo_width_percent),"mono_below_hz":float(mono_below_hz)}
             correction={"tonal":{"profile_error_before":float(err0),"profile_error_after_candidate":float(err1),"rolled_back":bool(tonal_rb),"bands":effects},"stereo":{"source_correlation":float(before["corr"]),"source_classification":src_class,"auto_width_factor":float(aw),"manual_width_factor":float(mw),"applied_width_factor":float(width),"output_correlation":float(after["corr"]),"output_classification":out_class,"correlation_delta":cdelta,"rolled_back":bool(stereo_rb),"status":stereo_status,"mono_below_hz":float(mono_below_hz)},"dynamics":{"source_lufs":float(dynamics_before["lufs"]),"source_rms_dbfs":float(dynamics_before["rms"]),"source_crest_db":float(dynamics_before["crest"]),"output_lufs":float(dynamics_after["lufs"]),"output_rms_dbfs":float(dynamics_after["rms"]),"output_crest_db":float(dynamics_after["crest"]),"crest_delta_db":float(dynamics_after["crest"]-dynamics_before["crest"]),"accepted_passes":int(dyn["accepted_passes"]),"rejected_passes":int(dyn["rejected_passes"]),"body_peak_lift_db":float(dyn["body_peak_lift_db"]),"body_avg_lift_db":float(dyn["body_avg_lift_db"]),"transient_peak_gr_db":float(dyn["transient_peak_gr_db"]),"transient_avg_gr_db":float(dyn["transient_avg_gr_db"]),"makeup_db":float(dyn["makeup_db"]),"cumulative_dynamics_makeup_db":float(dyn["makeup_db"]),"final_chain_trim_db":float(trim),"limiter_gr_db":float(dyn["limiter_gr_db"]),"cumulative_candidate_limiter_gr_db":float(dyn["limiter_gr_db"]),"final_chain_limiter_gr_db":float(limiter_gr),"history":dyn["history"],"last_rejected_candidate":dyn["last_rejected_candidate"],"final_chain_preview":dyn["final_chain_preview"],"crest_targeting":{"reference_target_db":float(adaptive_crest["reference_target_db"]),"source_crest_db":float(adaptive_crest["source_crest_db"]),"post_correction_crest_db":float(adaptive_crest["post_correction_crest_db"]),"correction_crest_increase_db":float(adaptive_crest["correction_crest_increase_db"]),"adaptive_target_db":float(adaptive_crest["adaptive_target_db"]),"profile_floor_db":float(adaptive_crest["profile_floor_db"]),"convergence_fraction":float(adaptive_crest["convergence_fraction"]),"achieved_crest_db":float(dynamics_after["crest"]),"crest_reduction_db":float(adaptive_crest["post_correction_crest_db"]-dynamics_after["crest"]),"convergence_percent":float(crest_convergence_pct),"convergence_status":crest_convergence_status},"status":("EFFECTIVE" if dyn["accepted_passes"]>0 else ("ROLLED_BACK" if dyn["rejected_passes"]>0 else "NOT_NEEDED"))},"loudness":{"trim_db":float(trim),"true_peak_limiter_gr_db":float(limiter_gr),"limiter_budget":final_limiter_budget}}
             rd={"schema":"nova.audio_master.report","schema_version":10,"master_version":VERSION,"provenance":{"report_id":str(uuid.uuid4()),"created_utc":datetime.now(timezone.utc).isoformat().replace("+00:00","Z"),"software":"Nova Audio Master","master_version":VERSION,"analysis_version":"1.0","schema_version":10,"processing_mode":mode,"processing_profile":profile,"run_count":int(run_count)},"mode":mode,"profile":profile,"settings":settings,"identity":{"source_pcm_sha256":_pcm_sha256(x),"master_pcm_sha256":_pcm_sha256(y),"canonical_pcm_format":"channels-first float32 little-endian","sample_rate_hz":int(sr),"channels":int(x.shape[0]),"samples":int(x.shape[-1]),"duration_seconds":float(x.shape[-1]/sr)},"source":{"integrated_lufs":float(before["lufs"]),"true_peak_dbtp":float(before["tp"]),"sample_peak_dbfs":float(before["sp"]),"rms_dbfs":float(before["rms"]),"crest_db":float(before["crest"]),"lr_correlation":float(before["corr"]),"dc_offset":float(before["dc"]),"bands_percent":{k:float(before["bands"][n]) for k,n in [("bass_20_250_hz","bass"),("mid_250_2000_hz","mid"),("presence_2000_6000_hz","presence"),("hf_6000_plus_hz","hf")]}},"mastered":{"integrated_lufs":float(after["lufs"]),"true_peak_dbtp":float(after["tp"]),"sample_peak_dbfs":float(after["sp"]),"rms_dbfs":float(after["rms"]),"crest_db":float(after["crest"]),"lr_correlation":float(after["corr"]),"dc_offset":float(after["dc"]),"bands_percent":{k:float(after["bands"][n]) for k,n in [("bass_20_250_hz","bass"),("mid_250_2000_hz","mid"),("presence_2000_6000_hz","presence"),("hf_6000_plus_hz","hf")]}},"correction":correction,"classification":{"true_peak":{"status":peak_s,"note":peak_n,"score":float(peak_score)},"loudness":{"status":loud_s,"note":loud_n,"score":float(loud_score),"reference":{"target_lufs":float(target_lufs),"achieved_lufs":float(after["lufs"]),"status":adaptive_loudness_validation["reference_status"],"delta_lu":float(adaptive_loudness_validation["delta_lu"])},"adaptive":{"status":adaptive_loudness_validation["status"],"interpretation":adaptive_loudness_validation["release_interpretation"],"safe":bool(adaptive_loudness_validation["safe"]),"gain_budget_used":bool(adaptive_loudness_validation["gain_budget_used"]),"max_trim_db":float(adaptive_loudness_validation["max_trim_db"]),"final_chain_trim_db":float(trim),"limiter_gr_db":float(limiter_gr),"limiter_budget":final_limiter_budget},"legacy_profile_classification":{"status":legacy_loud_s,"note":legacy_loud_n,"score":float(legacy_loud_score)}},"crest":{"status":crest_s,"note":crest_n,"score":float(crest_score),"reference":{"target_db":float(adaptive_crest["reference_target_db"]),"achieved_db":float(after["crest"]),"status":adaptive_crest_validation["reference_status"],"delta_db":float(adaptive_crest_validation["reference_delta_db"])},"adaptive":{"target_db":float(adaptive_crest["adaptive_target_db"]),"achieved_db":float(after["crest"]),"status":adaptive_crest_validation["adaptive_status"],"delta_db":float(adaptive_crest_validation["adaptive_delta_db"]),"convergence_percent":float(adaptive_crest_validation["convergence_percent"]),"crest_reduction_db":float(adaptive_crest_validation["crest_reduction_db"]),"safe":bool(adaptive_crest_validation["safe"])},"legacy_profile_classification":{"status":legacy_crest_s,"note":legacy_crest_n,"score":float(legacy_crest_score)}},"stereo":{"status":stereo_s,"note":stereo_n,"score":float(stereo_score),"source_image":src_class,"output_image":out_class},"tonal_balance":{"status":tonal_s,"notes":list(tonal_notes),"score":float(tonal_score),"reference":{"status":adaptive_tonal_validation["reference_status"],"profile":profile,"legacy_score":float(legacy_tonal_score)},"adaptive":{"status":adaptive_tonal_validation["correction_status"],"interpretation":adaptive_tonal_validation["release_interpretation"],"profile_error_before":float(adaptive_tonal_validation["profile_error_before"]),"profile_error_after":float(adaptive_tonal_validation["profile_error_after"]),"profile_error_improvement":float(adaptive_tonal_validation["profile_error_improvement"]),"profile_error_reduction_percent":float(adaptive_tonal_validation["profile_error_reduction_percent"]),"safe":bool(adaptive_tonal_validation["safe"])},"legacy_profile_classification":{"status":legacy_tonal_s,"notes":list(legacy_tonal_notes),"score":float(legacy_tonal_score)}},"limiter_dependency":{"status":limiter_budget,"gr_db":float(limiter_gr),"score":float(limiter_score)}},"validation":{"strategy":"ADAPTIVE_RELEASE_VALIDATION","strategy_version":3,"reference_compliance":{"loudness_status":adaptive_loudness_validation["reference_status"],"loudness_target_lufs":float(target_lufs),"loudness_achieved_lufs":float(after["lufs"]),"crest_status":adaptive_crest_validation["reference_status"],"reference_target_db":float(adaptive_crest["reference_target_db"]),"achieved_crest_db":float(after["crest"]),"tonal_status":adaptive_tonal_validation["reference_status"],"tonal_profile":profile},"adaptive_achievement":{"loudness":{"status":adaptive_loudness_validation["status"],"interpretation":adaptive_loudness_validation["release_interpretation"],"score":float(loud_score),"delta_lu":float(adaptive_loudness_validation["delta_lu"]),"gain_budget_used":bool(adaptive_loudness_validation["gain_budget_used"]),"limiter_budget":final_limiter_budget,"safe":bool(adaptive_loudness_validation["safe"])},"crest":{"status":adaptive_crest_validation["adaptive_status"],"score":float(crest_score),"adaptive_target_db":float(adaptive_crest["adaptive_target_db"]),"convergence_percent":float(crest_convergence_pct),"safe":bool(adaptive_crest_validation["safe"])},"tonal":{"status":adaptive_tonal_validation["correction_status"],"interpretation":adaptive_tonal_validation["release_interpretation"],"score":float(tonal_score),"profile_error_before":float(err0),"profile_error_after":float(err1),"profile_error_reduction_percent":float(adaptive_tonal_validation["profile_error_reduction_percent"]),"safe":bool(adaptive_tonal_validation["safe"])}},"release_safety":{"true_peak_status":peak_s,"stereo_status":stereo_s,"dc_offset":float(after["dc"])},"limiter_dependency":{"budget":final_limiter_budget,"gr_db":float(limiter_gr),"score":float(limiter_score)}},"release":{"status":release_s,"confidence":float(confidence),"grade":grade,"summary":release_n,"correction_warnings":warnings},"reproduction_fingerprint":_reproduction_fingerprint(after),"validation_reference":{"reference_role":"MASTER_OUTPUT","metrics":{"integrated_lufs":float(after["lufs"]),"true_peak_dbtp":float(after["tp"]),"sample_peak_dbfs":float(after["sp"]),"rms_dbfs":float(after["rms"]),"crest_db":float(after["crest"]),"lr_correlation":float(after["corr"]),"bands_percent":{"bass":float(after["bands"]["bass"]),"mid":float(after["bands"]["mid"]),"presence":float(after["bands"]["presence"]),"hf":float(after["bands"]["hf"])}},"tolerances":{"integrated_lufs":0.10,"true_peak_dbtp":0.10,"rms_dbfs":0.10,"crest_db":0.15,"lr_correlation":0.01,"band_energy_percent":0.50},"crest_reference_target_db":float(adaptive_crest["reference_target_db"]),"crest_adaptive_target_db":float(adaptive_crest["adaptive_target_db"]),"crest_achieved_db":float(dynamics_after["crest"]),"crest_convergence_percent":float(crest_convergence_pct),"crest_convergence_status":crest_convergence_status,"loudness_reference_status":adaptive_loudness_validation["reference_status"],"loudness_adaptive_status":adaptive_loudness_validation["status"],"loudness_target_lufs":float(target_lufs),"loudness_achieved_lufs":float(after["lufs"]),"loudness_delta_lu":float(adaptive_loudness_validation["delta_lu"]),"loudness_gain_budget_used":bool(adaptive_loudness_validation["gain_budget_used"]),"tonal_reference_status":adaptive_tonal_validation["reference_status"],"tonal_correction_status":adaptive_tonal_validation["correction_status"],"tonal_profile_error_before":float(err0),"tonal_profile_error_after":float(err1),"tonal_profile_error_reduction_percent":float(adaptive_tonal_validation["profile_error_reduction_percent"]),"comparison_note":"Current Nova Player top/bar LUFS is static during playback; compare against final archived/bench analysis when Player validator support is added."}}
-            rd["identity"]["settings_sha256"]=_canonical_json_sha256(settings); rd["identity"]["reproduction_fingerprint_sha256"]=_canonical_json_sha256(rd["reproduction_fingerprint"]); rd["identity"]["report_payload_sha256"]=_canonical_json_sha256(rd)
+            rd["identity"]["settings_sha256"]=_canonical_json_sha256(settings)
+            rd["identity"]["reproduction_fingerprint_sha256"]=_canonical_json_sha256(rd["reproduction_fingerprint"])
+            rd["identity"]["report_payload_sha256"]=_canonical_json_sha256(rd)
             report=(f"NOVA AUDIO MASTER v{VERSION}\nCorrective Mastering / Validation Report\n"
                     f"RUN COUNT: {int(run_count)}\n\n"
                     f"SOURCE: LUFS {before['lufs']:.2f} | TP {before['tp']:.2f} dBTP | RMS {before['rms']:.2f} | Crest {before['crest']:.2f} | Corr {before['corr']:.3f} [{src_class}]\n"
@@ -1291,8 +1356,12 @@ class NovaAudioMaster:
                     f"LOUDNESS: Final Chain Trim {trim:+.2f}dB | Limiter GR {limiter_gr:.2f}dB [{final_limiter_budget}] | Final {after['lufs']:.2f} LUFS / {after['tp']:.2f} dBTP\n"
                     f"MASTERED BANDS: Bass {after['bands']['bass']:.2f}% | Mid {after['bands']['mid']:.2f}% | Presence {after['bands']['presence']:.2f}% | HF {after['bands']['hf']:.2f}%\n"
                     f"RELEASE: {release_s} | Confidence {confidence:.1f}/100 | Grade {grade}\n" + ("\n".join('- '+w for w in warnings) if warnings else "- Corrective stages completed without correction warnings."))
-            reports.append(report); json_reports.append(rd); outs.append(y)
-        mastered={"waveform":torch.stack(outs,0).to(waveform.dtype),"sample_rate":sr}; original_audio={"waveform":original,"sample_rate":sr}; payload=json_reports[0] if len(json_reports)==1 else {"schema":"nova.audio_master.batch_report","schema_version":10,"master_version":VERSION,"reports":json_reports}
+            reports.append(report)
+            json_reports.append(rd)
+            outs.append(y)
+        mastered={"waveform":torch.stack(outs,0).to(waveform.dtype),"sample_rate":sr}
+        original_audio={"waveform":original,"sample_rate":sr}
+        payload=json_reports[0] if len(json_reports)==1 else {"schema":"nova.audio_master.batch_report","schema_version":10,"master_version":VERSION,"reports":json_reports}
         return mastered, original_audio, "\n\n".join(reports), json.dumps(payload,indent=2,ensure_ascii=False,allow_nan=False)
 
 NODE_CLASS_MAPPINGS = {"NovaAudioMaster": NovaAudioMaster}
