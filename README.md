@@ -1,6 +1,6 @@
 # Nova Audio Player
 
-**Twenty-five nodes for making music with ACE-Step in ComfyUI** — generation
+**Thirty-one nodes for making music with ACE-Step in ComfyUI** — generation
 parameters, corrective mastering, measurement you can trust, report viewers,
 delivery, and LoRA training.
 
@@ -104,7 +104,7 @@ the rest are being filled in.
 |---|---|
 | **Nova Player 🔊** | The player: thirteen live visualisers, a whole-file measurement panel, a theme system, and a `panel_info` output for logging every take. |
 | **Nova Track Inspector 🔬** | Analyses the whole track over time and tells you where to listen, against a baseline. |
-| **Nova Final Master Validator** | Answers one question: did the file you saved still reproduce the master you approved? |
+| **Nova Final Master Validator ✅** | Answers one question: did the file you saved still reproduce the master you approved? |
 
 ![Nova Player](docs/images/nodes/NovaPlayerNode-waveform.png)
 
@@ -143,11 +143,11 @@ redrawn a second time.
 
 | Node | What it does |
 |---|---|
-| **Save Audio FLAC 24-bit ⬇️** | Writes an `AUDIO` input to FLAC at 24-bit or 16-bit. |
-| **Save Audio WAV PCM16\|PCM24\|FLOAT32 ⬇️** | Writes RIFF/WAVE at 16-bit PCM, 24-bit PCM or 32-bit float. |
+| **Nova Save Audio FLAC 24/16-bit ⬇️** | Writes an `AUDIO` input to FLAC at 24-bit or 16-bit. |
+| **Nova Save Audio WAV PCM16\|PCM24\|FLOAT32 ⬇️** | Writes RIFF/WAVE at 16-bit PCM, 24-bit PCM or 32-bit float. |
 | **Nova Tag Writer 🏷️** | Writes a table of metadata onto files, with column mapping, skip rules and a dry-run mode that reports without touching anything. |
 | **Nova Tag Reader 🔖** | Reads tags off a file list into a console report and `tags_json`. |
-| **Nova SQLite Reader 🗃️ [DEPRECATED]** | Reads a table out of a SQLite database — columns, `where`, and the option to create a new database. |
+| **Nova SQLite Reader 🗃️ [DEPRECATED]** | Deprecated: use Nova Dynamic SQLite Browser and the three SQLite nodes that follow it. Reads a table out of a SQLite database inside ComfyUI's input folder — columns, `where`, and the option to create a new database there. |
 | **Nova Dynamic SQLite Browser 📁** | Pick a database, table and columns. Outputs the rows. |
 | **Nova SQLite Row Iterator & Splitter 📦** | Loops through the rows and outputs each column of the current row. |
 | **Nova SQLite Single Row Filter 🔍** | Outputs each column of one selected row, with no loop. |
@@ -251,7 +251,7 @@ There is deliberately no MP3, M4A, Opus or WebM, and there will not be.
 This node measures. Its own SAT row reads `0.0000%` on a 320k MP3 — the figure
 does not fail, it quietly stops meaning anything — so a lossy download from the
 measurement node would be a file its own panel cannot honestly read. Delivery
-formats also have their own home: **Save Audio FLAC 24-bit** and **Save Audio
+formats also have their own home: **Nova Save Audio FLAC 24/16-bit** and **Nova Save Audio
 WAV PCM16|PCM24|FLOAT32** under Delivery & Metadata. The download arrow is for
 auditioning what you are measuring, not for shipping it.
 
@@ -312,8 +312,8 @@ views have a **Sequences** section in the drawer that works like recording a
 macro:
 
 1. Click **● Record new…** and type a name, for example *Spinning Fury Master*.
-2. Click **Start**, then play with the settings: speeds, tilt, colours, whatever
-   you like. The pauses between changes are recorded too. The recording clock
+2. Click **Start**, then play with the settings: speeds, tilt, sizes, whatever
+   you like. Colour changes are not recorded. The pauses between changes are recorded too. The recording clock
    **follows the song**, so if you need to think, pause the music: time spent
    paused isn't recorded, and you won't come back to long dead gaps.
 3. Click **■ Stop & save**. The sequence is saved under the name you chose and

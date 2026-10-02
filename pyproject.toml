@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-novaaudioplayer"
-description = "Twenty-five nodes for making music with ACE-Step: generation parameters with presets and validation, corrective mastering with rollback and a reproduction fingerprint, an audio player with live visualisers and a BS.1770 measurement panel, track inspection, in-canvas report viewers, tagging and SQLite/MySQL delivery, FLAC and WAV export, and LoRA training. Installs nothing at runtime."
+description = "Thirty-one nodes for making music with ACE-Step: generation parameters with presets and validation, corrective mastering with rollback and a reproduction fingerprint, an audio player with live visualisers and a BS.1770 measurement panel, track inspection, in-canvas report viewers, tagging and SQLite/MySQL delivery, FLAC and WAV export, and LoRA training."
 version = "2.6.1"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
@@ -18,7 +18,7 @@ requires-python = ">=3.10"
 # install paths; it does nothing for the very common one where somebody clones
 # this repository straight into custom_nodes and never runs pip. On that path an
 # undeclared-but-imported package is an ImportError in __init__.py, and an
-# ImportError in __init__.py takes all twenty-six nodes off the menu over one
+# ImportError in __init__.py takes all thirty-one nodes off the menu over one
 # optional feature. Every third-party import in this package is therefore lazy
 # or guarded, and fails in words at the point of use.
 #

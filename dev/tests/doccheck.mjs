@@ -73,13 +73,44 @@ for (const [name, text] of CLAIMS) {
 
 // The README's table of views is the other place the number lives, implicitly.
 const readme = read("README.md");
-const table = readme.match(/\|\s*\|\s*\|\n\|---\|---\|\n((?:\|.*\|\n)+)/);
+// Anchored to the section heading: the table grew a third (screenshot)
+// column, and a shape-only match silently stopped finding it.
+const table = readme.match(/views, one button[\s\S]*?\n\|[^\n]*\|\n\|(?:---\|)+\n((?:\|.*\|\n)+)/i);
 if (table) {
   const rows = table[1].trim().split("\n").length;
   ck("the README's view table has one row per renderer", rows === N,
      `${rows} rows vs ${N} renderers`);
 } else {
   ck("the README's view table was found", false, "table shape changed — update this check");
+}
+
+// -- the node count ------------------------------------------------------------
+// "Twenty-five nodes" stayed in the README's first line, in pyproject.toml's
+// description and so on the Registry listing while the pack grew to 31. The
+// literal table in __init__.py is what ComfyUI registers, so it is the truth.
+const initPy = read("__init__.py");
+const classMap = initPy.match(/NODE_CLASS_MAPPINGS\s*=\s*\{([^}]*)\}/s);
+if (classMap) {
+  const NODES = (classMap[1].match(/^\s*"[A-Za-z0-9_]+"\s*:/gm) || []).length;
+  const ONES = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+  const TENS = { 2: "twenty", 3: "thirty", 4: "forty", 5: "fifty" };
+  const spell = n => n < 17 ? WORDS[n]
+    : n < 20 ? ["seventeen", "eighteen", "nineteen"][n - 17]
+    : TENS[Math.floor(n / 10)] + (n % 10 ? "-" + ONES[n % 10] : "");
+  const nodeWord = spell(NODES);
+  console.log(`\nnode count (__init__.py registers ${NODES}, "${nodeWord}")\n`);
+  const NODE_RE = /\b((?:twenty|thirty|forty|fifty)(?:-[a-z]+)?|\d+)\s+nodes\b(?=\s+for making music)/gi;
+  const pyproject = read("pyproject.toml");
+  const description = (pyproject.match(/^description\s*=\s*"([^"]*)"/m) || [, ""])[1];
+  for (const [name, text] of [["README.md", readme], ["pyproject.toml description", description]]) {
+    const found = [...text.matchAll(NODE_RE)].map(m => m[1].toLowerCase());
+    const wrong = found.filter(f => f !== nodeWord && f !== String(NODES));
+    ck(`${name} says "${nodeWord} nodes"`, found.length > 0 && wrong.length === 0,
+       found.length ? (wrong.length ? `found ${wrong.map(w => `"${w}"`).join(", ")}` : `${found.length} mention(s)`)
+                    : "(no count stated — the check is idle, which is a failure)");
+  }
+} else {
+  ck("NODE_CLASS_MAPPINGS was found in __init__.py", false, "table shape changed — update this check");
 }
 
 // -- Madow's parameter and output counts -------------------------------------

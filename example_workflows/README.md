@@ -32,7 +32,7 @@ nodes exist for:
 3. **Nova Master Report Viewer** renders that report in the canvas — and every
    view exports as a PNG from its right-click menu.
 4. **Nova Master Identity** turns the report into release and archive identity.
-5. **Save Audio WAV** writes the file.
+5. **Nova Save Audio WAV** writes the file.
 6. **Nova Final Master Validator** answers the question that matters after a
    write: *did the file you saved still reproduce the master you approved?*
 

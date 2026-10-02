@@ -1,7 +1,7 @@
 """
 ComfyUI-NovaAudioPlayer — a Nova Audio node pack.
 
-Nova Player: an audio player node with twelve live visualisers.
+Nova Player: an audio player node with thirteen live visualisers.
 Madow Inputs: every ACE-Step generation parameter in one node.
 Madow Unpack: fans a Madow bundle out into typed outputs.
 
@@ -207,10 +207,10 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NovaTagReader": 'Nova Tag Reader 🔖',
     "NovaTagWriter": 'Nova Tag Writer 🏷️',
     "NovaAudioMaster": 'Nova Audio Master 🧾',
-    "NovaFinalMasterValidator": 'Nova Final Master Validator',
+    "NovaFinalMasterValidator": 'Nova Final Master Validator ✅',
     "NovaMasterIdentity": 'Nova Master Identity \U0001faaa',
-    "NovaAudioSaveFLAC24": 'Save Audio FLAC 24-bit ⬇️',
-    "NovaAudioSaveWAV": 'Save Audio WAV PCM16|PCM24|FLOAT32 ⬇️',
+    "NovaAudioSaveFLAC24": 'Nova Save Audio FLAC 24/16-bit ⬇️',
+    "NovaAudioSaveWAV": 'Nova Save Audio WAV PCM16|PCM24|FLOAT32 ⬇️',
     "NovaTrackInspector": 'Nova Track Inspector 🔬',
     "NovaACEDatasetBuilder": 'Nova ACE Dataset Builder 🧱',
     "NovaACEDatasetReview": 'Nova ACE Dataset Review 🔍',
