@@ -157,6 +157,14 @@ function setupNode(node) {
   };
 }
 
+// Must match _LEGACY_ACTIONS in utilities/nova_namepath_manager.py.
+const LEGACY_ACTIONS = {
+  "use the widgets below": "use widgets",
+  "apply selected profile": "apply profile",
+  "save to selected profile": "save to profile",
+  "save as new profile": "save as new",
+};
+
 app.registerExtension({
   name: "Nova.NamePathManager",
   async beforeRegisterNodeDef(nodeType, nodeData) {
@@ -168,6 +176,23 @@ app.registerExtension({
         setupNode(this);
       } catch (err) {
         console.error("[Nova NamePath] could not build the profile controls", err);
+      }
+      return result;
+    };
+
+    // A workflow saved before 2.7.0 carries the old, longer option texts in
+    // profile_action. The backend still accepts them, but the widget went on
+    // showing the old text, cut off at the node's default width (B-06). They
+    // are replaced with the option they meant as the workflow loads.
+    const onConfigure = nodeType.prototype.onConfigure;
+    nodeType.prototype.onConfigure = function (...args) {
+      const result = onConfigure?.apply(this, args);
+      try {
+        const widget = this.widgets?.find((w) => w.name === "profile_action");
+        const renamed = LEGACY_ACTIONS[widget?.value];
+        if (renamed) widget.value = renamed;
+      } catch (err) {
+        console.error("[Nova NamePath] could not update profile_action", err);
       }
       return result;
     };

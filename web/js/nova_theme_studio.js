@@ -596,6 +596,23 @@ function detectRenderer() {
                  how: named ? `setting ${named.id}` : "no nodes on the canvas yet" };
     }
 
+    // ASKED BY ID FIRST. The frontend stamps every Nodes 2.0 card with
+    // `data-node-id`, and a card that carries a graph node's id is a DOM node
+    // by definition. Unlike the hit-test below, this does not depend on the
+    // node being on screen, on the zoom, on what is drawn over it or on the
+    // title text having rendered. Retest 1 of 2.7.0: after a restart the
+    // hit-test found no card on a page full of them, the answer came back
+    // "classic", and the adapter's stylesheet was removed and never rebuilt.
+    for (const node of nodes) {
+        if (node?.id == null) continue;
+        let card = null;
+        try { card = document.querySelector(`[data-node-id="${CSS.escape(String(node.id))}"]`); } catch { /* odd id */ }
+        if (card) {
+            everV2 = true;
+            return { mode: "v2", nodes: nodes.length, how: "a node card carries data-node-id" };
+        }
+    }
+
     // SAMPLED FROM WHAT IS ON SCREEN, not from the first eight in the list.
     // This is a hit-test, so a node scrolled out of view cannot answer it —
     // and on a large graph the first eight are very often exactly the ones

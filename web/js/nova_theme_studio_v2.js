@@ -124,11 +124,36 @@ const usableClasses = (el) => [...(el.classList || [])].filter(
 
 /** Every on-screen node paired with the element drawing it. Re-run rather than
  *  cached: the renderer replaces a card's element whenever it re-renders it. */
+/**
+ * A node's card, asked for by the node's id.
+ *
+ * The frontend stamps every Nodes 2.0 card with `data-node-id`; its own resize
+ * code finds cards that way. It needs no hit-test, so it does not care whether
+ * the node is on screen, how far the canvas is zoomed out, what is drawn over
+ * the node, or whether the card's title text has been rendered yet. The
+ * hit-test below is kept for a renderer that does not stamp its cards.
+ *
+ * Retest 1 of 2.7.0 is why this exists: on a page that plainly had Nodes 2.0
+ * cards, the hit-test found none after a restart, the adapter wrote no
+ * stylesheet, and the Glass finish was simply not applied.
+ */
+function cardById(node) {
+    if (node?.id == null) return null;
+    try {
+        return document.querySelector(`[data-node-id="${CSS.escape(String(node.id))}"]`);
+    } catch { return null; }
+}
+
 function pairsFor(nodes, canvas, limit) {
     const seen = [];
     const out = [];
     for (const node of nodes) {
         if (out.length >= limit) break;
+        const direct = cardById(node);
+        if (direct) {
+            if (!seen.includes(direct)) { seen.push(direct); out.push({ node, card: direct }); }
+            continue;
+        }
         const p = screenPointFor(node, canvas);
         if (!p) continue;
         const el = findCard(p, node);
@@ -267,8 +292,12 @@ function bodyColour(palette, ctx) {
 
     // Glass and frosted asked for "not painted"; here that becomes "barely
     // painted", which is what they would have asked for if they could.
+    // 0.14 was tried for Glass and left labels low-contrast over the bright
+    // parts of a wallpaper (Retest 1, B-01): light text needs something dark
+    // behind it, and a blurred wallpaper is still a bright one. 0.32 keeps the
+    // wallpaper visibly coming through and is enough to read on.
     const alpha = finish?.body == null
-        ? (finish?.id === "glass" ? 0.14 : 0.30)
+        ? ({ glass: 0.32, frosted: 0.45 }[finish?.id] ?? 0.60)
         : finish.body;
     return ctx.rgba(theme.ink, alpha);
 }

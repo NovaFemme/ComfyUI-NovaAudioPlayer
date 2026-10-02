@@ -31,7 +31,7 @@
  *     pixel size, so it follows the node when the node is resized;
  *   - the card gets an inline `min-width` for the length of a resize. It is
  *     written on `pointerdown`, in the capture phase, which runs before the
- *     frontend's own handler reads it, and removed on `pointerup`. Vue
+ *     frontend's own handler reads it, and removed when the pointer leaves. Vue
  *     replaces and reuses card elements, and a value written at that moment
  *     cannot be stale.
  *
@@ -60,23 +60,57 @@ function widthFor(card) {
 /** The card this module last wrote a min-width on, so it can be taken off again. */
 let marked = null;
 
-function onPointerDown(event) {
+/** What happened last, for `novaVueSize()` in the console. */
+const seen = { event: null, nodeId: null, width: 0, wrote: false };
+
+function mark(event) {
     const card = event.target?.closest?.("[data-node-id]");
     if (!card) return;
     const width = widthFor(card);
-    if (width > FRONTEND_MIN_WIDTH) {
+    seen.event = event.type;
+    seen.nodeId = card.dataset.nodeId;
+    seen.width = width;
+    seen.wrote = width > FRONTEND_MIN_WIDTH;
+    if (marked && marked !== card) marked.style.removeProperty("min-width");
+    if (seen.wrote) {
         card.style.minWidth = `${width}px`;
         marked = card;
+    } else if (marked === card) {
+        // The element now belongs to a node with no minimum of its own.
+        card.style.removeProperty("min-width");
+        marked = null;
     }
 }
 
-// TAKEN OFF AGAIN WHEN THE POINTER IS RELEASED. Vue reuses a card element for
+// WRITTEN WHEN THE POINTER ARRIVES, AND AGAIN WHEN IT GOES DOWN.
+//
+// `pointerdown` alone was not enough on every machine: Retest 1 of 2.7.0
+// measured the minimum heights working and the minimum widths not (FlowPulse
+// 225 x 508). The pointer has to enter a node before its corner can be
+// grabbed, so the value is also written on `pointerover`, which is well ahead
+// of any resize. Both paths do the same thing and either is sufficient.
+const onPointerDown = mark;
+const onPointerOver = mark;
+
+// TAKEN OFF AGAIN WHEN THE POINTER LEAVES THE NODE. Vue reuses a card element for
 // another node, and a min-width left behind made the next node on that element
 // 430 px wide whatever it was: measured, a Nova Console created after a Theme
 // Studio node. The frontend only reads the value while a resize is in progress,
 // so it has no reason to outlive one.
-function onPointerUp() {
+function onPointerUp(event) {
     if (!marked) return;
+    // Still over the same node: leave it for the next grab. It is taken off
+    // when the pointer moves to another node (see mark()) or leaves this one.
+    if (event?.type === "pointerup" && marked.contains(event.target)) return;
+    marked.style.removeProperty("min-width");
+    marked = null;
+}
+
+function onPointerOut(event) {
+    if (!marked || event.buttons) return;              // not in the middle of a drag
+    const to = event.relatedTarget;
+    if (to && marked.contains(to)) return;             // still inside the card
+    if (!marked.contains(event.target)) return;
     marked.style.removeProperty("min-width");
     marked = null;
 }
@@ -97,8 +131,17 @@ function install() {
 }`;
     document.head.appendChild(style);
     document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("pointerover", onPointerOver, true);
+    document.addEventListener("pointerout", onPointerOut, true);
     document.addEventListener("pointerup", onPointerUp, true);
     document.addEventListener("pointercancel", onPointerUp, true);
+    // For a tester: what this module last saw and did.
+    window.novaVueSize = () => ({
+        ...seen,
+        hosts: document.querySelectorAll(`.${HOST}`).length,
+        markedNodeId: marked?.dataset?.nodeId ?? null,
+        markedMinWidth: marked?.style?.minWidth ?? null,
+    });
 }
 
 /**
