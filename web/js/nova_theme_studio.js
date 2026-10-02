@@ -618,6 +618,14 @@ function detectRenderer() {
         everV2 = true;
         return { mode: "v2", nodes: nodes.length, how: "node cards carry data-node-id" };
     }
+    // AND THE SAME RULE THE OTHER WAY. When the setting says Nodes 2.0 is off,
+    // the canvas is drawing the nodes. Before this, switching the setting off
+    // on an open page left the answer at "unknown" for good (regression pass,
+    // R-1): the page had once had cards, so a v1 reading was refused, and the
+    // Nodes 2.0 stylesheet stayed in a page that no longer had any cards.
+    if (named?.on === false) {
+        return { mode: "v1", nodes: nodes.length, how: `setting ${named.id} is off` };
+    }
 
     // SAMPLED FROM WHAT IS ON SCREEN, not from the first eight in the list.
     // This is a hit-test, so a node scrolled out of view cannot answer it —
@@ -1137,6 +1145,14 @@ const isBlankColour = (v) => {
         || /^#([0-9a-f]{3}0|[0-9a-f]{6}00)$/.test(s);
 };
 
+/** The wash a widget gets when the finish declares no widget colour. */
+function fieldWash() {
+    const theme = THEMES.find((t) => t.id === preset.theme);
+    const glass = preset.finish === "glass";
+    return theme ? rgba(theme.field, glass ? 0.55 : 0.70)
+                 : `rgba(12, 14, 20, ${glass ? 0.55 : 0.70})`;
+}
+
 function applyFieldFloor(litegraph_base = {}) {
     const existing = document.getElementById(FLOOR_ID);
     if (!isBlankColour(litegraph_base.WIDGET_BGCOLOR)) {
@@ -1146,10 +1162,7 @@ function applyFieldFloor(litegraph_base = {}) {
     // The theme's field colour as a wash: dark enough to carry light text over
     // a bright wallpaper, still see-through. A palette loaded from a file may
     // name no theme this build knows, and then a neutral dark does the job.
-    const theme = THEMES.find((t) => t.id === preset.theme);
-    const glass = preset.finish === "glass";
-    const wash = theme ? rgba(theme.field, glass ? 0.55 : 0.70)
-                       : `rgba(12, 14, 20, ${glass ? 0.55 : 0.70})`;
+    const wash = fieldWash();
     const text = isBlankColour(litegraph_base.NODE_TEXT_COLOR) ? null : litegraph_base.NODE_TEXT_COLOR;
 
     const style = existing || document.createElement("style");
@@ -1194,6 +1207,27 @@ function applyPalette() {
     if (window.LGraphCanvas?.link_type_colors) Object.assign(window.LGraphCanvas.link_type_colors, node_slot);
 
     if (LG) for (const [k, v] of Object.entries(litegraph_base)) LG[k] = v;
+    // WIDGET NAMES ON THE CANVAS, UNDER A SEE-THROUGH FINISH (regression pass,
+    // R-2). The classic renderer draws a widget's name in the SECONDARY text
+    // colour, a dimmed one that assumes a widget box behind it. Glass and
+    // Frosted have no box: the name sat straight on the wallpaper at #8791b0
+    // and could not be read, worst on empty text fields and switched-off
+    // toggles, where the name is the only text on the row. With no box, the
+    // name takes the primary widget text colour. A palette that declares a
+    // real widget background keeps its own secondary colour.
+    //
+    // And the widget itself gets the same wash Nodes 2.0 fields get (B-12), so
+    // the name has something dark behind it over a bright wallpaper. The
+    // canvas honours the alpha of a widget fill, unlike a node body's. This is
+    // set on LiteGraph only; the palette, and anything saved from it, still
+    // says `transparent`.
+    if (LG && isBlankColour(litegraph_base.WIDGET_BGCOLOR)) {
+        const strong = [litegraph_base.WIDGET_TEXT_COLOR, litegraph_base.NODE_TEXT_COLOR]
+            .find((v) => !isBlankColour(v));
+        if (strong) LG.WIDGET_SECONDARY_TEXT_COLOR = strong;
+        const wash = fieldWash();
+        if (wash) LG.WIDGET_BGCOLOR = wash;
+    }
     // Four that the canvas caches on itself rather than reading from LiteGraph
     // each frame; assigning only the constant leaves the old value on screen.
     if ("NODE_TITLE_COLOR" in litegraph_base) c.node_title_color = litegraph_base.NODE_TITLE_COLOR;
@@ -1402,6 +1436,15 @@ function watchGraphSwap() {
     graphWatch = setInterval(() => {
         const graph = liveGraph();
         if (!graph) return;
+
+        // The renderer was switched in Settings while the page stayed open.
+        // Nothing else re-applies on that, so the Nodes 2.0 stylesheet stayed
+        // behind in a Classic page, or was missing from a Nodes 2.0 one.
+        const now = activeRenderer().mode;
+        if (now !== "unknown" && lastRenderer && now !== lastRenderer.mode) {
+            applyAll();
+            return;
+        }
 
         // A CONDITION, NOT AN EVENT — and that distinction is the whole bug.
         //
