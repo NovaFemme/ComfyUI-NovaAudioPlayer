@@ -1083,6 +1083,64 @@ function readLive() {
  * working across frontend versions: the service has moved and been renamed,
  * the things it assigns to have not.
  */
+/**
+ * A FLOOR UNDER NODES 2.0 TEXT FIELDS, WHATEVER THE PALETTE SAYS.
+ *
+ * Glass and Frosted store the widget background as `transparent`, and so does
+ * every palette saved from them. The frontend copies that value to
+ * `--component-node-widget-background` on the page root, and a Nodes 2.0 text
+ * field takes its whole box from that variable: transparent means no box at
+ * all (Retest 1, "B-12 follow-up": measured on `artist_name`, input and three
+ * wrappers transparent, border width 0).
+ *
+ * The Nodes 2.0 adapter also sets the variable, but only after it has found
+ * node cards on screen and settled on a selector for them, and it did not on
+ * the machine that retest ran on. A field having a visible edge should not
+ * hang on that. So the floor is written here, by the studio, every time a
+ * palette is applied, against `[data-node-id]` — the attribute the frontend's
+ * own resize code looks cards up by. It needs no sampling and no renderer
+ * detection: on the classic renderer no element carries the attribute and the
+ * rule matches nothing.
+ *
+ * Only when the palette's own widget colour is blank. A palette that declares
+ * a real one keeps it.
+ */
+const FLOOR_ID = "nova-theme-studio-fields";
+const isBlankColour = (v) => {
+    const s = String(v ?? "").trim().toLowerCase();
+    return !s || s === "transparent"
+        || /^rgba\([^)]*,\s*0(\.0+)?\s*\)$/.test(s)
+        || /^#([0-9a-f]{3}0|[0-9a-f]{6}00)$/.test(s);
+};
+
+function applyFieldFloor(litegraph_base = {}) {
+    const existing = document.getElementById(FLOOR_ID);
+    if (!isBlankColour(litegraph_base.WIDGET_BGCOLOR)) {
+        existing?.remove();
+        return null;
+    }
+    // The theme's field colour as a wash: dark enough to carry light text over
+    // a bright wallpaper, still see-through. A palette loaded from a file may
+    // name no theme this build knows, and then a neutral dark does the job.
+    const theme = THEMES.find((t) => t.id === preset.theme);
+    const glass = preset.finish === "glass";
+    const wash = theme ? rgba(theme.field, glass ? 0.55 : 0.70)
+                       : `rgba(12, 14, 20, ${glass ? 0.55 : 0.70})`;
+    const text = isBlankColour(litegraph_base.NODE_TEXT_COLOR) ? null : litegraph_base.NODE_TEXT_COLOR;
+
+    const style = existing || document.createElement("style");
+    style.id = FLOOR_ID;
+    style.textContent = [
+        `[data-node-id] {`,
+        `  --component-node-widget-background: ${wash} !important;`,
+        text ? `  --node-component-slot-text: ${text} !important;` : "",
+        text ? `  --component-node-foreground: ${text} !important;` : "",
+        `}`,
+    ].filter(Boolean).join("\n");
+    if (!existing) document.head.appendChild(style);
+    return wash;
+}
+
 function applyPalette() {
     if (!palette) return false;
     const c = app?.canvas;
@@ -1127,6 +1185,7 @@ function applyPalette() {
     // before any renderer-specific work and never depends on it.
     const root = document.documentElement;
     for (const [k, v] of Object.entries(comfy_base)) root.style.setProperty(`--${k}`, v);
+    applyFieldFloor(litegraph_base);
 
     // The renderer-specific half. Under Nodes 2.0 everything assigned above to
     // LiteGraph still sits there correctly and simply has no canvas reading it,
