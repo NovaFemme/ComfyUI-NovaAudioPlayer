@@ -28,21 +28,14 @@ import os
 import platform
 import sys
 from typing import Dict, List, Optional, Tuple
+from pathlib import Path
 
-try:
-    from .nova_ace_common import (
-        ACE_VERSION, TRAINING_CATEGORY, VARIANT_DIRS,
-        check_checkpoint_tree, check_remote_code_imports,
-        describe_checkpoint_requirement, install_command,
-    )
-    from ..authoring.nova_authoring_common import banner
-except ImportError:  # direct execution / test harness
-    from nova_ace_common import (
-        ACE_VERSION, TRAINING_CATEGORY, VARIANT_DIRS,
-        check_checkpoint_tree, check_remote_code_imports,
-        describe_checkpoint_requirement, install_command,
-    )
-    from nova_authoring_common import banner
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, check_remote_code_imports, describe_checkpoint_requirement, install_command, banner
+from nova_categories import TRAINING
 
 #: Packages ComfyUI's own requirements.txt provides. If one of these is
 #: missing, the ComfyUI install is broken — and "pip install --no-deps torch"
@@ -83,7 +76,7 @@ def _torch_report() -> Tuple[List[str], Optional[str]]:
     when torch itself will not import, which is fatal for everything here."""
     lines: List[str] = []
     try:
-        import torch
+        import torch # type: ignore
     except Exception as exc:                       # pragma: no cover
         return ([f"  torch          NOT IMPORTABLE — {exc}",
                  "                 Nothing in this pack can run. That is a broken "
@@ -112,7 +105,7 @@ def _torch_report() -> Tuple[List[str], Optional[str]]:
 def _decoder_report(backend: Optional[str]) -> Tuple[List[str], bool]:
     """torchcodec is how torchaudio >= 2.9 decodes. Returns (lines, blocking)."""
     try:
-        from torchcodec.decoders import AudioDecoder  # noqa: F401
+        from torchcodec.decoders import AudioDecoder  # type: ignore # noqa: F401
         return ["  audio decode   torchcodec loads correctly"], False
     except ImportError:
         state = "not installed"
@@ -141,7 +134,7 @@ def _decoder_report(backend: Optional[str]) -> Tuple[List[str], bool]:
 
 
 class NovaACESetupCheck:
-    CATEGORY = TRAINING_CATEGORY
+    CATEGORY = TRAINING
     FUNCTION = "check"
     RETURN_TYPES = ("BOOLEAN", "STRING")
     RETURN_NAMES = ("ready", "console")
@@ -151,8 +144,7 @@ class NovaACESetupCheck:
         "The full report — wire into Nova Console.",
     )
     DESCRIPTION = (
-        f"Nova ACE Setup Check v{ACE_VERSION} — reports whether this machine can "
-        "preprocess and train, before you spend GPU time finding out. Installs "
+        f"Nova ACE Setup Check spend GPU time finding out. Installs "
         "and downloads nothing."
     )
 
@@ -184,7 +176,7 @@ class NovaACESetupCheck:
         return float("nan")   # the environment can change under a saved workflow
 
     def check(self, checkpoint_dir, variant, acestep_repo_path="", **kwargs):
-        log: List[str] = [banner(f"NOVA ACE SETUP CHECK v{ACE_VERSION}")]
+        log: List[str] = [banner(f"NOVA ACE SETUP CHECK")]
         blocking: List[str] = []
         advisory: List[str] = []
         fix_packages: List[str] = []

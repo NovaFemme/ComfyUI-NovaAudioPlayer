@@ -8,21 +8,23 @@ import numpy as np
 import torch
 
 try:
-    from ..nova_categories import ANALYSIS
-except ImportError:  # direct execution / test harness
-    from nova_categories import ANALYSIS
+    from . import nova_inspector_profiles as _profiles
+except ImportError:                       # direct execution / test harness
+    import nova_inspector_profiles as _profiles
+
+import sys
+from pathlib import Path
+
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_categories import ANALYSIS
 
 VERSION = "0.2.0"
 SCHEMA = "nova.track_inspector.report"
 SCHEMA_VERSION = 2
 EPS = 1e-12
-
-
-try:
-    from . import nova_inspector_profiles as _profiles
-except ImportError:                       # direct execution / test harness
-    import nova_inspector_profiles as _profiles
-
 
 def _db(v: float) -> float:
     return 20.0 * math.log10(max(float(v), EPS))

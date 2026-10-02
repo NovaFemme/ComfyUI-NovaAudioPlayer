@@ -9,20 +9,23 @@ rest of the operators — but it is screened for statement separators and for
 anything that writes.
 """
 
+
 import json
 import os
 import re
 import sqlite3
 from typing import Any, Dict, List, Optional, Tuple
 
-try:
-    from .nova_authoring_common import (
-        DELIVERY_CATEGORY as AUTHORING_CATEGORY, AUTHORING_VERSION, TABLE_TYPE, empty_table, make_table,
-    )
-except ImportError:  # standalone / direct execution
-    from nova_authoring_common import (
-        DELIVERY_CATEGORY as AUTHORING_CATEGORY, AUTHORING_VERSION, TABLE_TYPE, empty_table, make_table,
-    )
+import sys
+from pathlib import Path
+
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_definitions import TABLE_TYPE, empty_table, make_table
+from nova_categories import UTILITY_IO
+
 
 def _norm(name: str) -> str:
     """Column names differ only in punctuation and case between databases."""
@@ -242,7 +245,7 @@ def _coerce(value: Any) -> Any:
 
 
 class NovaSQLiteReader:
-    CATEGORY = AUTHORING_CATEGORY
+    CATEGORY = UTILITY_IO
     FUNCTION = "read"
     RETURN_TYPES = (TABLE_TYPE, "INT", "INT", "STRING", "STRING", "STRING")
     RETURN_NAMES = ("table", "record_count", "column_count", "column_headers", "identity_json", "value")
@@ -258,7 +261,7 @@ class NovaSQLiteReader:
         "reference_lyrics. Set value_column to switch it on.",
     )
     DESCRIPTION = (
-        f"Nova SQLite Reader v{AUTHORING_VERSION} — opens an existing SQLite file "
+        f"Nova SQLite Reader — opens an existing SQLite file "
         "read-only and returns every column of the chosen table, optionally "
         "filtered by a WHERE expression."
     )

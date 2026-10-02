@@ -22,10 +22,14 @@ from .panel_info import audio_sha256, build_panel_info
 from .config_manager import manager
 from .peaks_cache import cache_peaks, write_peaks_sidecar
 
-try:
-    from ..nova_categories import ANALYSIS
-except ImportError:  # imported as a module rather than as part of the pack
-    from nova_categories import ANALYSIS
+import sys
+from pathlib import Path
+
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_categories import ANALYSIS
 
 
 class NovaPlayerNode:

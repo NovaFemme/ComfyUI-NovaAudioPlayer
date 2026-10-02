@@ -3,25 +3,19 @@ import json
 import sqlite3
 from contextlib import closing
 
-from aiohttp import web
-import folder_paths
-from server import PromptServer
+from aiohttp import web # type: ignore
+import folder_paths # type: ignore
+from server import PromptServer # type: ignore
 
-try:
-    from .nova_authoring_common import (DELIVERY)
-except ImportError:  # standalone / direct execution
-    from nova_authoring_common import (DELIVERY)
+import sys
+from pathlib import Path
 
-# NOVA_TABLE is the payload the rest of the pack passes around (Nova Tag Writer,
-# Nova Tag Reader, ...). Imported so this file always matches the pack's own value.
-try:
-    from .nova_authoring_common import TABLE_TYPE
-except ImportError:
-    try:
-        from nova_authoring_common import TABLE_TYPE
-    except ImportError:
-        TABLE_TYPE = "NOVA_TABLE"
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+# Clean absolute imports
+from nova_definitions import TABLE_TYPE
+from nova_categories import DELIVERY
 
 # Must match MAX_COLUMN_OUTPUTS in nova_sqlite_browser.js
 MAX_COLUMN_OUTPUTS = 64
@@ -281,12 +275,12 @@ def _match(row, condition, case_sensitive):
         if a is None or b is None:
             a, b = cell_cmp, wanted_cmp
         if operator == "greater than":
-            return a > b
+            return a > b # type: ignore
         if operator == "greater or equal":
-            return a >= b
+            return a >= b # type: ignore
         if operator == "less than":
-            return a < b
-        return a <= b
+            return a < b # type: ignore
+        return a <= b # type: ignore
 
     if operator == "contains":
         return wanted_cmp in cell_cmp

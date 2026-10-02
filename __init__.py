@@ -81,9 +81,10 @@ from .utilities.nova_memory_probe import (
 from .nova_player.node import NovaPlayerNode
 from .madow.node import MadowInputs
 from .madow.unpack import MadowUnpack
+from .utilities.nova_theme_studio import NovaThemeStudio
 from .authoring.nova_batch_audio_load import NovaBatchLoadAudio
-from .authoring.nova_console import NovaConsole
-from .authoring.nova_load_audio import NovaLoadAudio
+from .utilities.nova_console import NovaConsole
+from .nova_load_audio import NovaLoadAudio
 from .authoring.nova_sqlite_reader import NovaSQLiteReader
 from .authoring.nova_tag_reader import NovaTagReader
 from .authoring.nova_tag_writer import NovaTagWriter
@@ -164,6 +165,7 @@ NODE_CLASS_MAPPINGS = {
     "NovaPlayerNode": NovaPlayerNode,
     "MadowInputs": MadowInputs,
     "MadowUnpack": MadowUnpack,
+    "NovaThemeStudio": NovaThemeStudio,
     "NovaBatchLoadAudio": NovaBatchLoadAudio,
     "NovaConsole": NovaConsole,
     "NovaLoadAudio": NovaLoadAudio,
@@ -197,6 +199,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NovaPlayerNode": 'Nova Player 🔊',
     "MadowInputs": 'Madow Inputs 🎚️',
     "MadowUnpack": 'Madow Unpack ⚪',
+    "NovaThemeStudio": "Nova Theme Studio 🎨",
     "NovaBatchLoadAudio": 'Nova Batch Load Audio 🎼',
     "NovaConsole": 'Nova Console 🖥️',
     "NovaLoadAudio": 'Nova Load Audio 🔄',

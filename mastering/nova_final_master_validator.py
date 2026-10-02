@@ -7,14 +7,17 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
-
 import torch
 import folder_paths
 
-try:
-    from ..nova_categories import ANALYSIS
-except ImportError:  # imported as a module rather than as part of the pack
-    from nova_categories import ANALYSIS
+import sys
+from pathlib import Path
+
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_categories import ANALYSIS
 
 try:
     from . import nova_master_archive_index as archive_index

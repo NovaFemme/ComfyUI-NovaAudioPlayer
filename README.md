@@ -102,7 +102,7 @@ the rest are being filled in.
 
 | Node | What it does |
 |---|---|
-| **Nova Player 🔊** | The player: twelve live visualisers, a whole-file measurement panel, a theme system, and a `panel_info` output for logging every take. |
+| **Nova Player 🔊** | The player: thirteen live visualisers, a whole-file measurement panel, a theme system, and a `panel_info` output for logging every take. |
 | **Nova Track Inspector 🔬** | Analyses the whole track over time and tells you where to listen, against a baseline. |
 | **Nova Final Master Validator** | Answers one question: did the file you saved still reproduce the master you approved? |
 
@@ -181,7 +181,7 @@ ACE-Step install; this pack installs and downloads nothing at runtime.
 
 Drop **Nova Player 🔊** into a workflow and connect any `AUDIO` output.
 
-### Twelve views, one button
+### Thirteen views, one button
 
 Cycle them with the pill in the transport row. Every view is a separate module
 and every one is themeable.
@@ -200,6 +200,7 @@ and every one is themeable.
 | **FFT Analyzer** | High-resolution spectrum with peak hold | ![](docs/images/nodes/NovaPlayerNode-fft.png) |
 | **RTA Analyzer** | 1/3-octave real-time analyser | ![](docs/images/nodes/NovaPlayerNode-rta.png) |
 | **APG Meter** | Artifact metrics for tuning generation settings | ![](docs/images/nodes/NovaPlayerNode-apg.png) |
+| **Halo** | Decorative burst ring with drifting bubbles — display only, not a measurement | ![](docs/images/nodes/NovaPlayerNode-halo.png) |
 
 ### Loudness, measured properly
 
@@ -300,6 +301,36 @@ what you have.
 **Text size** and **bar relief** sliders live with the theme controls. Both are
 display preferences rather than theme content, so switching theme does not
 change them.
+
+### Sequences: record a show, then sit back
+
+Some views are made to be watched rather than read. **Halo** is the first. These
+views have a **Sequences** section in the drawer that works like recording a
+macro:
+
+1. Click **● Record new…** and type a name, for example *Spinning Fury Master*.
+2. Click **Start**, then play with the settings: speeds, tilt, colours, whatever
+   you like. The pauses between changes are recorded too. The recording clock
+   **follows the song**, so if you need to think, pause the music: time spent
+   paused isn't recorded, and you won't come back to long dead gaps.
+3. Click **■ Stop & save**. The sequence is saved under the name you chose and
+   appears in the list.
+
+Pick one from the list and click **▶ Play**. It plays once, a number of times,
+or in a loop, with the same timing you used while the music plays. Your own
+settings are never touched: when the sequence stops, the view is exactly as you
+left it. Changing any setting yourself during playback hands control back to you.
+
+The files live in **`ComfyUI/user/nova_player/sequences/<view>/`**, one plain
+JSON file per sequence and one folder per view. Back the folder up, share
+sequences, or drop other people's into it. The list re-reads the folder every
+time you choose the view. A file made for a different view or an older version
+still plays: any setting it names that this view does not have, or whose value
+is the wrong type or out of range, is skipped, and the rest plays through to the
+end. **🗑** deletes a sequence after an "Are you sure?".
+
+Measurement views deliberately do not have this: a meter whose settings change
+by themselves is a meter you cannot trust.
 
 ---
 

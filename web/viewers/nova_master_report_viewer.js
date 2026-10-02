@@ -1,5 +1,5 @@
 // Nova Master Report Viewer v0.2.4 - Nova Report Viewer interaction standard
-import { app } from "../../scripts/app.js";
+import { app } from "/scripts/app.js";
 
 const EXT_NAME = "NovaAudio.MasterReportViewer";
 

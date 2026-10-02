@@ -23,7 +23,6 @@ WHAT THIS NODE DOES NOT DO — and both are deliberate:
 """
 
 import os
-
 from .comfy_types import BUNDLE_SCHEMA_VER, BUNDLE_TYPE, kind_for
 from .context import build_json
 from .naming import build_file_path
@@ -32,10 +31,14 @@ from .params import (ARG, DEFAULTS, KEYS, KIND, NON_AUDIO_KEYS, PARAMS,
 from . import presets as preset_store
 from .validate import RULESET_VER, validate
 
-try:
-    from ..nova_categories import GENERATION
-except ImportError:  # imported as a module rather than as part of the pack
-    from nova_categories import GENERATION
+import sys
+from pathlib import Path
+
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_categories import GENERATION
 
 PACK_VERSION = "0.1.0"
 

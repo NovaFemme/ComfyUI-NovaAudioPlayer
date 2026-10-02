@@ -19,6 +19,7 @@ behind individual decisions see [the design notes](design/).
 - [Whole-file measurement](#whole-file-measurement)
   - [Two RMS conventions](#two-rms-conventions)
   - [The panel_info output](#the-panel_info-output)
+- [Recorded sequences](#recorded-sequences)
 - [Where settings are stored](#where-settings-are-stored)
 - [HTTP endpoints](#http-endpoints)
 - [Local development and tests](#local-development-and-tests)
@@ -50,12 +51,14 @@ web/
     audio-engine.js      audio element, Web Audio graph, per-frame signal bag
     gfx.js               drawing primitives + the gfx object renderers receive
     host.js              DOM canvas, RAF loop, pointer input, per-node state
+    sequences.js         recorded sequences: file API, validation, recorder, player
   renderers/
     registry.js          the single list everything else is derived from
     _template.js         copy this to add a view mode (not imported)
     waveform.js  spectrum.js  analyzer.js  spectrogram.js  combined.js
     peak_rms.js  lr_correlation.js  freq_percentages.js  combined_suite.js
-    fft_analyzer.js  rta_analyzer.js  projected_guidance.js
+    fft_analyzer.js  rta_analyzer.js  projected_guidance.js  halo.js
+    _template_decorative.js   copy this for a decorative view (recorded sequences)
   ui/
     chrome.js            transport, meter, scrub, pills, hover glow, hit testing
     bench-panel.js       the whole-file statistics strip
@@ -87,6 +90,12 @@ and settings-panel sections are all derived from it.
 That is the whole procedure. The pill label, its measured width, the cycle
 position, the minimum node size and its own settings-panel section all appear
 with no further edit.
+
+For a **decorative** view (made to be watched, not read), copy
+`_template_decorative.js` instead. It is the same contract plus
+`sequences: true`, which adds [recorded sequences](#recorded-sequences) with no
+code of your own. Read its header before choosing param keys: your `params` are
+the sequence file format.
 
 Any colour role your renderer declares must exist in `defaults.py`, or
 `palette.get()` returns **magenta** and warns — by design, so a missing role is
@@ -162,6 +171,8 @@ export default {
     params: {
         gain: { type: "range", min: 0.5, max: 4, step: 0.1, default: 1, label: "Gain" },
         show: { type: "toggle", default: true, label: "Show labels" },
+        mode: { type: "select", default: "a", label: "Mode",
+                options: [{ value: "a", label: "Option A" }, { value: "b", label: "Option B" }] },
     },
 
     // Every colour you use, by role name. Must exist in defaults.py.
@@ -418,6 +429,73 @@ after it in a log the user has already been writing to.
 
 ---
 
+## Recorded sequences
+
+A standard feature for decorative renderers: the user records themselves
+changing a view's settings and replays it, once, N times or in a loop.
+A renderer opts in with `sequences: true`; `registry.supportsSequences(id)`
+also requires a non-empty `params`. Halo is the first.
+
+| Piece | Where |
+|---|---|
+| File API, validation, `SequenceRecorder`, `SequencePlayer` | `web/core/sequences.js` |
+| One recorder and one player per node; playback layer | `host.js` (`seq*` methods, `_seqTick`) |
+| The drawer section | `settings-panel.js` `sequencesSection()` |
+| Storage, safe names, no overwrites | `nova_player/sequences.py` |
+
+**Recording** snapshots the renderer's settings at Start, then logs every
+`setParam` for that renderer with the wait since the previous change. Changes
+to the same key within `MERGE_MS` (30 ms) merge, so a slider drag replays
+smoothly without logging every pixel. A recording stops itself at 20 000
+steps, and switching view mid-recording saves what was recorded.
+
+**The clock follows the song.** Recording and playback both use
+`host._seqNow()`, a clock that advances only while the song is playing, or
+always when no song is loaded and the idle demo runs. Time spent with the music
+paused is therefore not recorded as a wait: a user can pause, think, change a
+setting and resume, and changes made while paused land on the same instant.
+Same-key changes then merge, keeping only where the setting ended up. A playing
+sequence pauses with the music and stays in step with it.
+
+**Playback** is a temporary layer: `paramsFor(id)` merges the player's params
+over the node's own, and nothing is written to `state.overrides`. After each
+change the renderer's `resize()` is called so it can drop setting-dependent
+caches. A stalled tab catches up by walking the missed steps. When playback ends or is stopped, the node is as it was. A
+manual `setParam` on that renderer during playback stops it, handing control
+back to the user.
+
+**Validation happens at play time**, per setting, against the renderer's
+schema (`checkSetting`): unknown key, wrong type (`toggle` wants a boolean,
+`select` a string among its options or `aliases`, `range` a finite number) or
+outside `min..max` means that one setting is skipped. A skipped step still
+takes its time, so the rest stays in sync. The drawer reports how many
+settings were ignored.
+
+**Files** live in `<ComfyUI>/user/nova_player/sequences/<renderer>/<name>.json`
+(falling back to `output`, then the package; `NOVA_SEQUENCES_DIR` overrides).
+The `user` folder is used because a reinstall replaces the package directory.
+Version 1:
+
+```json
+{ "format": "nova-player-sequence", "version": 1, "renderer": "halo",
+  "name": "Spinning Fury", "created": "…",
+  "start": { "tilt": 0, "spin": 0.04 },
+  "steps": [ { "wait_ms": 1200, "key": "tilt", "value": 35 } ],
+  "end_ms": 3000 }
+```
+
+Names are cleaned to letters, digits, space and `- _ . ( ) ' & ,`. Every path
+is resolved and checked to stay in the folder. A save never overwrites: a clash
+becomes `Name (2)`. Files that are not JSON are listed with an error so they
+can still be deleted.
+
+**Keeping old recordings working** is the renderer author's job and is cheap.
+Keep param keys stable, only widen ranges, and when renaming a `select` option
+list the old value in `aliases` (Halo maps `circle → spin` and
+`sideways → rotate` that way).
+
+---
+
 ## Where settings are stored
 
 **On disk** (`config/`), shared by every node:
@@ -458,6 +536,10 @@ All under `/nova_player/`.
 | POST | `/config/renderer/{id}` | persist one renderer's params |
 | POST | `/config/reload` | re-read from disk |
 | DELETE | `/config/theme/{name}` | delete a theme |
+| GET | `/sequences/{renderer}` | `{folder, items: [{name, steps, duration_ms, error?}]}` |
+| GET | `/sequences/{renderer}/{name}` | one sequence file |
+| POST | `/sequences/{renderer}` | save `{name, sequence}`; returns the name used |
+| DELETE | `/sequences/{renderer}/{name}` | delete one sequence |
 
 Every filename is basenamed and its realpath verified to stay inside the temp
 directory — the original passed URL input straight to `os.path.join`.
@@ -595,3 +677,14 @@ measured the same as radius 4 — so there is no "turn the glow down" fix, only 
 "stop using shadows on complex paths" one. Two wide translucent strokes of the
 same path give a comparable bloom for a fraction of the cost. Measure with
 `dev/tests/perfprobe.mjs` before and after touching anything in a frame loop.
+
+**Never measure zoom from the element whose size depends on it.** Under
+Nodes 2.0 a stylesheet elsewhere on the page overrode the canvas's inline
+`width: 100%`, so it displayed at its backing-store size. `_zoom()` read the
+canvas's on-screen width, the backing store was sized from `_zoom()`, and the
+loop ran the render scale to its 0.5x or 2.5x clamp: the player drew
+half-size in a corner, or overflowed with the transport cut off, and changed
+as the graph zoomed. Zoom is now the *container's* on-screen width over its
+`offsetWidth`, and the canvas is pinned in pixels with `!important`.
+`dev/tests/vuenodetest.mjs` runs the player in a replica of the Vue node
+layout, with and without such a rule.

@@ -722,16 +722,34 @@ app.registerExtension({
 
             summaryEl.textContent = `${sorted.length} node(s) · ${fmtSecs(totalTime)} inside nodes · click a row for detail`;
 
-            let h = `<table style="width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums;">
-                <thead><tr style="color:var(--nfp-ink3); font-size:calc(var(--nfp-size) - 2px); letter-spacing:.6px;">
+            // TABLE-LAYOUT: FIXED, and the widths below are the whole reason.
+            //
+            // With the browser's default `auto` layout every column is measured
+            // from its content on every render, and this table re-renders on
+            // every poll. A node name a few characters longer, a figure going
+            // from "5 ms" to "1.23 s", the running marker appearing — any of
+            // them re-measured the whole table and the NODE column visibly grew
+            // and shrank several times a second while a graph ran.
+            //
+            // Fixed layout reads the widths once from the first row: the
+            // measured columns get a size that fits their widest realistic
+            // value, NODE takes whatever is left, and content can no longer
+            // move anything. Long names ellipsis instead, which they already
+            // did. The body scrolls horizontally if the node is made narrower
+            // than the fixed columns need.
+            let h = `<table style="width:100%; border-collapse:collapse; table-layout:fixed;
+                            font-variant-numeric:tabular-nums;">
+                <thead><tr style="color:var(--nfp-ink3); font-size:calc(var(--nfp-size) - 2px); letter-spacing:.6px;
+                            white-space:nowrap;">
                     <th style="text-align:left; padding:0 6px 4px 4px;">NODE</th>
-                    <th style="text-align:right; padding:0 6px 4px;">CALLS</th>
-                    <th style="text-align:right; padding:0 6px 4px;">TOTAL</th>
-                    <th style="text-align:right; padding:0 6px 4px;">AVG</th>
-                    <th style="text-align:right; padding:0 6px 4px; color:${SERIES.cpu};">CPU</th>
-                    <th style="text-align:right; padding:0 6px 4px; color:${SERIES.ram};">PEAK RAM</th>
-                    <th style="text-align:right; padding:0 6px 4px; color:${SERIES.ram};">Δ RAM</th>
-                    <th style="text-align:right; padding:0 4px 4px;" title="Bytes read + written">I/O</th>
+                    <th style="text-align:right; padding:0 6px 4px; width:48px;">CALLS</th>
+                    <th style="text-align:right; padding:0 6px 4px; width:66px;">TOTAL</th>
+                    <th style="text-align:right; padding:0 6px 4px; width:62px;">AVG</th>
+                    <th style="text-align:right; padding:0 6px 4px; width:46px; color:${SERIES.cpu};">CPU</th>
+                    <th style="text-align:right; padding:0 6px 4px; width:76px; overflow:hidden;
+                               text-overflow:ellipsis; color:${SERIES.ram};">PEAK RAM</th>
+                    <th style="text-align:right; padding:0 6px 4px; width:72px; color:${SERIES.ram};">Δ RAM</th>
+                    <th style="text-align:right; padding:0 4px 4px; width:66px;" title="Bytes read + written">I/O</th>
                 </tr></thead><tbody>`;
 
             for (const r of sorted) {
@@ -740,9 +758,14 @@ app.registerExtension({
                 const live = meta?.current === r.id;
                 const delta = r.rss_delta || 0;
                 h += `<tr data-id="${esc(r.id)}" class="nfp-row" style="cursor:pointer; border-top:1px solid var(--nfp-grid);">
-                    <td style="padding:4px 6px 4px 4px; max-width:210px;">
+                    <td style="padding:4px 6px 4px 4px; overflow:hidden;">
                         <div style="display:flex; align-items:center; gap:5px; min-width:0;">
-                            ${live ? `<span style="color:var(--nfp-accent);">●</span>` : ""}
+                            <!-- ALWAYS PRESENT, sometimes invisible. Adding and
+                                 removing the running marker shifted the name
+                                 sideways every time the executing node changed;
+                                 hiding it instead keeps its box. -->
+                            <span style="flex:0 0 auto; color:var(--nfp-accent);
+                                  visibility:${live ? "visible" : "hidden"};">●</span>
                             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${esc(nodeLabel(r.id))} — ${esc(nodeType(r.id))}">${esc(nodeLabel(r.id))}</span>
                         </div>
                         <div style="height:3px; margin-top:3px; background:var(--nfp-grid); border-radius:2px; overflow:hidden;">

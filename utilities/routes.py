@@ -26,7 +26,7 @@ request cannot read outside profiles/namepath/.
 
 import logging
 
-from . import nova_profile_store as profiles
+from .. import nova_profile_store as profiles
 
 logger = logging.getLogger("NovaAudioPlayer")
 

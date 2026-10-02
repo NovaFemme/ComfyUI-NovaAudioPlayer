@@ -152,6 +152,18 @@ DEFAULT_COLOR_CONFIG = {
                 "bench.value":           "#dfe4f5",
                 "bench.warn":            "#ff8a5c",
 
+                # -- halo (decorative burst ring) ------------------------
+                "halo.bg":               "#05030dff",
+                "halo.core":             "#fff4d8",
+                "halo.spike.low":        "#7a1496",   # quiet spikes
+                "halo.spike.mid":        "#e2207c",
+                "halo.spike.high":       "#ffb62a",   # loud spikes
+                "halo.spike.tip":        "#ffe860",   # "Gradient" blends toward this
+                "halo.bubble.a":         "#29c6e0",
+                "halo.bubble.b":         "#3ecf5c",
+                "halo.bubble.c":         "#e0304f",
+                "halo.bubble.d":         "#f5d020",
+
                 # -- control hints ---------------------------------------
                 "tooltip.bg":            "#0b0d18f5",
                 "tooltip.border":        "#ffffff26",
@@ -172,6 +184,7 @@ DEFAULT_COLOR_CONFIG = {
                 "mode.fft_analyzer":     "#0f5f6f",
                 "mode.rta_analyzer":     "#5a2d6f",
                 "mode.projected_guidance": "#1f4f7f",
+                "mode.halo":             "#8a1f5f",
 
                 # -- settings panel (HTML, styled from these tokens) -----
                 "panel.bg":              "#12101acc",
@@ -223,6 +236,12 @@ DEFAULT_COLOR_CONFIG = {
                 "mode.analyzer":         "#1f4f7a",
                 "mode.spectrogram":      "#2b3f7a",
                 "mode.combined":         "#155e63",
+                "halo.bg":               "#01060cff",
+                "halo.core":             "#e0f6ff",
+                "halo.spike.low":        "#1560b0",
+                "halo.spike.mid":        "#1fa6d6",
+                "halo.spike.high":       "#22d3a7",
+                "halo.spike.tip":        "#c8fff0",
                 "panel.accent":          "#38bdf8",
             },
             "ramps": {

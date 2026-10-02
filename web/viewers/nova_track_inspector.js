@@ -1,4 +1,4 @@
-import { app } from "../../scripts/app.js";
+import { app } from "/scripts/app.js";
 
 const EXT = "NovaAudio.TrackInspectorReportViewer";
 (function css(){const id="nova-track-inspector-css";if(document.getElementById(id))return;const l=document.createElement("link");l.id=id;l.rel="stylesheet";l.href=new URL("./nova_track_inspector.css",import.meta.url).href;document.head.appendChild(l)})();

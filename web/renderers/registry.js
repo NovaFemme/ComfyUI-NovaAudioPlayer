@@ -31,6 +31,7 @@ import combined_suite from "./combined_suite.js";
 import fft_analyzer from "./fft_analyzer.js";
 import rta_analyzer from "./rta_analyzer.js";
 import projected_guidance from "./projected_guidance.js";
+import halo from "./halo.js";
 
 /** Cycle order of the view button. */
 export const RENDERERS = [
@@ -45,7 +46,8 @@ export const RENDERERS = [
     combined_suite,
     fft_analyzer,
     rta_analyzer,
-    projected_guidance
+    projected_guidance,
+    halo
 ];
 
 export const RENDERER_IDS = RENDERERS.map(r => r.id);
@@ -99,6 +101,17 @@ export function measurePillWidth(ctx, id) {
 export function needsOf(id) {
     const r = getRenderer(id);
     return r.needs || { freq: true, time: true, peaks: true };
+}
+
+/**
+ * Does this renderer offer recorded sequences (core/sequences.js)?
+ * Decorative renderers opt in with `sequences: true` in their module — see
+ * _template_decorative.js. Measurement views never should: a meter whose
+ * settings change by themselves is a meter you cannot read.
+ */
+export function supportsSequences(id) {
+    const r = BY_ID.get(id);
+    return !!(r && r.sequences === true && r.params && Object.keys(r.params).length);
 }
 
 /** Every colour role any renderer declares — used to group the panel. */

@@ -1,8 +1,8 @@
 """
-nova_ace_common.py — shared pieces for the ACE-Step LoRA dataset nodes.
+nova_common.py — shared definistions for the ▶️ Nova Audio nodes.
 
-WHAT THESE NODES DO, AND DELIBERATELY DO NOT DO
------------------------------------------------
+# common ACE-Step definitions
+-----------------------------
 They prepare a dataset. They do not train.
 
 The tensor format ACE-Step's trainer consumes is not documented anywhere
@@ -13,32 +13,30 @@ schema, and the failure mode is silent: training runs, loss falls, the LoRA is
 subtly wrong. Owning the dataset JSON (where Nova has metadata nobody else
 has) and borrowing the tensor writer is the split that stays correct.
 
-THE DATASET JSON, as read by acestep.training_v2.preprocess_discovery
-.load_sample_metadata: either a bare list or {"samples": [...]}, each entry
-keyed by `filename` (basename) or `audio_path`:
-
-    filename, audio_path, caption, lyrics, genre, bpm, keyscale,
-    timesignature, duration, is_instrumental, custom_tag, prompt_override
-
-`custom_tag` is the LoRA trigger word. `prompt_override` ("caption" | "genre" |
-null) picks which text the prompt builder uses per sample.
+# Common custom definitions
+---------------------------
+Two custom link types travel between nodes e.g. Nova
+ SQLite Reader → Nova Tag Writer → Nova Tag Reader → Nova Console:
+  * NOVA_TABLE — a dict with schema "nova.authoring.table" and a list of rows
+    (dicts) from a database table, plus metadata about the table and its source.
+  * NOVA_FILES — a dict with schema "nova.authoring.files" and a list of files
+    (dicts) with path, name, stem, extension, size, modified date, etc.
 """
-
 import ast
 import importlib.util
 import os
 import sys
+from datetime import datetime, timezone
 from typing import Any, Dict, List
+from pathlib import Path
 
-try:
-    from ..nova_categories import TRAINING
-except ImportError:  # direct execution / test harness
-    from nova_categories import TRAINING
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-TRAINING_CATEGORY = TRAINING
-ACE_VERSION = "1.0.0"
+# Clean absolute imports
+from nova_categories import TRAINING
 
-DATASET_TYPE = "NOVA_ACE_DATASET"
+# region Ace Common Definitions
 
 # variant -> checkpoint subdirectory, mirroring _VARIANT_DIR in
 # acestep/training_v2/model_loader.py. Duplicated rather than imported so the
@@ -67,7 +65,7 @@ SAMPLE_DEFAULTS = {
 }
 
 INSTRUMENTAL = "[Instrumental]"
-
+DATASET_TYPE = "NOVA_ACE_DATASET"
 
 def check_checkpoint_tree(checkpoint_dir: str, variant: str) -> List[str]:
     """Return a list of what is missing from an ACE-Step checkpoint directory.
@@ -277,3 +275,145 @@ def normalise_sample(entry: Dict[str, Any]) -> Dict[str, Any]:
     out = dict(SAMPLE_DEFAULTS)
     out.update({k: v for k, v in entry.items() if v is not None or k == "prompt_override"})
     return out
+
+# endregion
+
+
+# region Common types mapped to custom types.
+TABLE_TYPE = "NOVA_TABLE"
+FILES_TYPE = "NOVA_FILES"
+
+class AnyType(str):
+    """A slot type that ComfyUI's validator accepts from any link.
+
+    ComfyUI compares slot types with `!=`; a str subclass that always reports
+    "equal" therefore matches every producer. This is the long-standing
+    community idiom for a wildcard input.
+    """
+
+    def __ne__(self, other) -> bool:  # noqa: D105
+        return False
+
+    def __eq__(self, other) -> bool:  # noqa: D105
+        return True
+
+    def __hash__(self):  # noqa: D105
+        return hash(str(self))
+
+
+ANY_TYPE = AnyType("*")
+
+
+# ---------------------------------------------------------------------------
+# Payload builders
+# ---------------------------------------------------------------------------
+
+def make_table(
+    database_path: str,
+    table: str,
+    columns: List[str],
+    rows: List[Dict[str, Any]],
+    sql: str = "",
+    where: str = "",
+    source: str = "sqlite",
+) -> Dict[str, Any]:
+    return {
+        "schema": "nova.authoring.table",
+        "schema_version": 1,
+        "source": source,
+        "database_path": str(database_path),
+        "table": str(table),
+        "columns": list(columns),
+        "rows": list(rows),
+        "record_count": len(rows),
+        "column_count": len(columns),
+        "sql": str(sql),
+        "where": str(where),
+    }
+
+
+def empty_table(database_path: str = "", table: str = "", note: str = "") -> Dict[str, Any]:
+    payload = make_table(database_path, table, [], [])
+    payload["note"] = note
+    return payload
+
+
+def describe_file(path: str, extra: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    name = os.path.basename(path)
+    stem, ext = os.path.splitext(name)
+    entry: Dict[str, Any] = {
+        "path": os.path.abspath(path),
+        "name": name,
+        "stem": stem,
+        "extension": ext[1:].lower(),
+    }
+    try:
+        stat = os.stat(path)
+        entry["size_bytes"] = int(stat.st_size)
+        entry["modified_utc"] = (
+            datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
+    except OSError:
+        entry["size_bytes"] = 0
+        entry["modified_utc"] = ""
+    if extra:
+        entry.update(extra)
+    return entry
+
+
+def make_files(root: str, files: List[Dict[str, Any]], decoded: bool = False) -> Dict[str, Any]:
+    return {
+        "schema": "nova.authoring.files",
+        "schema_version": 1,
+        "root": str(root),
+        "count": len(files),
+        "decoded": bool(decoded),
+        "files": list(files),
+    }
+
+
+def file_paths(payload: Any) -> List[str]:
+    """Accept a NOVA_FILES payload, a bare list, or a single path string."""
+    if payload is None:
+        return []
+    if isinstance(payload, str):
+        return [payload] if payload.strip() else []
+    if isinstance(payload, dict):
+        entries = payload.get("files") or []
+        return [str(e.get("path")) for e in entries if isinstance(e, dict) and e.get("path")]
+    if isinstance(payload, (list, tuple)):
+        out: List[str] = []
+        for item in payload:
+            if isinstance(item, str):
+                out.append(item)
+            elif isinstance(item, dict) and item.get("path"):
+                out.append(str(item["path"]))
+        return out
+    return []
+
+
+# ---------------------------------------------------------------------------
+# Console text
+# ---------------------------------------------------------------------------
+
+def banner(title: str, width: int = 72) -> str:
+    title = f" {title} "
+    pad = max(0, width - len(title))
+    left = pad // 2
+    return "=" * left + title + "=" * (pad - left)
+
+
+def render_value(value: Any, limit: int = 0) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple)):
+        text = ", ".join(render_value(v) for v in value)
+    else:
+        text = str(value)
+    text = text.replace("\r\n", "\n")
+    if limit and len(text) > limit:
+        text = text[:limit] + f"… <+{len(text) - limit} chars>"
+    return text
+# endregion

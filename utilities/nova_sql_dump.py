@@ -40,6 +40,15 @@ import re
 from aiohttp import web
 from server import PromptServer
 
+import sys
+from pathlib import Path
+
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_categories import UTILITY_IO
+
 # OPTIONAL, AND IT HAS TO BE.
 #
 # __init__.py imports this module to register the node, so a hard `import
@@ -51,12 +60,6 @@ try:
     import pymysql
 except ImportError:                                     # pragma: no cover
     pymysql = None
-
-try:
-    from ..nova_categories import UTILITY_IO
-except ImportError:  # direct execution / test harness
-    from nova_categories import UTILITY_IO
-
 
 # --- The whole connection, fixed. Nothing here comes from a node or a request. --
 DB_HOST = "127.0.0.1"

@@ -403,7 +403,16 @@ export default {
         const headH = 13 * S;
         const rowH = Math.max(11 * S, Math.min(20 * S,
             (rect.h - pad * 2 - 34 * S - headH) / METRICS.length));
-        const panelW = Math.min(rect.w - pad * 2, 366 * S);
+        // THE PANEL FILLS THE VISUALISATION IT SITS ON.
+        //
+        // This used to be `Math.min(rect.w - pad * 2, 366 * S)`, a hard cap:
+        // past a node about 390 px wide the panel simply stopped growing.
+        // Measured on a 955 px node it held 443 px — 366 times the 1.21 text
+        // scale — and left 53% of the width as empty backdrop, which is what
+        // "it does not fill" was describing. `textScale` is a user setting
+        // rather than anything derived from the node or the zoom, so the cap
+        // never moved: the bigger the node, the smaller the panel looked.
+        const panelW = rect.w - pad * 2;
 
         // Coverage and the hint are needed to SIZE the panel, so they are
         // resolved before it is drawn rather than inside the paint pass.

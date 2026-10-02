@@ -1,16 +1,20 @@
 import json
 from typing import Any, Dict
 
-try:
-    from ..nova_categories import REPORT
-except ImportError:  # direct execution / test harness
-    from nova_categories import REPORT
+import sys
+from pathlib import Path
+
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_categories import REPORT
 
 
 class NovaMasterReportViewer:
     CATEGORY = REPORT
     FUNCTION = "render"
-    RETURN_TYPES = ("STRING",)
+    RETURN_TYPES = ("NOVA_REPORT",)
     RETURN_NAMES = ("report_json",)
     OUTPUT_NODE = True
     DESCRIPTION = "Nova Master Report Viewer v0.2.3 — rich visual dashboard for Nova Audio Master report_json."
@@ -19,7 +23,7 @@ class NovaMasterReportViewer:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "report_json": ("STRING", {
+                "report_json": ("NOVA_REPORT", {
                     "forceInput": True,
                     "tooltip": "Connect Nova Audio Master report_json here."
                 }),

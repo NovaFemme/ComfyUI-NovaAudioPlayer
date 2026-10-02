@@ -5,10 +5,14 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-try:
-    from ..nova_categories import MASTERING
-except ImportError:  # imported as a module rather than as part of the pack
-    from nova_categories import MASTERING
+import sys
+from pathlib import Path
+
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_categories import MASTERING
 
 VERSION = "0.2.6"
 

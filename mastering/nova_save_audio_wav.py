@@ -51,10 +51,14 @@ import torch
 
 import folder_paths
 
-try:
-    from ..nova_categories import DELIVERY
-except ImportError:  # imported as a module rather than as part of the pack
-    from nova_categories import DELIVERY
+import sys
+from pathlib import Path
+
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_categories import DELIVERY
 
 VERSION = "1.0.0"
 

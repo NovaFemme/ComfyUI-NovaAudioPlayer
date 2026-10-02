@@ -41,6 +41,7 @@ bit_depth    INT      bits per sample (0 when lossy or undeterminable)
 """
 
 
+import sys
 import json
 import math
 import os
@@ -48,16 +49,16 @@ import struct
 import hashlib
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
+import torch  # type: ignore
+from pathlib import Path
 
-import torch
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_categories import UTILITY_IO
 
 VERSION = "1.0.0"
-
-try:
-    from ..nova_categories import UTILITY_IO
-except ImportError:  # direct execution / test harness
-    from nova_categories import UTILITY_IO
-
 CATEGORY = UTILITY_IO
 
 # ---------------------------------------------------------------------------
@@ -315,7 +316,7 @@ def _decode_torchaudio(path: str) -> Tuple[torch.Tensor, int, Dict[str, Any]]:
 
 def _decode_pyav(path: str) -> Tuple[torch.Tensor, int, Dict[str, Any]]:
     import av  # type: ignore
-    import numpy as np
+    import numpy as np # type: ignore
 
     chunks: List["np.ndarray"] = []
     info: Dict[str, Any] = {"backend": "pyav"}

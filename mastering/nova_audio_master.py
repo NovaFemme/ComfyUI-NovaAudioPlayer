@@ -5,11 +5,15 @@ import hashlib
 from datetime import datetime, timezone
 from typing import Dict, Any, Tuple, List
 import torch
+import sys
+from pathlib import Path
 
-try:
-    from ..nova_categories import MASTERING
-except ImportError:  # imported as a module rather than as part of the pack
-    from nova_categories import MASTERING
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_categories import MASTERING
+
 
 try:
     from ..analysis import (
@@ -1007,14 +1011,17 @@ def _stereo_class(c,profile):
 class NovaAudioMaster:
     CATEGORY = MASTERING
     FUNCTION = "master"
-    RETURN_TYPES = ("AUDIO", "AUDIO", "STRING", "STRING")
+    RETURN_TYPES = ("AUDIO", "AUDIO", "STRING", "NOVA_REPORT")
     RETURN_NAMES = ("mastered_audio", "original_audio", "report", "report_json")
     DESCRIPTION = "Nova Audio Master v0.2.7.7-fix4: frozen mastering DSP, run control, profile defaults, and true Off pass-through mode."
 
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {
-            "audio": ("AUDIO",),
+            "audio": ("AUDIO",{
+                "forceInput": True,
+                "tooltip": "Connect Nova Audio Loader."
+            }),
             "run_count": ("INT", {
                 "default": 1,
                 "min": 0,

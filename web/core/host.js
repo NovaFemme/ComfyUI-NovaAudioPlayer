@@ -31,13 +31,22 @@ import {
 } from "./gfx.js";
 import { normalise, prune, DEFAULT_STATE } from "./state.js";
 import {
-    getRenderer, nextRendererId, RENDERER_IDS, defaultParams,
+    getRenderer, nextRendererId, RENDERER_IDS, defaultParams, paramSchema, supportsSequences,
 } from "../renderers/registry.js";
+import {
+    SequencePlayer, SequenceRecorder, cleanName, deleteSequence, listSequences,
+    loadSequence, saveSequence,
+} from "./sequences.js";
 import * as chrome from "../ui/chrome.js";
 import { drawBenchButton, drawBenchPanel } from "../ui/bench-panel.js";
 import { createSettingsPanel } from "../ui/settings-panel.js";
 import { showDownloadMenu, closeDownloadMenu, isDownloadMenuOpen } from "../ui/download-menu.js";
 import { drawTooltip, tipFor, TOOLTIP_DELAY_MS } from "../ui/tooltips.js";
+
+/** Set inline styles with !important, so a page-wide rule cannot override them. */
+function pinStyle(el, props) {
+    for (const [k, v] of Object.entries(props)) el.style.setProperty(k, v, "important");
+}
 
 export class PlayerHost {
     constructor(node, data) {
@@ -88,10 +97,12 @@ export class PlayerHost {
                 }
             }
 
+            this._syncMinHeight();
             this.panel.refresh();
             this.markDirty();
         });
 
+        this._syncMinHeight();
         this._bindEvents();
         this._startLoop();
     }
@@ -101,24 +112,41 @@ export class PlayerHost {
     _buildDom() {
         this.element = document.createElement("div");
         this.element.className = "nova-player";
-        Object.assign(this.element.style, {
+        // !important, like the canvas below. Under Nodes 2.0 a node's height
+        // is MEASURED from its content, so a fresh node is exactly as tall as
+        // this element says. A page-wide rule elsewhere that overrides our
+        // min-height or height (plain inline styles lose to a stylesheet's
+        // !important) squeezed the player row to zero: the node came out
+        // 156 px tall with no player in it, and stayed that way.
+        pinStyle(this.element, {
             position: "relative",
+            display: "block",
             width: "100%",
             height: "100%",
-            minHeight: "160px",
+            "min-height": "160px",     // replaced by _syncMinHeight() below
+            "max-height": "none",
             overflow: "hidden",
-            borderRadius: "10px",
+            "border-radius": "10px",
             contain: "strict",
         });
 
         this.canvas = document.createElement("canvas");
-        Object.assign(this.canvas.style, {
+        // Sized with !important and, from the first resize on, in explicit
+        // pixels. A stylesheet elsewhere on the page that sets
+        // `canvas { width: auto }` (seen under Nodes 2.0) otherwise wins over
+        // plain inline percentages, the canvas falls back to its backing-store
+        // size, and — because the zoom measurement used to read the canvas —
+        // a feedback loop drives the render scale to a clamp. See _zoom().
+        pinStyle(this.canvas, {
             position: "absolute",
-            inset: "0",
+            left: "0",
+            top: "0",
             width: "100%",
             height: "100%",
+            "max-width": "none",
+            "max-height": "none",
             display: "block",
-            touchAction: "none",     // we handle drags ourselves
+            "touch-action": "none",  // we handle drags ourselves
         });
         this.ctx = this.canvas.getContext("2d");
         // Every `ctx.font = "9px ..."` in the codebase — and in any renderer
@@ -155,9 +183,17 @@ export class PlayerHost {
      * what has to be divided out of every incoming coordinate.
      */
     _zoom() {
-        const r = this.canvas.getBoundingClientRect();
-        if (!r.width || !this._cssW) return 1;
-        return r.width / this._cssW;
+        // Measured on the CONTAINER, whose size the frontend owns, against its
+        // own layout width (offsetWidth ignores transforms). Never on the
+        // canvas: the canvas's size depends on the render scale, which
+        // depends on this — measuring it closes a loop that, whenever the
+        // canvas is not pinned to the container, runs the scale to a clamp
+        // (0.5x or 2.5x) and draws the player half-size or overflowing.
+        const el = this.element;
+        const w = el.offsetWidth;
+        if (!w) return 1;
+        const r = el.getBoundingClientRect();
+        return r.width ? r.width / w : 1;
     }
 
     _resize(cssW, cssH) {
@@ -176,6 +212,11 @@ export class PlayerHost {
         if (this.canvas.width !== bw || this.canvas.height !== bh) {
             this.canvas.width = bw;
             this.canvas.height = bh;
+        }
+        // Pin the displayed size to the layout size, in pixels, so it can
+        // never follow the backing store (see _buildDom).
+        if (cssW !== this._cssW || cssH !== this._cssH) {
+            pinStyle(this.canvas, { width: cssW + "px", height: cssH + "px" });
         }
         // Renderers keep working in CSS pixels; the transform does the scaling.
         this.ctx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -235,10 +276,139 @@ export class PlayerHost {
     }
 
     paramsFor(id) {
-        return {
+        const own = {
             ...defaultParams(id),
             ...config.rendererParams(id, this.state.overrides),
         };
+        // A playing sequence is a temporary layer on top, never written to
+        // the node — stopping it leaves the node exactly as it was.
+        const pl = this._player;
+        return pl && pl.id === id ? { ...own, ...pl.params } : own;
+    }
+
+    // -- recorded sequences (decorative renderers) ---------------------------
+    //
+    // See core/sequences.js. One recorder and one player per node; they never
+    // run at the same time, and both stop if the view is switched away.
+
+    /**
+     * The sequences clock, in ms. It FOLLOWS THE SONG: it only advances while
+     * the song is playing (or always, when no song is loaded and the idle demo
+     * runs). So a user can pause the music, think as long as they like, change
+     * a setting and resume — the thinking time is not recorded as a wait —
+     * and a playing sequence pauses with the music and stays in step with it.
+     */
+    _seqNow() { return this._showClock || 0; }
+
+    _advanceShowClock(now) {
+        const last = this._showClockAt;
+        this._showClockAt = now;
+        if (last === undefined) return;
+        if (this._showClockRunning()) this._showClock = (this._showClock || 0) + (now - last);
+    }
+
+    _showClockRunning() {
+        return this.engine.idle || this.engine.playing;
+    }
+
+    /** Start recording the active renderer. The name is chosen first. */
+    seqStartRecording(name) {
+        const id = this.state.viewMode;
+        if (!supportsSequences(id)) return { ok: false, message: "This view has no sequences" };
+        const clean = cleanName(name);
+        if (!clean) return { ok: false, message: "Please give the sequence a name" };
+        this.seqStopPlayback();
+        this._recorder = new SequenceRecorder(id, clean, this.paramsFor(id), this._seqNow());
+        this._syncPanelSoon();
+        return { ok: true, name: clean };
+    }
+
+    /** Stop recording and write the file. */
+    async seqStopRecording() {
+        const rec = this._recorder;
+        if (!rec) return { ok: false, message: "Not recording" };
+        this._recorder = null;
+        const body = rec.finish(this._seqNow());
+        const res = await saveSequence(rec.id, rec.name, body);
+        this._syncPanelSoon();
+        if (!res.ok) return { ok: false, message: `Not saved: ${res.message}` };
+        return { ok: true, name: res.name, id: rec.id,
+                 message: res.name === rec.name ? `Saved "${res.name}"`
+                                                : `Saved as "${res.name}" (name was taken)` };
+    }
+
+    seqCancelRecording() {
+        this._recorder = null;
+        this._syncPanelSoon();
+    }
+
+    /** Load a sequence file and play it on the active renderer. */
+    async seqPlay(name, opts) {
+        const id = this.state.viewMode;
+        if (!supportsSequences(id)) return { ok: false, message: "This view has no sequences" };
+        if (this._recorder) return { ok: false, message: "Stop recording first" };
+        const res = await loadSequence(id, name);
+        if (!res.ok) return { ok: false, message: `Cannot play: ${res.message}` };
+        if (this.state.viewMode !== id) return { ok: false, message: "View changed" };
+        this._player = new SequencePlayer(id, name, res.sequence, paramSchema(id), opts);
+        this.markDirty();
+        this._syncPanelSoon();
+        const skipped = this._player.skippedKeys;
+        return { ok: true, message: skipped.length
+            ? `Playing — ignoring ${skipped.length} unusable setting${skipped.length === 1 ? "" : "s"} (${skipped.slice(0, 3).join(", ")}${skipped.length > 3 ? "…" : ""})`
+            : `Playing "${name}"` };
+    }
+
+    seqStopPlayback() {
+        if (!this._player) return;
+        const id = this._player.id;
+        this._player = null;
+        this._paramsChanged(id);
+        this._syncPanelSoon();
+    }
+
+    seqState() {
+        const r = this._recorder, p = this._player;
+        const paused = !this._showClockRunning();
+        return {
+            recording: r ? { name: r.name, steps: r.steps.length, elapsedMs: this._seqNow() - r.t0, paused } : null,
+            playing: p ? { name: p.name, progress: p.progress, pass: p.pass + 1,
+                           loop: p.loop, times: p.times, paused } : null,
+        };
+    }
+
+    /** Settings changed from outside the drawer (playback): let buffers catch up. */
+    _paramsChanged(id) {
+        const r = getRenderer(id);
+        if (r.resize) { try { r.resize(this._gfxFor(id)); } catch {} }
+        this.markDirty();
+    }
+
+    /** Called every animation frame. */
+    _seqTick(now) {
+        this._advanceShowClock(now);
+        const p = this._player;
+        if (p) {
+            if (p.id !== this.state.viewMode) { this.seqStopPlayback(); return; }
+            if (p.tick(this._seqNow())) this._paramsChanged(p.id);
+            if (p.done) {
+                this._player = null;
+                this._paramsChanged(p.id);
+                this.panel.notify?.(`Finished "${p.name}"`, "ok");
+                // The drawer's Play/Stop button and status must follow.
+                this._syncPanelSoon();
+            }
+        }
+        if (this._recorder && this._recorder.id !== this.state.viewMode) {
+            // Switched away mid-recording: keep what was recorded.
+            this.seqStopRecording().then(res => this.panel.notify?.(res.message, res.ok ? "ok" : "error"));
+        }
+        // The drawer's sequence status (timer, progress) ticks a few times a
+        // second while something is running, not every frame.
+        if ((p || this._recorder) && this.state.panelOpen && now - (this._seqUiAt || 0) > 250) {
+            this._seqUiAt = now;
+            this._syncPanelSoon();
+        }
     }
 
     _storeFor(id) {
@@ -312,6 +482,7 @@ export class PlayerHost {
                 this._lastZoomCheck = now;
                 this._syncRenderScale();
             }
+            this._seqTick(now);
 
             // An idle node animates too, or the demo would be a still frame.
             // `engine.playing` is false there: nothing is playing, and claiming
@@ -430,7 +601,10 @@ export class PlayerHost {
      * click falls through to the visualisation and seeks instead.
      */
     _pointerPos(e) {
-        const r = this.canvas.getBoundingClientRect();
+        // The container, for the same reason as _zoom(): its box is the one
+        // the layout was computed for. The canvas is pinned to it, so the two
+        // agree whenever the page behaves — and this stays right when not.
+        const r = this.element.getBoundingClientRect();
         const sx = r.width ? (this._cssW || r.width) / r.width : 1;
         const sy = r.height ? (this._cssH || r.height) / r.height : 1;
         return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sy };
@@ -549,6 +723,7 @@ export class PlayerHost {
                 // The settings drawer is positioned from wfBottom, which just
                 // moved.
                 this._syncPanelBottom();
+                this._syncMinHeight();
                 this._save();
                 break;
 
@@ -684,6 +859,7 @@ export class PlayerHost {
         if (next === this.state.benchHeight) return;
 
         this.state.benchHeight = next;
+        this._syncMinHeight();
         // The visualisation just changed size under the strip.
         for (const id of RENDERER_IDS) {
             const r = getRenderer(id);
@@ -826,8 +1002,29 @@ export class PlayerHost {
                 self._syncPanelSoon();
             },
 
+            // Recorded sequences — see core/sequences.js.
+            seqSupported: (id) => supportsSequences(id),
+            seqList: (id) => listSequences(id),
+            seqState: () => self.seqState(),
+            seqStartRecording: (name) => self.seqStartRecording(name),
+            seqStopRecording: () => self.seqStopRecording(),
+            seqCancelRecording: () => self.seqCancelRecording(),
+            seqPlay: (name, opts) => self.seqPlay(name, opts),
+            seqStop: () => self.seqStopPlayback(),
+            seqDelete: (id, name) => deleteSequence(id, name),
+
             getParam: (id, key) => self.paramsFor(id)[key],
             setParam: (id, key, value) => {
+                if (self._recorder && self._recorder.id === id) {
+                    if (!self._recorder.record(key, value, self._seqNow())) {
+                        self.seqStopRecording().then(res => self.panel.notify?.(
+                            res.ok ? `Recording is full — ${res.message}` : res.message,
+                            res.ok ? "ok" : "error"));
+                    }
+                }
+                // Touching a setting while a sequence plays hands control back
+                // to you: playback stops and your change takes effect.
+                if (self._player && self._player.id === id) self.seqStopPlayback();
                 const bucket = self.state.overrides.renderers[id] ||
                                (self.state.overrides.renderers[id] = {});
                 bucket[key] = value;
@@ -1035,6 +1232,7 @@ export class PlayerHost {
         this.engine.setMuted(this.state.muted);
         this.engine.setLooping(this.state.looping);
         this.panel.setOpen(this.state.panelOpen);
+        this._syncMinHeight();
         // refresh(), not rebuild(): it rebuilds only when the active renderer
         // has actually changed, and otherwise just writes values into the
         // controls that already exist.
@@ -1058,6 +1256,7 @@ export class PlayerHost {
         this.data = data;
         this.peaks = data.peaks || this.peaks;
         this.stereo = !!(data.stereo && this.peaks.ch1);
+        this._syncMinHeight();
 
         if (!sameFile) {
             // Playback carries across a re-render on purpose: the same take
@@ -1104,6 +1303,22 @@ export class PlayerHost {
         }
     }
 
+    /**
+     * The player box's CSS min-height is its layout's real minimum.
+     *
+     * Under Nodes 2.0 the node is measured from its content, so this IS the
+     * height a freshly created node gets. A fixed 160 px was below what the
+     * layout needs (203 px by default, more with the stats strip open), so a
+     * new node came out cramped. Pinned !important — see _buildDom().
+     */
+    _syncMinHeight() {
+        if (!this.element) return;
+        const h = Math.round(this.minimumSize()[1]);
+        if (h === this._minH) return;
+        this._minH = h;
+        pinStyle(this.element, { "min-height": h + "px" });
+    }
+
     minimumSize() {
         // benchOpen raises the floor: the strip needs its own height on top of
         // a usable visualiser, so opening it grows the node rather than
@@ -1122,6 +1337,9 @@ export class PlayerHost {
     destroy() {
         if (this._destroyed) return;
         this._destroyed = true;
+        this._player = null;
+        // A recording in progress is kept rather than lost with the node.
+        if (this._recorder) { this.seqStopRecording().catch(() => {}); }
 
         if (this._raf) cancelAnimationFrame(this._raf);
         this._clearTooltip();

@@ -24,23 +24,15 @@ import json
 import os
 import sys
 from typing import Any, Dict, List
+from pathlib import Path
 
-try:
-    from .nova_ace_common import (
-        ACE_VERSION, DATASET_TYPE, TRAINING_CATEGORY, VARIANT_DIRS,
-        check_checkpoint_tree, describe_checkpoint_requirement,
-        check_remote_code_imports, describe_remote_code_requirement,
-    )
-    from ..authoring.nova_authoring_common import banner
-    from .nova_ace_audio_shim import apply_decode_shim, TORCHCODEC_FIX
-except ImportError:  # direct execution / test harness
-    from nova_ace_common import (
-        ACE_VERSION, DATASET_TYPE, TRAINING_CATEGORY, VARIANT_DIRS,
-        check_checkpoint_tree, describe_checkpoint_requirement,
-        check_remote_code_imports, describe_remote_code_requirement,
-    )
-    from nova_authoring_common import banner
-    from nova_ace_audio_shim import apply_decode_shim, TORCHCODEC_FIX
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner
+from nova_categories import TRAINING
+from nova_ace_audio_shim import apply_decode_shim, TORCHCODEC_FIX
 
 INSTALL_HINT = (
     "ACE-Step's training code is not importable.\n"
@@ -53,7 +45,7 @@ INSTALL_HINT = (
 
 
 class NovaACEPreprocess:
-    CATEGORY = TRAINING_CATEGORY
+    CATEGORY = TRAINING
     FUNCTION = "preprocess"
     RETURN_TYPES = ("STRING", "INT", "INT", "STRING")
     RETURN_NAMES = ("tensor_dir", "processed", "failed", "console")
@@ -65,7 +57,7 @@ class NovaACEPreprocess:
         "Run log — wire into Nova Console.",
     )
     DESCRIPTION = (
-        f"Nova ACE Preprocess v{ACE_VERSION} — runs ACE-Step's own two-pass tensor "
+        f"Nova ACE Preprocess — runs ACE-Step's own two-pass tensor "
         "generation over a Nova dataset. Prepares training data; does not train."
     )
 
@@ -124,7 +116,7 @@ class NovaACEPreprocess:
 
     def preprocess(self, dataset_json, output_dir, checkpoint_dir, variant,
                    max_duration, device, precision, acestep_repo_path="", **kwargs):
-        log: List[str] = [banner(f"NOVA ACE PREPROCESS v{ACE_VERSION}")]
+        log: List[str] = [banner(f"NOVA ACE PREPROCESS")]
 
         dataset = os.path.abspath(os.path.expanduser((dataset_json or "").strip().strip('"')))
         out = os.path.abspath(os.path.expanduser((output_dir or "").strip().strip('"')))
@@ -154,12 +146,7 @@ class NovaACEPreprocess:
         # GPU. Checking here costs milliseconds.
         absent = check_remote_code_imports(ckpt, variant)
         if absent:
-            raise ImportError(
-                "Nova ACE Preprocess: the "
-                + VARIANT_DIRS.get(variant, variant)
-                + " checkpoint needs " + ", ".join(absent)
-                + ", which is not installed in ComfyUI's Python.\n"
-                + describe_remote_code_requirement(absent)
+            raise ImportError(f"Nova ACE Preprocess: the {VARIANT_DIRS.get(variant, variant)} checkpoint needs", ".join(absent), which is not installed in ComfyUI's Python.\n{describe_remote_code_requirement(absent)}"
             )
 
         repo = (acestep_repo_path or "").strip().strip('"')
@@ -174,7 +161,7 @@ class NovaACEPreprocess:
                 log.append(f"Added to sys.path: {repo}")
 
         try:
-            from acestep.training_v2.preprocess import preprocess_audio_files
+            from acestep.training_v2.preprocess import preprocess_audio_files # type: ignore
         except ImportError as exc:
             raise ImportError(f"Nova ACE Preprocess: {INSTALL_HINT}\n  ({exc})") from exc
 
@@ -201,7 +188,7 @@ class NovaACEPreprocess:
         print("\n".join(log))
 
         try:
-            from comfy.utils import ProgressBar
+            from comfy.utils import ProgressBar # type: ignore
             bar = ProgressBar(max(1, len(samples)))
         except Exception:
             bar = None

@@ -1,15 +1,19 @@
 from __future__ import annotations
 import json
 
-try:
-    from ..nova_categories import REPORT
-except ImportError:  # direct execution / test harness
-    from nova_categories import REPORT
+import sys
+from pathlib import Path
+
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_categories import REPORT
 
 class NovaTrackInspectorReportViewer:
     CATEGORY = REPORT
     FUNCTION = "render"
-    RETURN_TYPES = ("STRING",)
+    RETURN_TYPES = ("NOVA_REPORT",)
     RETURN_NAMES = ("inspection_json",)
     OUTPUT_NODE = True
     DESCRIPTION = "Rich viewer for Nova Track Inspector timeline, markers, subscores and verdict."
@@ -18,7 +22,7 @@ class NovaTrackInspectorReportViewer:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "inspection_json": ("STRING", {"forceInput": True}),
+                "inspection_json": ("NOVA_REPORT", {"forceInput": True}),
                 "view_mode": (["Inspector", "Timeline", "Markers", "Technical"], {"default": "Inspector"}),
                 "theme": (["Nova Dark", "High Contrast", "Studio Slate"], {"default": "Nova Dark"}),
                 "font_scale": ("FLOAT", {"default": 1.0, "min": 0.75, "max": 1.5, "step": 0.05}),

@@ -17,29 +17,22 @@ file are left out of the tensor (they stay in the file list) and the exclusion
 is recorded in `metadata`.
 """
 
+import sys
 import fnmatch
 import json
 import os
 from typing import Any, Dict, List
+import torch # type: ignore
+from pathlib import Path
 
-import torch
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-try:
-    from .nova_authoring_common import (
-        UTILITY_CATEGORY, AUTHORING_VERSION, FILES_TYPE, describe_file, make_files,
-    )
-    from .nova_load_audio import (
-        AUDIO_EXTENSIONS, _channel_layout, _decode, _hms, _probe_header,
-        _read_tags, _resolve_bit_depth,
-    )
-except ImportError:  # standalone / direct execution
-    from nova_authoring_common import (
-        UTILITY_CATEGORY, AUTHORING_VERSION, FILES_TYPE, describe_file, make_files,
-    )
-    from nova_load_audio import (
-        AUDIO_EXTENSIONS, _channel_layout, _decode, _hms, _probe_header,
-        _read_tags, _resolve_bit_depth,
-    )
+# Clean absolute imports
+from nova_definitions import FILES_TYPE, describe_file, make_files
+from nova_categories import UTILITY_IO
+
+from ..nova_load_audio import AUDIO_EXTENSIONS, _channel_layout, _decode, _hms, _probe_header,_read_tags, _resolve_bit_depth
 
 try:
     import folder_paths  # type: ignore
@@ -145,7 +138,7 @@ def _stack(decoded: List[Dict[str, Any]], warnings: List[str]):
 
 
 class NovaBatchLoadAudio:
-    CATEGORY = UTILITY_CATEGORY
+    CATEGORY = UTILITY_IO
     FUNCTION = "load"
     RETURN_TYPES = (FILES_TYPE, "AUDIO", "INT", "STRING", "STRING")
     RETURN_NAMES = ("files", "audio", "file_count", "filenames", "metadata")
@@ -158,7 +151,7 @@ class NovaBatchLoadAudio:
         "JSON: per-file facts, the scan settings, and any warnings.",
     )
     DESCRIPTION = (
-        f"Nova Batch Load Audio v{AUTHORING_VERSION} — lists a folder of audio files "
+        f"Nova Batch Load Audio — lists a folder of audio files "
         "as one batch with per-file metadata. Decoding is off by default; the tag "
         "nodes only need paths."
     )
@@ -259,7 +252,6 @@ class NovaBatchLoadAudio:
         metadata = {
             "schema": "nova.authoring.batch_load",
             "schema_version": 1,
-            "node_version": AUTHORING_VERSION,
             "scan": {
                 "root": root,
                 "file_filter": file_filter,

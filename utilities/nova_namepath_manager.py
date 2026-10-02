@@ -23,12 +23,15 @@ Two things deliberately NOT done here:
 import json
 from typing import Any, Dict, List, Tuple
 
-try:
-    from ..nova_categories import UTILITY_IO
-    from . import nova_profile_store as profiles
-except ImportError:  # direct execution / test harness
-    from nova_categories import UTILITY_IO
-    import nova_profile_store as profiles
+import sys
+from pathlib import Path
+
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_categories import UTILITY_IO
+import nova_profile_store as profiles
 
 VERSION = "1.0.0"
 

@@ -12,6 +12,9 @@
  * minimum size clamp.
  *
  * This file is NOT imported by registry.js — it is a reference, not a mode.
+ *
+ * Building something to look at rather than to measure with? Start from
+ * _template_decorative.js instead: same contract, plus recorded sequences.
  */
 
 import {
@@ -30,6 +33,8 @@ export default {
     // Parameters. This IS the settings-panel schema; there is no second list.
     //   type: "range"  -> min, max, step, default
     //   type: "toggle" -> default
+    //   type: "select" -> options: [{ value, label }], default (a value string),
+    //                     optional aliases: { oldValue: currentValue }
     params: {
         gain: { type: "range", min: 0.2, max: 4, step: 0.05, default: 1, label: "Intensity" },
         showGrid: { type: "toggle", default: true, label: "Grid" },

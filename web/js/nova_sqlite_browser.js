@@ -1027,16 +1027,51 @@ app.registerExtension({
         const NOTICE =
             "ℹ️ Copy your .db / .sqlite / .sqlite3 files into the ComfyUI input/ folder, " +
             "then press R to refresh. They will appear in database_path below.";
+        // How far in from the right edge an output label ends: the slot dot and
+        // its padding, which LiteGraph draws the label to the left of.
+        const SLOT_RESERVE = 34;
+        // Clear air between the notice and the nearest label.
+        const NOTICE_GAP = 14;
+
         const drawNotice = function (ctx) {
             if (this.flags?.collapsed || !ctx) return;
-            const slotH = window.LiteGraph?.NODE_SLOT_HEIGHT ?? 20;
+            const LG = window.LiteGraph;
+            const slotH = LG?.NODE_SLOT_HEIGHT ?? 20;
             ctx.save();
-            ctx.font = `${THEME.size + 1}px ${THEME.font}`;
-            const labelW = Math.max(0, ...(this.outputs ?? []).map((o) => ctx.measureText(o.label ?? o.name ?? "").width));
+
+            // MEASURED IN THE FONT THE LABELS ARE ACTUALLY DRAWN IN.
+            //
+            // This used to measure them in THEME.font at THEME.size — the
+            // panel's own font, which is this node's setting and has nothing to
+            // do with the canvas. Raise NODE_SUBTEXT_SIZE in a theme and the
+            // labels grow while the reservation does not, so the notice keeps
+            // its old width and the two run into each other.
+            //
+            // `inner_text_font` is the string LiteGraph itself assigns to
+            // ctx.font before drawing slot labels, so measuring with it cannot
+            // disagree with what ends up on screen — including when a theme has
+            // changed the size since the canvas was built, because the drawn
+            // labels use that same stale value too.
+            ctx.font = app?.canvas?.inner_text_font
+                || `normal ${LG?.NODE_SUBTEXT_SIZE ?? 12}px ${LG?.NODE_FONT ?? "Arial"}`;
+            const outputs = this.outputs ?? [];
+            const labelW = Math.max(0, ...outputs.map(
+                (o) => ctx.measureText(o.label ?? o.name ?? "").width));
+
             const x = 8;
             const y = 5;
-            const w = this.size[0] - labelW - 36;
-            const h = (this.outputs?.length ?? 0) * slotH - 6;
+            const w = this.size[0] - x - labelW - SLOT_RESERVE - NOTICE_GAP;
+
+            // Prefer the slots' own geometry where the frontend exposes it:
+            // with a larger label font the rows are taller than NODE_SLOT_HEIGHT
+            // and a fixed multiple would leave the box short of the last one.
+            const last = outputs[outputs.length - 1];
+            const rect = last?.boundingRect;
+            const slotsBottom = Array.isArray(rect) && rect.length >= 4
+                ? rect[1] + rect[3]
+                : outputs.length * slotH;
+            const h = slotsBottom - y - 6;
+
             if (w < 90 || h < 24) { ctx.restore(); return; }
 
             // box
@@ -1732,6 +1767,42 @@ app.registerExtension({
             return ids.slice(Math.min(ia, ib), Math.max(ia, ib) + 1);
         };
 
+        // --- keeping the rest of the chain in step with the selection --------
+        /**
+         * SELECTING ROWS IS AN EDIT TO THIS NODE'S OUTPUT, so the nodes fed by
+         * it are stale the moment the selection changes. Until now only ▶ told
+         * them otherwise, which meant a Single Row node downstream went on
+         * showing a row nobody had selected any more. Changing the selection
+         * now runs exactly what ▶ runs.
+         *
+         * Debounced, because dragging across rows changes the selection on
+         * every pointermove, and each run is a round trip for every node
+         * downstream. It also refuses to run for a selection it has already
+         * run for, so a click that puts the selection back where it was — or a
+         * drag that ends where it started — costs nothing.
+         */
+        const selectionKey = () => [...selection].sort((a, b) => a - b).join(",");
+        let firedFor = selectionKey();   // the state on load is not a change
+        let fireTimer = null;
+        let firing = false;
+
+        const runChain = async () => {
+            // A run already in flight is left to finish: starting a second
+            // would have two walks of the same chain writing over each other.
+            if (firing) { fireTimer = setTimeout(runChain, 120); return; }
+            const key = selectionKey();
+            if (key === firedFor) return;
+            firing = true;
+            try { await previewChain(node); firedFor = key; }
+            catch { /* leave firedFor alone so the next change tries again */ }
+            finally { firing = false; }
+        };
+
+        const fireSelection = () => {
+            clearTimeout(fireTimer);
+            fireTimer = setTimeout(runChain, 120);
+        };
+
         let dragging = null;   // { mode: "add" | "remove" }
 
         const onRowPointerDown = (e, tr) => {
@@ -1764,6 +1835,7 @@ app.registerExtension({
                 else if (act === "invert") selection = new Set(ids.filter((i) => !selection.has(i)));
                 paintSelection();
                 renderGrid();     // the # column and the header banner both change
+                fireSelection();
                 return;
             }
             const tr = e.target.closest?.("tr.nsq-row");
@@ -1790,6 +1862,9 @@ app.registerExtension({
             dragging = null;
             if (e?.pointerId != null) gridContent.releasePointerCapture?.(e.pointerId);
             renderGrid();   // refresh the header tally and the # numbering
+            // The end of the gesture, not each step of it: one run per click or
+            // drag, however many rows it passed over.
+            fireSelection();
         };
         gridContent.addEventListener("pointerup", endDrag);
         gridContent.addEventListener("pointercancel", endDrag);
@@ -1814,7 +1889,16 @@ app.registerExtension({
                 ? `${active} condition${active === 1 ? "" : "s"}${state.length > active ? ` (${state.length - active} off)` : ""}`
                 : "no filter - all rows");
             if (selection.size) bits.push(`${selection.size} selected`);
-            if (modeWidget?.value === OUTPUT_MODES[1]) bits.push("output: selected only");
+            // SAYING WHY A SELECTION APPEARS TO DO NOTHING.
+            //
+            // In "matching rows" mode the highlight is only a highlight: every
+            // matching row leaves the node whatever is selected, so a node
+            // downstream shows the same thing after a click as before it. That
+            // is correct, and it is indistinguishable from broken unless the
+            // node says so — which, until now, it did not.
+            const selectedOnly = modeWidget?.value === OUTPUT_MODES[1];
+            if (selectedOnly) bits.push("output: selected only");
+            else if (selection.size) bits.push('highlight only — set output_rows to "selected rows" to send it on');
             noteEl.textContent = bits.join(" · ");
             noteEl.title = noteEl.textContent;
         };

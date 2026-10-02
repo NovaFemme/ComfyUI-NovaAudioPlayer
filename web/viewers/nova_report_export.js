@@ -19,8 +19,8 @@
 // here, because the list is read from the node; and no viewer file is edited,
 // so nothing this does can alter how the viewers behave when it is not running.
 
-import { app } from "../../scripts/app.js";
-import { api } from "../../scripts/api.js";
+import { app } from "/scripts/app.js";
+import { api } from "/scripts/api.js";
 
 const EXT_NAME = "NovaAudio.ReportCapture";
 

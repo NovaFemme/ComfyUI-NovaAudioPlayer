@@ -55,21 +55,14 @@ import sys
 import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
+from pathlib import Path
 
-try:
-    from .nova_ace_common import (
-        ACE_VERSION, TRAINING_CATEGORY, VARIANT_DIRS,
-        check_checkpoint_tree, describe_checkpoint_requirement,
-        check_remote_code_imports, describe_remote_code_requirement,
-    )
-    from ..authoring.nova_authoring_common import banner
-except ImportError:  # direct execution / test harness
-    from nova_ace_common import (
-        ACE_VERSION, TRAINING_CATEGORY, VARIANT_DIRS,
-        check_checkpoint_tree, describe_checkpoint_requirement,
-        check_remote_code_imports, describe_remote_code_requirement,
-    )
-    from nova_authoring_common import banner
+# insert node to root folder into syspath
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Clean absolute imports
+from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner
+from nova_categories import TRAINING
 
 #: Upstream's preset directory, relative to the acestep package root.
 PRESET_SUBPATH = os.path.join("training_v2", "presets")
@@ -397,7 +390,7 @@ def quote_command(argv: List[str]) -> str:
 # ---------------------------------------------------------------------------
 
 class NovaACELoRATrainer:
-    CATEGORY = TRAINING_CATEGORY
+    CATEGORY = TRAINING
     FUNCTION = "train"
     RETURN_TYPES = ("STRING", "STRING", "INT", "STRING")
     RETURN_NAMES = ("lora_dir", "output_dir", "exit_code", "console")
@@ -409,7 +402,7 @@ class NovaACELoRATrainer:
         "Run log — wire into Nova Console.",
     )
     DESCRIPTION = (
-        f"Nova ACE LoRA Trainer v{ACE_VERSION} — runs ACE-Step's corrected "
+        f"Nova ACE LoRA Trainer — runs ACE-Step's corrected "
         "training loop over preprocessed tensors, as a cancellable child "
         "process so a multi-hour run cannot block or crash ComfyUI."
     )
@@ -636,7 +629,7 @@ class NovaACELoRATrainer:
               gradient_accumulation, save_every, optimizer,
               gradient_checkpointing, device, precision, dry_run,
               warmup_steps=0, acestep_repo_path="", resume_from="", **kwargs):
-        log: List[str] = [banner(f"NOVA ACE LORA TRAINER v{ACE_VERSION}")]
+        log: List[str] = [banner(f"NOVA ACE LORA TRAINE")]
 
         def clean(value):
             return os.path.abspath(os.path.expanduser((value or "").strip().strip('"'))) \
@@ -673,12 +666,7 @@ class NovaACELoRATrainer:
             )
         absent = check_remote_code_imports(ckpt, variant)
         if absent:
-            raise ImportError(
-                "Nova ACE LoRA Trainer: the "
-                + VARIANT_DIRS.get(variant, variant)
-                + " checkpoint needs " + ", ".join(absent)
-                + ", which is not installed in ComfyUI's Python.\n"
-                + describe_remote_code_requirement(absent)
+            raise ImportError(f"Nova ACE LoRA Trainer: the {VARIANT_DIRS.get(variant, variant)} checkpoint needs which is not installed in ComfyUI's Python.\n {describe_remote_code_requirement(absent)}"
             )
         if repo and not os.path.isdir(repo):
             raise NotADirectoryError(
