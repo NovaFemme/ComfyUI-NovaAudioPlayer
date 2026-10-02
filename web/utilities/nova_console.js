@@ -124,6 +124,8 @@ function preferValueSlot(nodeType) {
   };
 }
 
+const TEXT_MIN_H = 120;       // smallest height of the text area, in CSS pixels
+
 function buildTextarea() {
   const el = document.createElement("textarea");
   el.readOnly = true;
@@ -132,7 +134,7 @@ function buildTextarea() {
   Object.assign(el.style, {
     width: "100%",
     height: "100%",
-    minHeight: "120px",
+    minHeight: `${TEXT_MIN_H}px`,
     boxSizing: "border-box",
     padding: "6px 8px",
     border: "1px solid var(--border-color, #4e4e4e)",
@@ -155,7 +157,13 @@ function consoleWidget(node) {
   if (widget) return widget;
 
   const el = buildTextarea();
-  widget = node.addDOMWidget(WIDGET_NAME, "novaconsole", el, { serialize: false });
+  // The text area is never shorter than TEXT_MIN_H (its CSS min-height), so
+  // the widget must say so: without getMinHeight the classic renderer let the
+  // node be dragged down to 160 px and the text area hung out below it.
+  widget = node.addDOMWidget(WIDGET_NAME, "novaconsole", el, {
+    serialize: false,
+    getMinHeight: () => TEXT_MIN_H + 8,
+  });
   widget.serialize = false;
   if (widget.options) widget.options.serialize = false;
 

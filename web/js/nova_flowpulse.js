@@ -1,5 +1,6 @@
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
+import { vueSize, keepMinimumWidth } from "../core/vue-size.js";
 
 const FLOWPULSE = "NovaFlowPulseNode";
 
@@ -279,7 +280,13 @@ function hideWidget(w) {
 
 // The DOM widget is a pass-through host; the content is sized from node.size each
 // frame so nothing spills outside the node while it is dragged or resized.
-function makeDomHost(inner, initialH) {
+// Smallest size at which nothing in the dashboard is hidden or clipped: the
+// header row with its three buttons, the three tiles, one row of the node table
+// and the footer. Used by both renderers.
+const MIN_NODE_W = 400;
+const VUE_MIN = { minWidth: MIN_NODE_W, minHeight: 240 };
+
+function makeDomHost(inner, initialH, vueMin) {
     const host = document.createElement("div");
     host.style.cssText = "position:relative; overflow:visible; pointer-events:none; width:100%; height:100%;";
     Object.assign(inner.style, {
@@ -287,7 +294,8 @@ function makeDomHost(inner, initialH) {
         height: `${initialH}px`, boxSizing: "border-box", pointerEvents: "auto",
     });
     host.appendChild(inner);
-    return host;
+    // Nodes 2.0 measures minimum size from the page, not from getMinHeight.
+    return vueSize(host, inner, vueMin);
 }
 
 /**
@@ -566,12 +574,24 @@ app.registerExtension({
         wrap.append(bar, tiles, controls, body, foot);
 
         node._viewerH = 430;
-        const widget = node.addDOMWidget("flowpulse", "HTML", makeDomHost(wrap, 430), {
+        const widget = node.addDOMWidget("flowpulse", "HTML", makeDomHost(wrap, 430, VUE_MIN), {
             getMinHeight: () => node._viewerH,
             hideOnZoom: false,
             serialize: false,
         });
         widget.computeSize = (w) => [w ?? node.size[0], node._viewerH + 10];
+
+        // The header row (status, colours, Pause, Reset, Save log) needs about
+        // 400 px. The classic renderer clamps a resize against computeSize(),
+        // so the node's minimum width is stated there; Nodes 2.0 gets the same
+        // figure through VUE_MIN.
+        const baseComputeSize = node.computeSize;
+        node.computeSize = function (...args) {
+            const size = baseComputeSize.apply(this, args);
+            size[0] = Math.max(size[0], MIN_NODE_W);
+            return size;
+        };
+        keepMinimumWidth(node, MIN_NODE_W);
         pinDomSize(node, widget, wrap, 240);
 
         wrap.addEventListener("pointerdown", (e) => e.stopPropagation());
@@ -913,7 +933,9 @@ app.registerExtension({
                     : `gpu: off${meta.gpu?.note ? ` — ${meta.gpu.note}` : ""}`);
                 if (meta.last_log) bits.push(`log: ${meta.last_log.split(/[\\/]/).pop()}`);
             }
-            foot.innerHTML = `<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(bits.join("  ·  "))}</span>`;
+            // Wraps rather than being cut off: at the node's default width the
+            // line ran past the edge and its last part (the GPU note) was lost.
+            foot.innerHTML = `<span style="flex:1; min-width:0; white-space:normal; overflow-wrap:anywhere; line-height:1.35;">${esc(bits.join("  ·  "))}</span>`;
             if (meta?.gpu?.risky) {
                 foot.innerHTML += `<span style="color:${STATUS.warning}; white-space:nowrap;"
                     title="Polling the compute runtime during a run can abort ComfyUI on ROCm. Switch gpu_telemetry to 'auto (safe)' if the process aborts.">⚠ torch GPU mode</span>`;

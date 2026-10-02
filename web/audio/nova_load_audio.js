@@ -33,6 +33,7 @@ import { api } from "/scripts/api.js";
 
 const NODE_CLASS = "NovaLoadAudio";
 const FILE_WIDGET = "audio";
+const PREVIEW_H = 40;         // height of the inline preview bar, in CSS pixels
 const SENTINEL_RE = /^\s*\(no audio files/;
 
 /** "sub/song.wav [input]" -> /view?filename=song.wav&subfolder=sub&type=input */
@@ -64,10 +65,22 @@ function setupNovaLoadAudio(node) {
   player.controls = true;
   player.preload = "none";
   player.style.width = "100%";
+  // THE BAR'S HEIGHT IS RESERVED FROM THE START.
+  //
+  // Under Nodes 2.0 the element is a flex item with a zero basis, and an
+  // <audio> that has loaded nothing yet (preload is "none") was laid out 0 px
+  // tall. The controls took their real height only once the file was touched,
+  // which is after a run: the node grew by the height of the bar and slid over
+  // whatever sat below it. A fixed height makes the node the same size before
+  // and after. 40 px is the height Chromium and Firefox give the controls.
+  player.style.height = `${PREVIEW_H}px`;
+  player.style.minHeight = `${PREVIEW_H}px`;
+  player.style.flex = "0 0 auto";
   player.classList.add("comfy-audio");
 
   const preview = node.addDOMWidget("nova_audio_preview", "audiopreview", player, {
     serialize: false,
+    getMinHeight: () => PREVIEW_H,
   });
   preview.serialize = false;
   if (preview.options) preview.options.serialize = false;
