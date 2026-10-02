@@ -57,13 +57,15 @@ Four commits followed the first hand-back, each from a finding in the test agent
 | `09eb58e` | Retest 1: body still too transparent (B-01); Nodes 2.0 width still 225 (B-15); NamePath Manager still showed the old option (B-06). | Glass body tint 0.32. Minimum width also written on pointerover. Old `profile_action` text replaced on load. The adapter pairs nodes with cards by `data-node-id`. `window.novaVueSize()` reports what the size module last did. |
 | `a2c3317` | Retest 3: the adapter's stylesheet was removed on every load. Auto mode answered `v1` with `Comfy.VueNodes.Enabled` on, because the canvas had painted a node 142 ms earlier. On frontend 1.53.6 the canvas keeps calling `drawNode` under Nodes 2.0, so that test cannot tell the renderers apart. | The renderer is decided from the `Comfy.VueNodes.Enabled` setting, then from the presence of `[data-node-id]` cards. The canvas-paint test is only reached when neither answers. |
 
+**Fixed node colours removed (owner's decision, 3 Oct; test report R-3).** `web/config/nova_node_colours.js` coloured 25 of the 31 node types by role, as class-level colours, on by default. In Classic those 25 kept green, purple, olive, teal or brown bodies whatever the theme, while the six newer nodes followed it. Theme Studio's "Theme colours" did not clear them, because it clears the colour on each node and these sat on the node class. The file, its "Colour nodes by role" setting and `docs/node-colours.md` are gone, so the theme governs all 31 nodes in both renderers. A colour a user picks by hand on a node is untouched. Classic label legibility (R-2) should be rechecked on this build.
+
 **Seen on the owner's machine after `a2c3317`:** `novaTheme.renderer()` returns `{"mode":"v2","how":"setting Comfy.VueNodes.Enabled"}`, the `nova-theme-studio-v2` stylesheet is present, and Nova Master Identity shows a box on every text field with readable labels.
 
 **Not explained:** the misdetection never happened on the developer's test server, on the same frontend version.
 
 **Still to be re-run by the test agent on `a2c3317`:** B-01 and B-12 for its log, and the Classic checks (B-14, B-16, B-17) and minimum sizes, which were last measured before the two detection changes.
 
-**Left for the next release, by agreement:** output tooltips (74 of 130), and the SQLite, FlowPulse and Theme Studio nodes drawing with transparent bodies in Classic. The second needs a look in Classic over a bright wallpaper first; if it is a legibility problem it belongs with B-01.
+**Left for the next release, by agreement:** output tooltips (74 of 130). Theme Studio's "Theme colours" still does not override a colour another pack sets on a node class; not changed here.
 
 **Minor remainders, not changed:** the Save WAV option still reads "appends number e.g. 00001" (it is a stored option value); the `stop_at_row` tooltip is terse.
 
