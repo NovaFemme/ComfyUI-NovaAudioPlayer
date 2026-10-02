@@ -27,3 +27,13 @@ madow-context-contract.md
 # kept out of the package rather than published with it.
 profiles/
 presets/Eb minor 14 gradient_estimation beta aggressive.json
+
+# Recorded player sequences, when the package-folder fallback is used.
+/sequences/
+
+# A second config folder an earlier build wrote inside nova_player/. User
+# state, same class as config/*.json above.
+nova_player/config/
+
+# Backups and archives made while working in the folder.
+/*.zip
