@@ -156,8 +156,8 @@ class NovaACESetupCheck:
         "The full report — wire into Nova Console.",
     )
     DESCRIPTION = (
-        f"Nova ACE Setup Check spend GPU time finding out. Installs "
-        "and downloads nothing."
+        "Nova ACE Setup Check — reports whether this machine can preprocess and "
+        "train, before you spend GPU time finding out. Installs and downloads nothing."
     )
 
     @classmethod

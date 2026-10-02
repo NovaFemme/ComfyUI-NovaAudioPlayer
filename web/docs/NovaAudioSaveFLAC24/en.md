@@ -1,4 +1,4 @@
-# Save Audio FLAC 24-bit
+# Nova Save Audio FLAC 24/16-bit
 
 Writes an `AUDIO` input to the ComfyUI output folder as FLAC, at 24-bit by
 default. It exists because the stock save node cannot.
@@ -46,6 +46,6 @@ started with `--disable-metadata`. A batch writes one file per item, with
 
 ## Where it sits in the chain
 
-Mastering → **Save Audio FLAC 24-bit** → Nova Tag Writer, if you are writing
+Mastering → **Nova Save Audio FLAC 24/16-bit** → Nova Tag Writer, if you are writing
 release metadata onto the file afterwards. Save the FLAC first; the tag writer
 edits files in place.

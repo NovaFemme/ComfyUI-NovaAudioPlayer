@@ -703,10 +703,10 @@ class NovaLoadAudio:
         "Bits per sample of the source (0 when the source is lossy/compressed).",
     )
     DESCRIPTION = (
-        f"Nova Load Audio v{VERSION} — standalone audio file loader. "
+        "Nova Load Audio — standalone audio file loader. "
         "Decodes via soundfile / torchaudio / PyAV (first one available), "
         "and reports filename, sample rate, duration, extension, full metadata and "
-        "bit depth. CPU-only float32, safe on AMD ROCm (RX 9070 XT) and CUDA alike."
+        "bit depth. CPU-only float32, safe on AMD ROCm and CUDA alike."
     )
 
     @classmethod
@@ -930,7 +930,7 @@ class NovaLoadAudio:
                 "output_dtype": "float32",
                 "gpu_agnostic": True,
                 "note": "CPU float32 output; no CUDA/HIP-specific code paths. "
-                        "Verified-safe pattern for AMD ROCm (RX 9070 XT / gfx1201).",
+                        "Verified-safe pattern for AMD ROCm.",
             },
             "decoder_attempts": attempts,
             "warnings": warnings,

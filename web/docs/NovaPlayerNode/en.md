@@ -21,6 +21,9 @@ synthetic signal so the visualisers show what they do, and the badge row reads
 clip bundled with the pack through the real analyser, so what you see is an
 actual measurement rather than a mock-up.
 
+The `audio` input is optional. A workflow with an unwired player still runs:
+the node stays in this idle view and its `panel_info` output is empty.
+
 Nothing loads or plays until you press it. Wire an `AUDIO` in and the demo
 stops for good. `ui.idle_demo: false` in the system config turns the animation
 off.
@@ -33,7 +36,7 @@ decision rather than by accident.
 This node measures, and its own SAT row reads `0.0000%` on a 320k mp3 — the
 number does not fail, it stops meaning anything. Offering a lossy download from
 the measurement node would hand you a file its own panel cannot read honestly.
-For delivery use **Save Audio FLAC 24-bit** or **Save Audio WAV
+For delivery use **Nova Save Audio FLAC 24/16-bit** or **Nova Save Audio WAV
 PCM16|PCM24|FLOAT32**; this arrow is for auditioning what you are measuring.
 
 If you want an mp3, the WAV is one ffmpeg command away.

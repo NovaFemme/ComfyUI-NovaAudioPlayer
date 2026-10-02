@@ -275,7 +275,7 @@ class NovaTagWriter:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "table": (TABLE_TYPE, {"tooltip": "Rows from Nova SQLite Reader."}),
+                "table": (TABLE_TYPE, {"tooltip": "Rows from the table output of Nova Dynamic SQLite Browser or Nova SQLite Data Table & Filter."}),
                 "files": (FILES_TYPE, {"tooltip": "Batch from Nova Batch Load Audio."}),
                 "filename_column": ("STRING", {
                     "default": "FileName",

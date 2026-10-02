@@ -35,11 +35,25 @@ except ImportError:
 
 VERSION = "1.0.0"
 
-ACTION_IGNORE = "use the widgets below"
-ACTION_APPLY = "apply selected profile"
-ACTION_SAVE = "save to selected profile"
-ACTION_SAVE_AS = "save as new profile"
+ACTION_IGNORE = "use widgets"
+ACTION_APPLY = "apply profile"
+ACTION_SAVE = "save to profile"
+ACTION_SAVE_AS = "save as new"
 ACTIONS = [ACTION_IGNORE, ACTION_APPLY, ACTION_SAVE, ACTION_SAVE_AS]
+
+# The options were longer until 2.7.0 and were cut off at the node's default
+# width. A workflow saved before that still carries the old text, so it is
+# read as the option it meant.
+_LEGACY_ACTIONS = {
+    "use the widgets below": ACTION_IGNORE,
+    "apply selected profile": ACTION_APPLY,
+    "save to selected profile": ACTION_SAVE,
+    "save as new profile": ACTION_SAVE_AS,
+}
+
+
+def _action(value) -> str:
+    return _LEGACY_ACTIONS.get(str(value), str(value))
 
 # Every widget whose value a profile round-trips. Order is the display order.
 PROFILE_KEYS = (
@@ -99,7 +113,7 @@ class NovaNamePathManager:
     # WHY THIS IS AN OUTPUT NODE. ComfyUI's execution is demand-driven: it walks
     # back from output nodes and prunes everything that does not feed one. This
     # node writes a profile file as a side effect, and that side effect is the
-    # whole point of "save as new profile" — but with nothing connected
+    # whole point of "save as new" — but with nothing connected
     # downstream (or a downstream chain that ends in no output node) the node was
     # pruned from the prompt and never ran, so the save silently never happened.
     # OUTPUT_NODE is exactly the flag for "this node does something worth
@@ -133,7 +147,7 @@ class NovaNamePathManager:
         "Every resolved value as JSON, for Nova Console or a report.",
     )
     DESCRIPTION = (
-        f"Nova NamePath Manager v{VERSION} — holds the database, batch and output "
+        "Nova NamePath Manager — holds the database, batch and output "
         "paths for a delivery workflow, and stores the whole set as a named profile."
     )
 
@@ -143,22 +157,22 @@ class NovaNamePathManager:
             "required": {
                 "profile": (profiles.combo_choices(), {
                     "default": profiles.NONE_LABEL,
-                    "tooltip": "Saved profiles. The list refreshes when the browser reloads.",
+                    "tooltip": "Saved profiles. Press the Refresh button on the node to re-read the list; it is also re-read when the browser reloads.",
                 }),
                 "profile_action": (ACTIONS, {
                     "default": ACTION_IGNORE,
                     "tooltip": (
-                        "use the widgets below: ignore profiles entirely.\n"
-                        "apply selected profile: outputs come from the profile.\n"
-                        "save to selected profile: overwrite it with the widgets below.\n"
-                        "save as new profile: write the widgets below to new_profile_name."
+                        "use widgets: ignore profiles; the widgets below are used.\n"
+                        "apply profile: outputs come from the selected profile.\n"
+                        "save to profile: overwrite the selected profile with the widgets below.\n"
+                        "save as new: write the widgets below to new_profile_name."
                     ),
                 }),
                 "new_profile_name": ("STRING", {
                     "default": "",
                     "multiline": False,
                     "placeholder": "Tag Audio Files",
-                    "tooltip": "Name for 'save as new profile'. Letters, digits, space, dot, dash, underscore.",
+                    "tooltip": "Name for 'save as new'. Letters, digits, space, dot, dash, underscore.",
                 }),
 
                 "database_path": ("STRING", {
@@ -177,7 +191,7 @@ class NovaNamePathManager:
                     "tooltip": (
                         "On: database_path points at a database that already exists.\n"
                         "Off: it describes one to create — the path is split into "
-                        "new_database_folder and new_database_name for Nova SQLite Reader."
+                        "new_database_folder and new_database_name, for a node that creates one."
                     ),
                 }),
 
@@ -221,6 +235,7 @@ class NovaNamePathManager:
 
     @classmethod
     def IS_CHANGED(cls, profile, profile_action, new_profile_name, **kwargs):
+        profile_action = _action(profile_action)
         # A save writes to disk, and an apply reads a file that another run may
         # have rewritten — neither is safely cacheable. Composing strings is
         # cheap, so re-running costs nothing.
@@ -230,9 +245,10 @@ class NovaNamePathManager:
 
     @classmethod
     def VALIDATE_INPUTS(cls, profile, profile_action, new_profile_name, **kwargs):
+        profile_action = _action(profile_action)
         if profile_action == ACTION_SAVE_AS and not profiles.valid_name(_clean(new_profile_name)):
             return (
-                "Nova NamePath Manager: 'save as new profile' needs a new_profile_name "
+                "Nova NamePath Manager: 'save as new' needs a new_profile_name "
                 "of letters, digits, spaces, dots, dashes or underscores (max 64)."
             )
         if profile_action in (ACTION_APPLY, ACTION_SAVE) and profile == profiles.NONE_LABEL:
@@ -240,6 +256,7 @@ class NovaNamePathManager:
         return True
 
     def resolve(self, profile, profile_action, new_profile_name, **kwargs):
+        profile_action = _action(profile_action)
         widget_values: Dict[str, Any] = {key: kwargs.get(key) for key in PROFILE_KEYS}
         notes: List[str] = []
 

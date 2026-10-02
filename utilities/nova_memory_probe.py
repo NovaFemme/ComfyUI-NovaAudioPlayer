@@ -547,8 +547,17 @@ class NovaMemoryProbe:
                     "tooltip": "Names this probe point. History is tracked "
                                "per-label, so deltas compare like with like.",
                 }),
-                "detail": (["compact", "normal", "full"], {"default": "normal"}),
-                "log_to_console": ("BOOLEAN", {"default": True}),
+                "detail": (["compact", "normal", "full"], {
+                    "default": "normal",
+                    "tooltip": "How much the report shows. compact: host RAM, VRAM and the "
+                               "loaded models. normal: adds the system allocator's figures. "
+                               "full: adds PyTorch allocator retries, out-of-memory counts "
+                               "and the sampled configuration.",
+                }),
+                "log_to_console": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Also print each report to the ComfyUI console.",
+                }),
                 "write_jsonl": ("BOOLEAN", {
                     "default": False,
                     "tooltip": "Append each sample to "

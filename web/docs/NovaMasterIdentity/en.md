@@ -11,14 +11,18 @@ Widget values live in the workflow JSON, which means a browser reset or a
 reloaded graph can take them with it — and retyping a catalogue by hand is both
 tedious and a good way to file the wrong ISRC.
 
-Wire **Nova SQLite Reader** (`column_set` = `identity`, `where` narrowed to one
-song) into the `identity_fields_json` input instead. Every field the payload
+Wire one database row into the `identity_fields_json` input instead: **Nova
+Dynamic SQLite Browser** → **Nova SQLite Single Row Filter**, and that node's
+`single_row_json` output into this input. Columns are matched by name — `Title`,
+`Artist`, `Album`, `Track Number`, `Year`, `ISRC` and so on, or this node's own
+field names. (The deprecated Nova SQLite Reader's `identity_json` output still
+works too.) Every field the payload
 carries replaces the widget of the same name, and the console prints exactly
 which ones came from the database:
 
 ```
 [Nova Master Identity] from database: album_title='High Water Sessions',
-  artist_name='crazy gecko', release_year=2026, track_number=5,
+  artist_name='Example Artist', release_year=2026, track_number=5,
   track_title='Nine Hours North'
 ```
 
@@ -34,8 +38,8 @@ settings and are not.
 
 The bit-depth and sample-rate fields describe **publication intent** — what the
 release is meant to be — and the node performs no conversion whatsoever. The
-actual PCM encoding happens in a save node (`Save Audio WAV PCM16|PCM24|FLOAT32`
-or `Save Audio FLAC 24-bit`). Setting 24-bit here and saving PCM16 downstream
+actual PCM encoding happens in a save node (`Nova Save Audio WAV PCM16|PCM24|FLOAT32`
+or `Nova Save Audio FLAC 24/16-bit`). Setting 24-bit here and saving PCM16 downstream
 produces a 16-bit file with a record claiming 24, and nothing will stop you.
 
 ## Outputs

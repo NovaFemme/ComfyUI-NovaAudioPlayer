@@ -385,10 +385,20 @@ class NovaTrackInspector:
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {
-            "audio": ("AUDIO",),
-            "analysis_resolution": (["Normal", "Fine", "Fast"], {"default": "Normal"}),
-            "marker_sensitivity": ("FLOAT", {"default": 60.0, "min": 0.0, "max": 100.0, "step": 1.0}),
-            "coherence_sensitivity": ("FLOAT", {"default": 60.0, "min": 0.0, "max": 100.0, "step": 1.0}),
+            "audio": ("AUDIO", {"tooltip": "The track to inspect. It is passed through unchanged."}),
+            "analysis_resolution": (["Normal", "Fine", "Fast"], {
+                "default": "Normal",
+                "tooltip": "Time resolution of the analysis. Normal is the baseline; Fine resolves "
+                           "shorter events and takes longer; Fast is coarser and quicker."}),
+            "marker_sensitivity": ("FLOAT", {
+                "default": 60.0, "min": 0.0, "max": 100.0, "step": 1.0,
+                "tooltip": "How readily single events are marked, 0-100. Higher marks more. Leave it "
+                           "at 60 while calibrating a set of tracks, so they are all measured with "
+                           "the same ruler."}),
+            "coherence_sensitivity": ("FLOAT", {
+                "default": 60.0, "min": 0.0, "max": 100.0, "step": 1.0,
+                "tooltip": "How readily a section is marked as not belonging to the rest of the "
+                           "track, 0-100. Higher marks more. Leave it at 60 while calibrating."}),
             # ----------------------------------------------------------------
             # PROVISIONAL CONTROLS - appended, never inserted.
             # ComfyUI serialises widget values positionally, so a widget added
@@ -402,62 +412,62 @@ class NovaTrackInspector:
             "consistency_threshold": ("FLOAT", {
                 "default": 0.075, "min": 0.0, "max": 0.5, "step": 0.001, "round": False,
                 "tooltip": "Start-vs-end timbre difference that counts as a performer change. "
-                           "LOWER FLAGS MORE TRACKS. Six approved masters measured 0.018-0.058, so "
+                           "Lower flags more tracks. Reference masters measured 0.018-0.058, so "
                            "0.075 leaves them headroom while still catching known-bad takes at "
-                           "0.090 and above. NOTE: a deliberately explosive track can legitimately "
-                           "exceed this - No Gods No Mercy measures 0.213 - so expect an occasional "
+                           "0.090 and above. A deliberately explosive track can legitimately "
+                           "exceed this - one measured 0.213 - so expect an occasional "
                            "REVIEW on dramatic material until per-profile thresholds exist."}),
             "consistency_weight": ("FLOAT", {
                 "default": 0.35, "min": 0.0, "max": 1.0, "step": 0.05,
-                "tooltip": "How much a start-vs-end difference moves the score. HIGHER PENALISES "
+                "tooltip": "How much a start-vs-end difference moves the score. Higher penalises "
                            "tracks that end sounding like a different performance. 0 reports it "
                            "without scoring it."}),
             "excursion_seconds": ("FLOAT", {
                 "default": 10.0, "min": 0.0, "max": 120.0, "step": 5.0,
                 "tooltip": "Longest the track may sit away from its own baseline before flagging. "
-                           "LOWER IS MORE SENSITIVE. No approved master exceeded 10 s."}),
+                           "Lower is more sensitive. No reference master exceeded 10 s."}),
             "excursion_weight": ("FLOAT", {
                 "default": 0.35, "min": 0.0, "max": 1.0, "step": 0.05,
-                "tooltip": "How much a sustained excursion moves the score. HIGHER PENALISES "
+                "tooltip": "How much a sustained excursion moves the score. Higher penalises "
                            "sections that do not belong to the rest of the track."}),
             "repeat_allowance": ("FLOAT", {
                 "default": 0.70, "min": 0.0, "max": 1.0, "step": 0.05,
                 "tooltip": "Credit given to a section that repeats itself, so deliberate intros and "
-                           "loops are not mistaken for artifacts. At 0.70 only 30%% of repeating "
+                           "loops are not mistaken for artifacts. At 0.70 only 30% of repeating "
                            "time counts, so a 33 s repeating intro reads as 10 s and passes. "
                            "0.00 treats a repeating intro as an artifact; 1.00 never penalises "
                            "repetition."}),
             "step_z_threshold": ("FLOAT", {
                 "default": 9.0, "min": 0.0, "max": 20.0, "step": 0.1,
                 "tooltip": "Size of a single timbre jump that counts as an event, in robust "
-                           "standard deviations. LOWER FLAGS MORE. Approved masters legitimately "
+                           "standard deviations. Lower flags more. Reference masters legitimately "
                            "reached 8.5, so below that you will flag real musical sections."}),
             "step_weight": ("FLOAT", {
                 "default": 0.20, "min": 0.0, "max": 1.0, "step": 0.05,
                 "tooltip": "How much a single jump moves the score. Deliberately lower than the "
-                           "others: jump size on its own misclassified approved masters."}),
+                           "others: jump size on its own misclassified reference masters."}),
             "loudness_weight": ("FLOAT", {
                 "default": 0.25, "min": 0.0, "max": 1.0, "step": 0.05,
                 "tooltip": "How much dynamic extremes - very high crest, large level jumps - move "
-                           "the score. LOW BY DEFAULT because wide dynamics are a stylistic "
+                           "the score. Low by default because wide dynamics are a stylistic "
                            "choice, not a fault. Raise it only if you want the report to argue "
                            "with deliberately explosive tracks."}),
             "provisional_authority": ("FLOAT", {
                 "default": 0.30, "min": 0.0, "max": 1.0, "step": 0.05,
-                "tooltip": "How far UNVALIDATED measures may push the verdict. 0.00 comment only - "
+                "tooltip": "How far unvalidated measures may push the verdict. 0.00 comment only - "
                            "0.30 may reach REVIEW - 0.70 may reach POOR - 1.00 may reach REJECT. "
                            "Raise it as your own listening validates these measures."}),
             "weight_profile": (_profiles.combo_choices(), {
                 "default": _profiles.NONE_LABEL,
-                "tooltip": "Load the nine controls above from a saved profile. The list is Madow's "
+                "tooltip": "Load the nine scoring controls above (consistency_threshold to provisional_authority) from a saved profile. The list is Madow's "
                            "profile names, so the two stay in step. '— none —' uses the values set "
                            "on this node. A profile may override one control or all nine; anything "
                            "it does not mention keeps the value shown above. Different material "
                            "needs different thresholds - a deliberately explosive track and a "
                            "steady one cannot share one number."}),
             "save_weights_to_profile": ("BOOLEAN", {
-                "default": False, "label_on": "save on next run", "label_off": "read only",
-                "tooltip": "Writes the nine values above into the selected profile when the node "
+                "default": False, "label_on": "save", "label_off": "read only",
+                "tooltip": "save: writes the nine scoring values above into the selected profile when the node "
                            "runs, then behaves normally. Off by default: a run should not change "
                            "your saved settings unless you ask it to. Does nothing when the "
                            "profile is '— none —'."}),

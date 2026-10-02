@@ -150,7 +150,7 @@ class NovaAudioSaveWAV:
                 "audio": ("AUDIO", {"tooltip": "The audio to save."}),
                 "file_path": ("STRING", {
                     "default": "NovaAudio",
-                    "tooltip": "The prefix for the file to save. Subfolders are supported."
+                    "tooltip": "Where to save, under ComfyUI's output folder. Subfolders are supported. With filename_mode 'exact' this is the exact file name, extension included, e.g. NovaAudio/My Track.wav. With 'appends number' it is a prefix: a number and .wav are added."
                 }),
                 "format": (["wav"], {
                     "default": "wav",
@@ -159,8 +159,10 @@ class NovaAudioSaveWAV:
                 "filename_mode": (["exact (overwrite)", "appends number e.g. 00001"], {
                     "default": "exact (overwrite)",
                     "tooltip": (
-                        "exact (overwrite): file_path is the path and file name that will be overridden \n"
-                        "Appends number: appends new number e.g. _00001.wav"
+                        "exact (overwrite): the file is written as file_path, exactly. A file "
+                        "that already has that name is overwritten.\n"
+                        "appends number: file_path is a prefix and a counter is added, e.g. "
+                        "_00001.wav, so nothing is overwritten."
                     ),
                 }),
                 "reload_after_save": ("BOOLEAN", {
@@ -200,7 +202,7 @@ class NovaAudioSaveWAV:
     OUTPUT_NODE = True
     CATEGORY = DELIVERY
     DESCRIPTION = (
-        f"Save Audio WAV v{VERSION} — archival WAV writer for PCM16, PCM24 and "
+        "Nova Save Audio WAV — archival WAV writer for PCM16, PCM24 and "
         "32-bit float. Pure struct/numpy, so 24-bit and float output work on ROCm "
         "where torchaudio's encoders are unavailable. Ported from ComfyUI-SoundHub "
         "(MIT, Yuan-Man)."
@@ -537,5 +539,5 @@ class NovaAudioSaveWAV:
 
 NODE_CLASS_MAPPINGS = {"NovaAudioSaveWAV": NovaAudioSaveWAV}
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "NovaAudioSaveWAV": "Save Audio WAV PCM16|PCM24|FLOAT32 ⬇️"
+    "NovaAudioSaveWAV": "Nova Save Audio WAV PCM16|PCM24|FLOAT32 ⬇️"
 }

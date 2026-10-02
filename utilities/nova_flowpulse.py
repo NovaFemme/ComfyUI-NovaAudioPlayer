@@ -877,7 +877,8 @@ class NovaFlowPulseNode:
             "required": {
                 "log_to_file": ("BOOLEAN", {"default": False,
                                             "tooltip": "Write a profile file to output/nova_flowpulse when each run finishes."}),
-                "log_format": (LOG_FORMATS, {"default": "csv"}),
+                "log_format": (LOG_FORMATS, {"default": "csv",
+                                             "tooltip": "File format of the saved profile: csv, json or markdown."}),
                 "log_name": ("STRING", {"default": "nova_profile", "multiline": False,
                                         "tooltip": "File name prefix. A timestamp is always appended."}),
                 "sample_interval_ms": ("INT", {"default": 250, "min": 50, "max": 2000, "step": 50,
@@ -889,7 +890,8 @@ class NovaFlowPulseNode:
                 "reset_each_run": ("BOOLEAN", {"default": False,
                                                "tooltip": "On: every run starts from zero. Off: figures accumulate so averages settle."}),
                 # Hidden in the UI, driven by the dashboard (view mode, focused node, sort)
-                "view_state": ("STRING", {"default": "", "multiline": False}),
+                "view_state": ("STRING", {"default": "", "multiline": False,
+                                          "tooltip": "Set by the dashboard on the node: the view, the focused node and the sort order."}),
             }
         }
 
@@ -899,7 +901,7 @@ class NovaFlowPulseNode:
     FUNCTION = "profile"
     CATEGORY = UTILITY_IO
     OUTPUT_NODE = True
-    DESCRIPTION = (f"Nova FlowPulse v{FLOWPULSE_VERSION} - live CPU, memory, disk and GPU per node, "
+    DESCRIPTION = ("Nova FlowPulse - live CPU, memory, disk and GPU per node, "
                    "with an interactive dashboard for finding bottlenecks in large workflows.")
 
     @classmethod

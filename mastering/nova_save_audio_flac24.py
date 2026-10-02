@@ -92,9 +92,17 @@ class NovaAudioSaveFLAC24:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "audio": ("AUDIO",),
-                "filename_prefix": ("STRING", {"default": "audio/ComfyUI"}),
-                "bit_depth": (["24", "16"], {"default": "24"}),
+                "audio": ("AUDIO", {"tooltip": "The audio to write. Wire the master here."}),
+                "filename_prefix": ("STRING", {
+                    "default": "audio/ComfyUI",
+                    "tooltip": "Folder and name stem under ComfyUI's output folder, e.g. audio/My Track. "
+                               "A counter and .flac are added, so nothing is overwritten. "
+                               "%date%-style tokens and %batch_num% are supported.",
+                }),
+                "bit_depth": (["24", "16"], {
+                    "default": "24",
+                    "tooltip": "Bit depth of the FLAC file. 24 is what ComfyUI's own save node cannot write; 16 is there for delivery copies.",
+                }),
             },
             "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
         }
@@ -103,7 +111,8 @@ class NovaAudioSaveFLAC24:
     FUNCTION = "save_flac"
     OUTPUT_NODE = True
     CATEGORY = DELIVERY
-    DESCRIPTION = "Save audio as FLAC at 24-bit (or 16-bit) depth."
+    DESCRIPTION = ("Saves audio to ComfyUI's output folder as FLAC, at 24-bit (the default) or 16-bit. "
+                   "ComfyUI's own save node always writes 16-bit.")
 
 
     def save_flac(self, audio, filename_prefix="audio/ComfyUI", bit_depth="24", prompt=None, extra_pnginfo=None):
@@ -135,4 +144,4 @@ class NovaAudioSaveFLAC24:
 
 
 NODE_CLASS_MAPPINGS = {"NovaAudioSaveFLAC24": NovaAudioSaveFLAC24}
-NODE_DISPLAY_NAME_MAPPINGS = {"NovaAudioSaveFLAC24": "Save Audio FLAC 24-bit ⬇️"}
+NODE_DISPLAY_NAME_MAPPINGS = {"NovaAudioSaveFLAC24": "Nova Save Audio FLAC 24/16-bit ⬇️"}

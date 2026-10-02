@@ -26,7 +26,7 @@ import os
 from .comfy_types import BUNDLE_SCHEMA_VER, BUNDLE_TYPE, kind_for
 from .context import build_json
 from .naming import build_file_path
-from .params import (ARG, DEFAULTS, KEYS, KIND, NON_AUDIO_KEYS, PARAMS,
+from .params import (ARG, DEFAULTS, KEYS, KIND, NON_AUDIO_KEYS, PARAMS, TOOLTIPS,
                      SEED_KEY, TRIMMED_KEYS)
 from . import presets as preset_store
 from .validate import RULESET_VER, validate
@@ -64,12 +64,17 @@ class MadowInputs:
         for key, _group, _out, _kind_name, default, spec in PARAMS:
             opts = dict(spec)
             opts["default"] = default
+            if key in TOOLTIPS:
+                opts["tooltip"] = TOOLTIPS[key]
             t = kind_for(key)
             # A combo is passed as the list itself; everything else as a type
             # name plus its options dict.
             required[ARG[key]] = (t,) if isinstance(t, list) else (t, opts)
             if isinstance(t, list):
-                required[ARG[key]] = (t, {"default": default})
+                combo = {"default": default}
+                if key in TOOLTIPS:
+                    combo["tooltip"] = TOOLTIPS[key]
+                required[ARG[key]] = (t, combo)
         return {
             "required": required,
             "optional": {

@@ -16,7 +16,7 @@ class NovaMasterReportViewer:
     RETURN_TYPES = ("NOVA_REPORT",)
     RETURN_NAMES = ("report_json",)
     OUTPUT_NODE = True
-    DESCRIPTION = "Nova Master Report Viewer v0.2.3 — rich visual dashboard for Nova Audio Master report_json."
+    DESCRIPTION = "Nova Master Report Viewer — a visual dashboard for Nova Audio Master's report_json."
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -29,21 +29,26 @@ class NovaMasterReportViewer:
             },
             "optional": {
                 "view_mode": (["Dashboard", "Compare", "Mastering Guide", "Technical"], {
-                    "default": "Dashboard"
+                    "default": "Dashboard",
+                    "tooltip": "Dashboard: release grade and headline measurements. Compare: source against master. "
+                               "Mastering Guide: the process in phases. Technical: the report data. "
+                               "Changing it redraws from the cached report; the workflow does not run again."
                 }),
                 "theme": (["Nova Dark", "Studio", "High Contrast"], {
-                    "default": "Nova Dark"
+                    "default": "Nova Dark",
+                    "tooltip": "Colours of the report. It also applies to exported images."
                 }),
                 "font_scale": ("FLOAT", {
                     "default": 1.0,
                     "min": 0.75,
                     "max": 1.75,
-                    "step": 0.05
+                    "step": 0.05,
+                    "tooltip": "Text size of the report, where 1.0 is normal."
                 }),
-                "show_source": ("BOOLEAN", {"default": True}),
-                "show_processing": ("BOOLEAN", {"default": True}),
-                "show_validation": ("BOOLEAN", {"default": True}),
-                "show_release": ("BOOLEAN", {"default": True}),
+                "show_source": ("BOOLEAN", {"default": True, "tooltip": "Show the section on the source audio as it came in."}),
+                "show_processing": ("BOOLEAN", {"default": True, "tooltip": "Show the section on what the mastering stages did."}),
+                "show_validation": ("BOOLEAN", {"default": True, "tooltip": "Show the section that checks the master against its targets."}),
+                "show_release": ("BOOLEAN", {"default": True, "tooltip": "Show the release decision and its reasons."}),
             },
         }
 

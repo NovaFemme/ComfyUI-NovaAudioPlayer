@@ -103,7 +103,7 @@ class NovaACEDatasetBuilder:
                 "trigger_word": ("STRING", {
                     "default": "",
                     "multiline": False,
-                    "placeholder": "crazygecko",
+                    "placeholder": "myartistlora",
                     "tooltip": "The LoRA trigger, written to every sample as custom_tag. Use a rare token you can type at inference.",
                 }),
                 "tag_position": (["prepend", "append", "replace"], {

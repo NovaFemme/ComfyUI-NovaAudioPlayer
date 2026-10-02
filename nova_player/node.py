@@ -44,6 +44,9 @@ class NovaPlayerNode:
     RETURN_NAMES = ("panel_info",)
     OUTPUT_NODE = True
 
+    DESCRIPTION = ("Plays the connected audio with thirteen live views and a whole-file "
+                   "measurement panel, and outputs the measurements as panel_info.")
+
     PANEL_FORMATS = ["json", "text", "csv_row"]
 
     @classmethod

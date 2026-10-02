@@ -25,9 +25,10 @@ Two custom link types travel between nodes e.g. Nova
 import ast
 import importlib.util
 import os
+import re
 import sys
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 # Relative inside ComfyUI, where the pack is a package. Absolute under
@@ -463,3 +464,120 @@ def render_value(value: Any, limit: int = 0) -> str:
         text = text[:limit] + f"… <+{len(text) - limit} chars>"
     return text
 # endregion
+
+
+# ---------------------------------------------------------------------------
+# Database row -> Nova Master Identity fields
+#
+# Lives here, not in a node module, because two nodes need it: the deprecated
+# Nova SQLite Reader (its 'identity' column set) and Nova Master Identity
+# itself, which applies it to a row wired in from the newer SQLite nodes.
+# ---------------------------------------------------------------------------
+def _norm_column(name: str) -> str:
+    """Column names differ only in punctuation and case between databases."""
+    return re.sub(r"[^a-z0-9]+", "", str(name or "").lower())
+
+
+# Which Nova Master Identity widget each database column feeds. Keys are
+# normalised column names; several spellings map to one field on purpose.
+_IDENTITY_MAP: Dict[str, str] = {}
+for _field, _columns in {
+    "track_title": ("Title", "Track Title", "Song", "Song Title", "track_title"),
+    "artist_name": ("Artist", "Artist Name", "Album Artist", "Performer", "artist_name"),
+    "artist_initials": ("Artist Initials", "Initials", "artist_initials"),
+    "album_title": ("Album", "Album Title", "album_title"),
+    "track_number": ("Track Number", "Track", "TrackNo", "track_number"),
+    "version": ("Version", "Mix", "Mix Version", "version"),
+    "isrc": ("ISRC", "isrc"),
+    "catalog_number": ("Catalog Number", "CatalogNumber", "Catalogue Number",
+                       "Cat No", "catalog_number"),
+    "upc_ean": ("UPC", "EAN", "UPC_EAN", "Barcode", "upc_ean"),
+    "work_id": ("Work ID", "ISWC", "work_id"),
+    "publisher": ("Publisher", "publisher"),
+    "label": ("Label", "Record Label", "label"),
+    "composer": ("Composer", "Writer", "composer"),
+    "producer": ("Producer", "producer"),
+    "mix_engineer": ("Mix Engineer", "mix_engineer"),
+    "mastering_engineer": ("Mastering Engineer", "mastering_engineer"),
+    "mastering_company": ("Mastering Company", "mastering_company"),
+    "copyright_owner": ("Copyright", "Copyright Owner", "copyright_owner"),
+    "release_year": ("Year", "Date", "Release Year", "release_year"),
+    "project_name": ("Project", "Project Name", "project_name"),
+    "territory": ("Territory", "territory"),
+    "language": ("Language", "language"),
+    "explicit_flag": ("Explicit", "explicit_flag"),
+    "client_reference": ("Client Reference", "client_reference"),
+    "notes": ("Comment", "Notes", "Description", "notes"),
+    "target_bit_depth": ("Bit Depth", "target_bit_depth"),
+    "target_sample_rate": ("Sample Rate", "target_sample_rate"),
+}.items():
+    for _column in _columns:
+        _IDENTITY_MAP.setdefault(_norm_column(_column), _field)
+
+_INT_FIELDS = ("track_number", "release_year")
+_TRUE_WORDS = {"1", "true", "yes", "y", "on", "explicit"}
+
+# A column named exactly like an Identity field is a deliberate statement and
+# outranks a tag column that merely maps onto the same field. A table can
+# legitimately carry both: Copyright holds the full notice a player displays
+# while copyright_owner holds just the owner, and Comment holds the public
+# blurb while notes holds the mastering note.
+_CANONICAL_FIELDS = {_norm_column(f): f for f in set(_IDENTITY_MAP.values())}
+
+# Combo widgets accept only these values, so a database string is reduced to
+# its digits and checked rather than passed through ("24-bit" -> "24").
+_CHOICE_FIELDS = {
+    "target_bit_depth": ("24", "16"),
+    "target_sample_rate": ("48000", "44100", "96000"),
+}
+
+
+def _as_int(value: Any, field: str) -> Optional[int]:
+    """Pull an integer out of a tag value: '5/12' -> 5, '2026-09-11' -> 2026."""
+    text = str(value).strip()
+    if field == "release_year":
+        match = re.search(r"(1[89]\d{2}|2[01]\d{2})", text)
+        return int(match.group(1)) if match else None
+    match = re.match(r"\s*(\d+)", text)
+    return int(match.group(1)) if match else None
+
+
+def identity_fields_from_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Map one database row onto Nova Master Identity's field names.
+
+    Only non-empty values are emitted, so a blank cell never clears a value
+    that is already set on the Identity node. A column the map does not
+    recognise is ignored rather than guessed at.
+    """
+    fields: Dict[str, Any] = {}
+
+    def take(column: str, value: Any, authoritative: bool) -> None:
+        field = _CANONICAL_FIELDS.get(_norm_column(column)) if authoritative \
+            else _IDENTITY_MAP.get(_norm_column(column))
+        if not field or value is None:
+            return
+        if not authoritative and field in fields:
+            return                      # an exact column already spoke for this
+        text = str(value).strip()
+        if not text:
+            return
+        if field in _INT_FIELDS:
+            number = _as_int(text, field)
+            if number is not None:
+                fields[field] = number
+        elif field == "explicit_flag":
+            fields[field] = text.lower() in _TRUE_WORDS
+        elif field in _CHOICE_FIELDS:
+            digits = re.sub(r"[^0-9]", "", text)
+            if digits in _CHOICE_FIELDS[field]:
+                fields[field] = digits
+        else:
+            fields[field] = text
+
+    # Pass one: columns named exactly like an Identity field.
+    for column, value in row.items():
+        take(column, value, authoritative=True)
+    # Pass two: tag columns fill only what pass one left empty.
+    for column, value in row.items():
+        take(column, value, authoritative=False)
+    return fields

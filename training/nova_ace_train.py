@@ -446,7 +446,7 @@ class NovaACELoRATrainer:
                 }),
                 "learning_rate": ("FLOAT", {
                     "default": 0.0, "min": 0.0, "max": 0.01, "step": 0.00001, "round": False,
-                    "tooltip": "0 = from the preset (1e-4).",
+                    "tooltip": "Step size of the optimizer. 0 = use the preset's value (1e-4). Set a value here to override the preset.",
                 }),
                 "epochs": ("INT", {
                     "default": 0, "min": 0, "max": 100000,
@@ -454,7 +454,7 @@ class NovaACELoRATrainer:
                 }),
                 "batch_size": ("INT", {
                     "default": 0, "min": 0, "max": 64,
-                    "tooltip": "0 = from the preset.",
+                    "tooltip": "Samples per optimizer step. 0 = use the preset's value (1). A larger batch needs more VRAM; gradient_accumulation raises the effective batch without it.",
                 }),
                 "gradient_accumulation": ("INT", {
                     "default": 0, "min": 0, "max": 256,
@@ -481,8 +481,8 @@ class NovaACELoRATrainer:
                     "tooltip": "bf16 matches the bf16 checkpoints.",
                 }),
                 "dry_run": ("BOOLEAN", {
-                    "default": False, "label_on": "show command only", "label_off": "train",
-                    "tooltip": "Run every pre-flight check and print the exact command, without starting it.",
+                    "default": False, "label_on": "dry run", "label_off": "train",
+                    "tooltip": "train: start training. dry run: run every pre-flight check and print the exact command, without starting it.",
                 }),
                 # APPENDED, not inserted. ComfyUI serialises a node's widget
                 # values positionally, so slotting a new widget in beside the
@@ -631,7 +631,7 @@ class NovaACELoRATrainer:
               gradient_accumulation, save_every, optimizer,
               gradient_checkpointing, device, precision, dry_run,
               warmup_steps=0, acestep_repo_path="", resume_from="", **kwargs):
-        log: List[str] = [banner(f"NOVA ACE LORA TRAINE")]
+        log: List[str] = [banner("NOVA ACE LORA TRAINER")]
 
         def clean(value):
             return os.path.abspath(os.path.expanduser((value or "").strip().strip('"'))) \

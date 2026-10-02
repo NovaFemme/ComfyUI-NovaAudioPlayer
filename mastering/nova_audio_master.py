@@ -1035,14 +1035,16 @@ class NovaAudioMaster:
     FUNCTION = "master"
     RETURN_TYPES = ("AUDIO", "AUDIO", "STRING", "NOVA_REPORT")
     RETURN_NAMES = ("mastered_audio", "original_audio", "report", "report_json")
-    DESCRIPTION = "Nova Audio Master v0.2.7.7-fix4: frozen mastering DSP, run control, profile defaults, and true Off pass-through mode."
+    DESCRIPTION = ("Nova Audio Master — analyses the source and applies bounded tonal, stereo, "
+                   "dynamics, loudness and limiting corrections, with a readable report and a JSON one. "
+                   "Off is a true pass-through: measured and reported, samples untouched.")
 
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {
             "audio": ("AUDIO",{
                 "forceInput": True,
-                "tooltip": "Connect Nova Audio Loader."
+                "tooltip": "The audio to master. Connect Nova Load Audio."
             }),
             "run_count": ("INT", {
                 "default": 1,
@@ -1051,20 +1053,55 @@ class NovaAudioMaster:
                 "step": 1,
                 "tooltip": "Increment this value to force Nova Audio Master and all downstream nodes to execute as a new mastering run."
             }),
-            "mode": (["Auto","Assist","Manual","Off"], {"default":"Auto"}),
-            "profile": (["Metal","EDM-Trance","K-Pop","Balanced"], {"default":"Metal"}),
-            "strength": ("FLOAT", {"default":70.0,"min":0.0,"max":100.0,"step":1.0}),
-            "target_lufs": ("FLOAT", {"default":-11.5,"min":-18.0,"max":-8.0,"step":0.1}),
-            "target_true_peak_dbtp": ("FLOAT", {"default":-1.0,"min":-3.0,"max":-0.1,"step":0.1}),
-            "target_crest_db": ("FLOAT", {"default":9.5,"min":6.0,"max":16.0,"step":0.1}),
-            "high_pass_hz": ("FLOAT", {"default":30.0,"min":0.0,"max":80.0,"step":1.0}),
-            "bass_db": ("FLOAT", {"default":0.0,"min":-6.0,"max":6.0,"step":0.1}),
-            "low_mid_db": ("FLOAT", {"default":0.0,"min":-6.0,"max":6.0,"step":0.1}),
-            "mid_db": ("FLOAT", {"default":0.0,"min":-6.0,"max":6.0,"step":0.1}),
-            "presence_db": ("FLOAT", {"default":0.0,"min":-6.0,"max":6.0,"step":0.1}),
-            "air_db": ("FLOAT", {"default":0.0,"min":-6.0,"max":6.0,"step":0.1}),
-            "stereo_width_percent": ("FLOAT", {"default":100.0,"min":0.0,"max":180.0,"step":1.0}),
-            "mono_below_hz": ("FLOAT", {"default":120.0,"min":0.0,"max":300.0,"step":5.0}),
+            "mode": (["Auto","Assist","Manual","Off"], {
+                "default":"Auto",
+                "tooltip": "Auto: corrections come from the analysis and the profile; leave the EQ widgets at 0 dB.\n"
+                           "Assist: your EQ and width settings are combined with the automatic ones.\n"
+                           "Manual: only your EQ and width settings are used; automatic crest reduction is skipped.\n"
+                           "Off: true pass-through. The audio is analysed and reported, and the samples leave untouched."}),
+            "profile": (["Metal","EDM-Trance","K-Pop","Balanced"], {
+                "default":"Metal",
+                "tooltip": "Reference tonal balance, stereo range and dynamics for the material. "
+                           "It guides the automatic corrections; it does not force every target."}),
+            "strength": ("FLOAT", {
+                "default":70.0,"min":0.0,"max":100.0,"step":1.0,
+                "tooltip": "How far the automatic corrections go, in percent. 0 applies none of them; 100 applies them in full."}),
+            "target_lufs": ("FLOAT", {
+                "default":-11.5,"min":-18.0,"max":-8.0,"step":0.1,
+                "tooltip": "Integrated loudness to aim for, in LUFS. A reference, not a command: the report says "
+                           "NOT_REACHED when getting there would have meant damaging the source."}),
+            "target_true_peak_dbtp": ("FLOAT", {
+                "default":-1.0,"min":-3.0,"max":-0.1,"step":0.1,
+                "tooltip": "True-peak ceiling for the limiter, in dBTP. -1.0 leaves headroom for lossy encoding."}),
+            "target_crest_db": ("FLOAT", {
+                "default":9.5,"min":6.0,"max":16.0,"step":0.1,
+                "tooltip": "Crest factor (peak above RMS) to aim for, in dB. Lower is denser. A reference, like target_lufs."}),
+            "high_pass_hz": ("FLOAT", {
+                "default":30.0,"min":0.0,"max":80.0,"step":1.0,
+                "tooltip": "High-pass corner in Hz: removes rumble below it. 0 turns the filter off."}),
+            "bass_db": ("FLOAT", {
+                "default":0.0,"min":-6.0,"max":6.0,"step":0.1,
+                "tooltip": "Manual EQ for 20-250 Hz, in dB. Used in Assist and Manual; leave at 0 in Auto."}),
+            "low_mid_db": ("FLOAT", {
+                "default":0.0,"min":-6.0,"max":6.0,"step":0.1,
+                "tooltip": "Manual EQ for the low mids, in dB. It acts on the 250 Hz-2 kHz band at about half "
+                           "strength, added to mid_db. Used in Assist and Manual."}),
+            "mid_db": ("FLOAT", {
+                "default":0.0,"min":-6.0,"max":6.0,"step":0.1,
+                "tooltip": "Manual EQ for 250 Hz-2 kHz, in dB. Used in Assist and Manual; leave at 0 in Auto."}),
+            "presence_db": ("FLOAT", {
+                "default":0.0,"min":-6.0,"max":6.0,"step":0.1,
+                "tooltip": "Manual EQ for 2-6 kHz, in dB. Used in Assist and Manual; leave at 0 in Auto."}),
+            "air_db": ("FLOAT", {
+                "default":0.0,"min":-6.0,"max":6.0,"step":0.1,
+                "tooltip": "Manual EQ above 6 kHz, in dB. Used in Assist and Manual; leave at 0 in Auto."}),
+            "stereo_width_percent": ("FLOAT", {
+                "default":100.0,"min":0.0,"max":180.0,"step":1.0,
+                "tooltip": "Stereo width, where 100 leaves it unchanged. Ignored in Auto, scales the automatic "
+                           "width in Assist, and is used directly in Manual. The result is kept between 65 and 145 %."}),
+            "mono_below_hz": ("FLOAT", {
+                "default":120.0,"min":0.0,"max":300.0,"step":5.0,
+                "tooltip": "The side (stereo) signal is faded out below this frequency, so the low end stays mono."}),
         }}
 
     def master(self, audio: Dict[str, Any], run_count, mode, profile, strength, target_lufs,

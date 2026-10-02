@@ -21,10 +21,20 @@ class NovaTrackInspectorReportViewer:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "inspection_json": ("NOVA_REPORT", {"forceInput": True}),
-                "view_mode": (["Inspector", "Timeline", "Markers", "Technical"], {"default": "Inspector"}),
-                "theme": (["Nova Dark", "High Contrast", "Studio Slate"], {"default": "Nova Dark"}),
-                "font_scale": ("FLOAT", {"default": 1.0, "min": 0.75, "max": 1.5, "step": 0.05}),
+                "inspection_json": ("NOVA_REPORT", {
+                    "forceInput": True,
+                    "tooltip": "Connect Nova Track Inspector's inspection_json here."}),
+                "view_mode": (["Inspector", "Timeline", "Markers", "Technical"], {
+                    "default": "Inspector",
+                    "tooltip": "Inspector: score, grade and verdict. Timeline: the graphs over time. "
+                               "Markers: the marked events. Technical: the inspection data. "
+                               "Changing it redraws from the cached report; the workflow does not run again."}),
+                "theme": (["Nova Dark", "High Contrast", "Studio Slate"], {
+                    "default": "Nova Dark",
+                    "tooltip": "Colours of the report. It also applies to exported images."}),
+                "font_scale": ("FLOAT", {
+                    "default": 1.0, "min": 0.75, "max": 1.5, "step": 0.05,
+                    "tooltip": "Text size of the report, where 1.0 is normal."}),
             }
         }
 
