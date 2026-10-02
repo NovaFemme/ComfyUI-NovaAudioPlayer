@@ -467,8 +467,11 @@ function seedFor(group, key) {
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, Number(v) || 0));
 
+// `enabled` is the master switch: off, the studio applies nothing at all and
+// the page looks the way ComfyUI draws it. `restyleAll` is kept only so a
+// store written by an older build still loads; nothing sets it any more.
 const PRESET_DEFAULTS = { theme: "", finish: "", nodeAlpha: 1, restyleAll: false,
-                          renderer: "auto", collapsible: false };
+                          renderer: "auto", collapsible: false, enabled: true };
 
 /* ------------------------------------------------------------- renderer --
  * NODES 2.0 IS A DIFFERENT RENDERER, NOT A DIFFERENT SKIN.
@@ -813,10 +816,9 @@ function probeRenderer() {
  * Nothing a palette can say will reach it, which is why a green node stays
  * green through all twenty-four combinations.
  *
- * So the wipe is an explicit, reversible act rather than something a preset
- * does behind your back. Turning it on stores every override it clears, and
- * turning it off puts them all back — including the pack's own colours, which
- * are somebody's design decision and not noise.
+ * Since 2.7.0 the studio no longer clears those colours (the "Theme colours"
+ * button is gone). The maps below only remain so that a colour an older build
+ * cleared in this session can still be put back.
  */
 const cleared = new Map();   // node id -> { color, bgcolor }
 const clearedGroups = new Map();
@@ -886,47 +888,6 @@ function styleTargets() {
     };
 }
 
-function wipeNodeStyles() {
-    const { nodes, groups } = styleTargets();
-    let changed = 0, refused = 0;
-    for (const node of nodes) {
-        if (node.color === undefined && node.bgcolor === undefined) continue;
-        const saved = { color: node.color, bgcolor: node.bgcolor };
-        try {
-            // Assigned undefined rather than deleted: a pack that sets its
-            // colour on the CLASS would have the prototype's value reappear
-            // the moment an own property is removed. An own `undefined`
-            // shadows it and LiteGraph falls through to the palette.
-            node.color = undefined;
-            node.bgcolor = undefined;
-        } catch {
-            // A colour exposed as a getter with no setter throws here in
-            // strict mode. One node refusing must not abandon the rest.
-        }
-        // VERIFIED, NOT ASSUMED. Read it back: if the assignment did not take,
-        // this node is not counted and not recorded as something to restore,
-        // and the message below reports the refusal instead of claiming a
-        // change the canvas will plainly contradict.
-        if (node.color === undefined && node.bgcolor === undefined) {
-            if (!cleared.has(node.id)) cleared.set(node.id, saved);
-            changed++;
-        } else {
-            refused++;
-        }
-    }
-    for (const g of groups) {
-        if (g.color === undefined) continue;
-        if (!clearedGroups.has(g.id)) clearedGroups.set(g.id, g.color);
-        try { g.color = undefined; } catch { /* as above */ }
-        if (g.color === undefined) changed++; else refused++;
-    }
-    app?.canvas?.setDirty(true, true);
-    // `scanned` as well as `changed`, so "nothing happened" can say WHICH
-    // nothing: no graph reachable, a graph already clean, or a frontend that
-    // would not let go of its colours.
-    return { scanned: nodes.length, changed, refused };
-}
-
 function restoreNodeStyles() {
     const { nodes, groups } = styleTargets();
     let n = 0;
@@ -969,12 +930,6 @@ function hookNodeAdded() {
     const prev = graph.onNodeAdded;
     graph.onNodeAdded = function (node) {
         const r = prev?.apply(this, arguments);
-        if (preset.restyleAll && node &&
-            (node.color !== undefined || node.bgcolor !== undefined)) {
-            cleared.set(node.id, { color: node.color, bgcolor: node.bgcolor });
-            node.color = undefined;
-            node.bgcolor = undefined;
-        }
         // THE MOMENT THE RENDERER BECOMES KNOWABLE. Detection needs a node to
         // look at, so an empty canvas can only answer "unknown" — and a node
         // joining is precisely the event that changes that. Restoring a
@@ -1032,7 +987,7 @@ let baseline = null;     // what it was when this session started — what Reset
  */
 function applyNodeAlpha() {
     const c = app?.canvas;
-    if (!c) return;
+    if (!c || !studioOn()) return;
     c.editor_alpha = clamp(preset.nodeAlpha ?? 1, 0.2, 1);
     c.setDirty(true, true);
 }
@@ -1178,7 +1133,96 @@ function applyFieldFloor(litegraph_base = {}) {
     return wash;
 }
 
+/* ------------------------------------------------------- the master switch --
+ *
+ * ENABLED / DISABLED, IN PLACE OF "THEME COLOURS" / "OWN COLOURS".
+ *
+ * Those two buttons answered a question this pack no longer asks: since 2.7.0
+ * no Nova node carries a colour of its own. What was missing was a way to step
+ * out of the studio altogether. Picking a palette in ComfyUI's own Settings
+ * left the wallpaper and the see-through bodies on, with grey default text
+ * over them (test report, R-4), and nothing short of deleting the stored theme
+ * turned them off.
+ *
+ * Disabled means the studio applies NOTHING: no palette, no wallpaper, no node
+ * transparency, no Nodes 2.0 stylesheet, no field floor. Everything it had
+ * written is taken back, and ComfyUI's own active palette is re-applied by
+ * ComfyUI itself, so the canvas matches a stock install. The stored theme is
+ * kept and can still be edited; Enabled puts it back without a reload.
+ */
+const studioOn = () => preset.enabled !== false;
+
+/** Ask ComfyUI to re-apply the palette chosen in its own Settings. */
+async function reapplyComfyPalette() {
+    const id = readSetting("Comfy.ColorPalette");
+    const set = async (value) => {
+        if (app.extensionManager?.setting?.set) return app.extensionManager.setting.set("Comfy.ColorPalette", value);
+        if (app.ui?.settings?.setSettingValue) return app.ui.settings.setSettingValue("Comfy.ColorPalette", value);
+        throw new Error("no settings API");
+    };
+    if (typeof id !== "string" || !id) return false;
+    try {
+        // The frontend only loads a palette when the setting CHANGES, so it is
+        // moved off the current one and straight back. It ends where it began.
+        await set(id === "dark" ? "light" : "dark");
+        await set(id);
+        return true;
+    } catch (e) {
+        console.warn("[Nova Theme Studio] could not ask ComfyUI to re-apply its palette:", e);
+        return false;
+    }
+}
+
+/** Take back everything the studio wrote to the page. */
+async function disableAll() {
+    const c = app?.canvas;
+
+    document.getElementById(LAYER_ID)?.remove();           // wallpaper and scrim
+    document.getElementById(FLOOR_ID)?.remove();           // Nodes 2.0 field floor
+    try { window.novaThemeRenderers?.v2?.off?.(); } catch { /* not installed */ }
+    v2Applied = null;
+    lastRenderer = null;
+    clearTimeout(settleTimer);
+    settleTimer = null;
+
+    // A node whose colour an older build cleared for "Theme colours".
+    if (cleared.size) restoreNodeStyles();
+    preset.restyleAll = false;
+
+    if (c) {
+        c.editor_alpha = 1;
+        c.onRenderBackground = null;
+        c._pattern = null;
+        c._bg_img = null;
+    }
+
+    // The colours: ComfyUI's own loader writes every key the studio wrote.
+    // Failing that, what the page had when this session started.
+    if (!(await reapplyComfyPalette()) && baseline) {
+        const { node_slot = {}, litegraph_base = {}, comfy_base = {} } = baseline.colors || {};
+        const LG = window.LiteGraph || null;
+        if (c?.default_connection_color_byType) Object.assign(c.default_connection_color_byType, node_slot);
+        if (LG) for (const [k, v] of Object.entries(litegraph_base)) LG[k] = v;
+        for (const [k, v] of Object.entries(comfy_base)) document.documentElement.style.setProperty(`--${k}`, v);
+    }
+    c?.setDirty(true, true);
+}
+
+/** The switch itself. Returns the state it ended in. */
+async function setEnabled(on) {
+    preset.enabled = !!on;
+    saveStore();
+    if (preset.enabled) {
+        applyAll();
+        scheduleSettle(true);
+    } else {
+        await disableAll();
+    }
+    return preset.enabled;
+}
+
 function applyPalette() {
+    if (!studioOn()) return false;
     if (!palette) return false;
     const c = app?.canvas;
     if (!c) return false;
@@ -1291,7 +1335,6 @@ function applyPalette() {
     hookNodeAdded();
     // Re-run after every repaint: a preset that changes the defaults is only
     // visible on nodes that are actually using the defaults.
-    if (preset.restyleAll) wipeNodeStyles();
     c.setDirty(true, true);
     return true;
 }
@@ -1333,6 +1376,7 @@ function backdropLayer() {
 }
 
 function applyBackdrop() {
+    if (!studioOn()) return;
     const el = backdropLayer();
     const scrim = document.getElementById(`${LAYER_ID}-scrim`);
     const src = resolveSrc(backdrop.image);
@@ -1368,6 +1412,7 @@ function applyBackdrop() {
 }
 
 function applyAll() {
+    if (!studioOn()) return false;
     applyBackdrop();
     const r = applyPalette();
     scheduleSettle();
@@ -1434,6 +1479,7 @@ let watchedCount = -1;
 function watchGraphSwap() {
     if (graphWatch) return;
     graphWatch = setInterval(() => {
+        if (!studioOn()) return;
         const graph = liveGraph();
         if (!graph) return;
 
@@ -1542,6 +1588,7 @@ function reportGivingUp(why) {
 }
 
 function scheduleSettle(fresh = false) {
+    if (!studioOn()) return;
     if (fresh) { settleTries = 0; settleStart = 0; gaveUpLogged = false; }
     if (!settleStart) settleStart = Date.now();
     if (settleTimer || rendererSettled()) return;
@@ -1791,8 +1838,8 @@ function buildPanel(node) {
             <span class="nts__lbl">finish</span>
             <span class="nts__chips" data-kind="finish"></span>
             <span class="nts__sep"></span>
-            <span class="nts__lbl">nodes</span>
-            <span class="nts__chips" data-kind="nodes"></span>
+            <span class="nts__lbl">theme studio</span>
+            <span class="nts__chips" data-kind="enabled"></span>
             <span class="nts__sep"></span>
             <span class="nts__lbl">renderer</span>
             <span class="nts__chips" data-kind="renderer"></span>
@@ -1846,39 +1893,11 @@ function buildPanel(node) {
                 : kind === "finish" ? preset.finish
                 : kind === "renderer" ? preset.renderer
                 : kind === "panel" ? (preset.collapsible ? "on" : "off")
-                : (preset.restyleAll ? "theme" : "own");
+                : (studioOn() ? "on" : "off");
             for (const chip of box.children) {
                 chip.classList.toggle("on", chip.dataset.id === active);
             }
         }
-    }
-
-    /** Turn the wipe's verified counts into something a person can act on. */
-    function reportRestyle(on, { scanned, changed, refused }) {
-        if (!scanned) return say("No graph found — nothing to restyle", true);
-        if (refused) {
-            return say(`${changed} of ${scanned} changed; ${refused} would not ` +
-                       `give up their colour`, true);
-        }
-        if (!changed) {
-            return say(on ? `All ${scanned} nodes already follow the theme`
-                          : "Nothing to put back");
-        }
-        say(on ? `${changed} of ${scanned} nodes now follow the theme`
-               : `${changed} node${changed === 1 ? "" : "s"} back to their own colours`);
-    }
-
-    function setRestyle(on) {
-        preset.restyleAll = on;
-        saveStore();
-        hookNodeAdded();
-        const result = on ? wipeNodeStyles() : restoreNodeStyles();
-        paintChips();
-        // render() clears the message line on its way out, so the report goes
-        // after it. Reversing these two is how a "3 of 5 nodes" turned into a
-        // blank line and looked like nothing had happened.
-        render();
-        reportRestyle(on, result);
     }
 
     function buildChips() {
@@ -1922,30 +1941,33 @@ function buildPanel(node) {
             finishBox.appendChild(chip);
         }
 
-        // THE ANSWER TO "THE OTHER NODES DO NOT CHANGE", AND IT BELONGS HERE.
-        //
-        // This was a checkbox at the bottom of a sixty-row scrolling list,
-        // under a heading about the backdrop. Watching it be looked for and not
-        // found is the whole argument: the control that answers the question
-        // the finishes raise has to sit where the finishes are.
-        const nodesBox = root.querySelector('.nts__chips[data-kind="nodes"]');
-        const NODE_MODES = [
-            ["theme", "Theme colours",
-             "Clear the colour each node carries of its own, so every node " +
-             "follows the palette. Most packs set one, and a node with its own " +
-             "colour never looks at the theme."],
-            ["own", "Own colours",
-             "Give every node back the colour it had. Nothing is lost by " +
-             "switching between these."],
+        // THE MASTER SWITCH. It sits with the finishes because that is where the
+        // question comes up: "how do I get my own ComfyUI look back?"
+        const enabledBox = root.querySelector('.nts__chips[data-kind="enabled"]');
+        const ENABLED_MODES = [
+            ["on", "Enabled",
+             "Theme Studio applies its theme, finish, wallpaper and node " +
+             "transparency."],
+            ["off", "Disabled",
+             "Theme Studio applies nothing. The canvas looks the way ComfyUI " +
+             "draws it, with the palette chosen in ComfyUI's Settings: no " +
+             "wallpaper and no see-through nodes. Your theme is kept, and " +
+             "Enabled puts it back."],
         ];
-        for (const [id, label, tip] of NODE_MODES) {
+        for (const [id, label, tip] of ENABLED_MODES) {
             const chip = document.createElement("button");
             chip.className = "nts__chip";
             chip.dataset.id = id;
             chip.title = tip;
             chip.textContent = label;
-            chip.addEventListener("click", () => setRestyle(id === "theme"));
-            nodesBox.appendChild(chip);
+            chip.addEventListener("click", async () => {
+                await setEnabled(id === "on");
+                paintChips();
+                render();
+                say(studioOn() ? `${palette?.name || "Theme"} applied`
+                               : "Disabled — the canvas is as ComfyUI draws it");
+            });
+            enabledBox.appendChild(chip);
         }
 
         // Auto is the default and should stay it; the two overrides are for the
@@ -2177,10 +2199,6 @@ function buildPanel(node) {
                 ["dim", "range", [0, 0.9, 0.01], backdrop, applyBackdrop],
                 ["hideGrid", "check", null, backdrop, applyBackdrop],
                 ["nodeAlpha", "range", [0.2, 1, 0.01], preset, applyNodeAlpha],
-                // `restyleAll` is deliberately NOT a row here any more. It has
-                // a chip beside the finishes, and two controls for one piece
-                // of state is two things to keep in step and one of them to
-                // find stale.
             ].filter(([k]) => !q || k.toLowerCase().includes(q));
             if (fields.length) {
                 rows.appendChild(section("canvas & backdrop — not part of a theme file"));
@@ -2195,11 +2213,6 @@ function buildPanel(node) {
                             "For see-through nodes use a Tinted/Frosted/Glass " +
                             "finish instead; those leave the text crisp. " +
                             "Choosing any finish puts this back to 1."],
-                        restyleAll: ["restyle all nodes",
-                            "Most nodes carry a colour of their own, and a node " +
-                            "with its own colour never looks at the theme. This " +
-                            "clears those overrides so every node follows the " +
-                            "palette. Turning it back off restores each one."],
                     };
                     const label = document.createElement("label");
                     const [text, tip] = LABELS[key] || [key, key];
@@ -2372,7 +2385,9 @@ function bootstrap() {
     palette = stored.palette
         ? JSON.parse(JSON.stringify(stored.palette))
         : JSON.parse(JSON.stringify(baseline));
-    applyAll();
+    // "Theme colours" is gone; a store that still has it on is brought in line.
+    if (preset.restyleAll) { preset.restyleAll = false; saveStore(); }
+    applyAll();          // does nothing at all when the studio is disabled
     watchGraphSwap();
     return true;
 }
@@ -2665,8 +2680,8 @@ app.registerExtension({
                     `    themes:   ${THEMES.map(t => t.id).join(", ")}\n` +
                     `    finishes: ${FINISHES.map(f => f.id).join(", ")}\n` +
                     "novaTheme.nodeAlpha(0.2-1) fade whole nodes (editor_alpha)\n" +
-                    "novaTheme.restyle(true)    clear per-node colours so every\n" +
-                    "                           node follows the theme; false undoes it\n" +
+                    "novaTheme.enabled(false)   switch the studio off: nothing applied,\n" +
+                    "                           ComfyUI's own palette back; true undoes it\n" +
                     "novaTheme.unfade()         put back any alpha knocked to 0\n" +
                     "novaTheme.renderer()       which renderer is drawing the nodes\n" +
                     "novaTheme.probe()          what is colouring a node right now\n" +
@@ -2723,11 +2738,10 @@ app.registerExtension({
                 console.log(JSON.stringify(report, null, 2));
                 return report;
             },
-            restyle(on = true) {
-                preset.restyleAll = !!on;
-                saveStore();
-                hookNodeAdded();
-                return preset.restyleAll ? wipeNodeStyles() : restoreNodeStyles();
+            /** The master switch: novaTheme.enabled(false) applies nothing. */
+            enabled(on) {
+                if (on === undefined) return studioOn();
+                return setEnabled(!!on);
             },
             get: () => JSON.stringify(exportPalette(), null, 2),
             set(v) { importPalette(typeof v === "string" ? JSON.parse(v) : v); },

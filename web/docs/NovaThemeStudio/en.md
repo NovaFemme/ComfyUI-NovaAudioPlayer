@@ -37,7 +37,7 @@ wallpaper set and both `blur` and `dim` still at 0, the studio sets `blur` to
 
 | Row | Options | What it does |
 |---|---|---|
-| **nodes** | Theme colours / Own colours | *Theme colours* clears the colour each node carries of its own, so every node follows the palette. *Own colours* gives every node its colour back. Nothing is lost by switching. |
+| **theme studio** | Enabled / Disabled | The master switch. *Disabled* applies nothing at all: no palette, no wallpaper, no see-through nodes. Everything the studio wrote is taken back and the palette chosen in ComfyUI's own Settings is shown, as on a stock install. Your theme is kept, and can still be edited while disabled; *Enabled* puts it back without a reload. Also `novaTheme.enabled(false)` in the browser console. |
 | **renderer** | Auto / Classic / Nodes 2.0 | How the studio treats the nodes. Leave it on *Auto*; the other two are for when the probe reads the renderer wrongly. |
 | **top panel** | Always shown / Collapsible | *Collapsible* puts a fold button on the title bar of nodes that have a panel of their own. Folding hides the slots and widget rows above the panel. Nodes 2.0 only. |
 
