@@ -596,21 +596,27 @@ function detectRenderer() {
                  how: named ? `setting ${named.id}` : "no nodes on the canvas yet" };
     }
 
-    // ASKED BY ID FIRST. The frontend stamps every Nodes 2.0 card with
-    // `data-node-id`, and a card that carries a graph node's id is a DOM node
-    // by definition. Unlike the hit-test below, this does not depend on the
-    // node being on screen, on the zoom, on what is drawn over it or on the
-    // title text having rendered. Retest 1 of 2.7.0: after a restart the
-    // hit-test found no card on a page full of them, the answer came back
-    // "classic", and the adapter's stylesheet was removed and never rebuilt.
-    for (const node of nodes) {
-        if (node?.id == null) continue;
-        let card = null;
-        try { card = document.querySelector(`[data-node-id="${CSS.escape(String(node.id))}"]`); } catch { /* odd id */ }
-        if (card) {
-            everV2 = true;
-            return { mode: "v2", nodes: nodes.length, how: "a node card carries data-node-id" };
-        }
+    // THE SETTING DECIDES, AND THE PAGE CONFIRMS.
+    //
+    // `Comfy.VueNodes.Enabled` is the frontend's own statement of which
+    // renderer it is running, and every Nodes 2.0 card carries `data-node-id`.
+    // Either is a direct answer; neither depends on a node being on screen, on
+    // the zoom, on what is drawn over a node or on its title having rendered,
+    // which is everything the hit-test below depends on.
+    //
+    // Retests 1 to 3 of 2.7.0 are why this comes first. With Nodes 2.0 on and
+    // 31 cards in the page, this function answered "v1" because the canvas had
+    // painted a node 142 ms earlier — and on frontend 1.53.6 the canvas goes on
+    // calling `drawNode` under Nodes 2.0 (24 calls in 1.5 s, ComfyUI's own
+    // renderFrame -> draw -> drawFrontCanvas). A v1 answer removes the
+    // adapter's stylesheet and counts as settled, so Glass was never applied.
+    if (named?.on === true) {
+        everV2 = true;
+        return { mode: "v2", nodes: nodes.length, how: `setting ${named.id}` };
+    }
+    if (named?.on !== false && document.querySelector("[data-node-id]")) {
+        everV2 = true;
+        return { mode: "v2", nodes: nodes.length, how: "node cards carry data-node-id" };
     }
 
     // SAMPLED FROM WHAT IS ON SCREEN, not from the first eight in the list.
@@ -650,6 +656,7 @@ function detectRenderer() {
     // requires evidence that the canvas really is painting, and the absence of
     // both answers is reported as the absence of an answer.
     const sincePaint = lastDrawNode ? Date.now() - lastDrawNode : Infinity;
+
     if (sincePaint < 2000) {
         // AUTO-DETECTION MAY DECIDE, BUT IT MAY NOT CHANGE ITS MIND DOWNWARDS.
         //

@@ -147,9 +147,16 @@ function cardById(node) {
 function pairsFor(nodes, canvas, limit) {
     const seen = [];
     const out = [];
+    // Read off the cards themselves first: every stamped card, matched to its
+    // node by the id it carries. No selector is built from the id, so nothing
+    // about how an id is written can make the match fail.
+    const stamped = new Map();
+    for (const card of document.querySelectorAll("[data-node-id]")) {
+        if (!stamped.has(card.dataset.nodeId)) stamped.set(card.dataset.nodeId, card);
+    }
     for (const node of nodes) {
         if (out.length >= limit) break;
-        const direct = cardById(node);
+        const direct = stamped.get(String(node?.id)) || cardById(node);
         if (direct) {
             if (!seen.includes(direct)) { seen.push(direct); out.push({ node, card: direct }); }
             continue;
