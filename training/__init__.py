@@ -11,7 +11,7 @@ The whole path from a folder of mastered audio to a trained LoRA:
 
 Nova owns the dataset JSON, where it has metadata nothing else does. The
 tensor writer and the training loop are ACE-Step's own, called rather than
-reimplemented — see nova_ace_common.py for why that split is the one that
+reimplemented — see nova_definitions.py for why that split is the one that
 stays correct.
 """
 

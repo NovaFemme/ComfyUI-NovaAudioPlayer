@@ -43,3 +43,16 @@ example_workflows/*/*.png
 # revisions, including nodes held back from this release. It is working material,
 # not user documentation, and the same reasoning that keeps docs/ out keeps it out.
 training/RELEASE_NOTES.md
+
+# The training installer is fetched from GitHub by the users who want LoRA
+# training (training/USER_GUIDE.md, section 0; Nova ACE Setup Check prints the
+# command). Keeping both files out of the package means no package installation
+# happens anywhere in what the Registry publishes, and the reviewer of the main
+# pack does not have to read an installer most users never run.
+install.py
+training/nova_ace_setup.py
+
+# Working documents, not user documentation.
+HANDOVER.md
+INSTALL_V0.2.md
+AUDIO_MASTER_README.md

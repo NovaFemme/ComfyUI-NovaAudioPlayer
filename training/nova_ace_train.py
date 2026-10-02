@@ -60,10 +60,10 @@ from typing import Any, Dict, List, Optional, Tuple
 # Relative inside ComfyUI, where the pack is a package. Absolute under
 # dev/tests, which put the pack root on the path themselves.
 try:
-    from ..nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner
+    from ..nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner, check_acestep_repo
     from ..nova_categories import TRAINING
 except ImportError:
-    from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner
+    from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner, check_acestep_repo
     from nova_categories import TRAINING
 
 #: Upstream's preset directory, relative to the acestep package root.
@@ -640,7 +640,12 @@ class NovaACELoRATrainer:
         tensors = clean(tensor_dir)
         out = clean(output_dir)
         ckpt = clean(checkpoint_dir)
-        repo = clean(acestep_repo_path)
+        # Resolved and checked before anything uses it: this folder goes on the
+        # child's PYTHONPATH, so it must be a real ACE-Step clone and not a
+        # folder a workflow can write to.
+        repo, repo_problem = check_acestep_repo(acestep_repo_path)
+        if repo_problem:
+            raise ValueError(f"Nova ACE LoRA Trainer: {repo_problem}")
         resume = clean(resume_from)
 
         # -- Pre-flight. Everything that can be known before a model loads --
@@ -668,11 +673,12 @@ class NovaACELoRATrainer:
             )
         absent = check_remote_code_imports(ckpt, variant)
         if absent:
-            raise ImportError(f"Nova ACE LoRA Trainer: the {VARIANT_DIRS.get(variant, variant)} checkpoint needs which is not installed in ComfyUI's Python.\n {describe_remote_code_requirement(absent)}"
-            )
-        if repo and not os.path.isdir(repo):
-            raise NotADirectoryError(
-                f"Nova ACE LoRA Trainer: acestep_repo_path {repo} is not a directory."
+            raise ImportError(
+                "Nova ACE LoRA Trainer: the "
+                + VARIANT_DIRS.get(variant, variant)
+                + " checkpoint needs " + ", ".join(absent)
+                + ", which is not installed in ComfyUI's Python.\n"
+                + describe_remote_code_requirement(absent)
             )
 
         # Find acestep HERE rather than letting the child fail on the import.

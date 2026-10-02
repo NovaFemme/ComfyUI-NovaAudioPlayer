@@ -83,14 +83,20 @@ build and make things considerably worse.
 
 ## Fixing things
 
-This node only tells you. Two things fix:
+This node only tells you, and the pack itself installs nothing. The setup
+script fixes: run it once, from a terminal. It is fetched from GitHub, not
+shipped with the pack.
 
-- `install.py` at the pack root — run for you when the pack is installed or
-  updated through ComfyUI-Manager. Packages only; it deliberately does not
-  download the ~21 GB of models.
-- `training/nova_ace_setup.py` — run once, by you, from a terminal. Does the
-  packages, clones ACE-Step, builds the checkpoint tree, and ends by running
-  these same checks against what it built.
+```
+cd ~/ComfyUI
+curl -LO https://raw.githubusercontent.com/NovaFemme/ComfyUI-NovaAudioPlayer/main/training/nova_ace_setup.py
+python nova_ace_setup.py --dry-run     # shows the plan, changes nothing
+python nova_ace_setup.py
+```
+
+It installs the packages, clones ACE-Step, builds the checkpoint tree, and ends
+by running these same checks against what it built. It never replaces your
+PyTorch. If your ComfyUI is not at `~/ComfyUI`, `cd` to wherever it is.
 
 Restart ComfyUI after installing anything, then queue this node again.
 

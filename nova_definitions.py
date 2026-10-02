@@ -271,6 +271,51 @@ def describe_remote_code_requirement(missing: List[str]) -> str:
     )
 
 
+def check_acestep_repo(repo_path: str) -> tuple:
+    """Validate a caller-supplied ACE-Step clone path. Returns ``(path, problem)``.
+
+    The path ends up on ``sys.path`` (Preprocess, Setup Check) or on a child's
+    ``PYTHONPATH`` (Trainer), so whatever folder it names gets to run code. It
+    arrives from a node widget, which means from ``/prompt``. Three rules keep
+    that from being "import any folder a caller can write to":
+
+    * it is resolved with ``realpath``, so a symlink cannot disguise it;
+    * it must look like an ACE-Step clone: ``acestep/__init__.py`` exists;
+    * it may not lie inside ComfyUI's input, output or temp folders, which are
+      the places an upload or a workflow can write files.
+
+    ``problem`` is "" when the path is usable, otherwise one sentence saying why
+    not. An empty ``repo_path`` returns ``("", "")``: the package is then expected
+    to be installed.
+    """
+    raw = (repo_path or "").strip().strip('"').strip("'")
+    if not raw:
+        return "", ""
+    path = os.path.realpath(os.path.expanduser(raw))
+    if not os.path.isdir(path):
+        return path, f"acestep_repo_path {path} is not a directory."
+    if not os.path.isfile(os.path.join(path, "acestep", "__init__.py")):
+        return path, (f"acestep_repo_path {path} does not look like an ACE-Step clone: "
+                      "there is no acestep/__init__.py in it. Point it at the clone root.")
+    try:
+        import folder_paths
+        writable = [folder_paths.get_input_directory(),
+                    folder_paths.get_output_directory(),
+                    folder_paths.get_temp_directory()]
+    except Exception:
+        writable = []
+    for folder in writable:
+        try:
+            base = os.path.realpath(folder)
+        except (OSError, TypeError):
+            continue
+        if path == base or path.startswith(base + os.sep):
+            return path, (f"acestep_repo_path {path} is inside ComfyUI's {os.path.basename(base)} "
+                          "folder. Code is not loaded from the input, output or temp "
+                          "folders; keep the ACE-Step clone somewhere else.")
+    return path, ""
+
+
 def normalise_sample(entry: Dict[str, Any]) -> Dict[str, Any]:
     """Fill defaults so every emitted sample has the full field set."""
     out = dict(SAMPLE_DEFAULTS)

@@ -29,13 +29,19 @@ what and stops before spending any GPU time.
 
 ## 0. The short way
 
-`training/nova_ace_setup.py` does everything in section 1 and 2 for you. Run it
-with any Python 3.10+; it finds ComfyUI's own interpreter itself.
+`nova_ace_setup.py` does everything in section 1 and 2 for you. It is not part
+of the installed pack: fetch it from GitHub into your ComfyUI folder and run it
+with any Python 3.10+. It finds ComfyUI's own interpreter itself.
 
 ```
-python nova_ace_setup.py --dry-run     # show the plan, change nothing
-python nova_ace_setup.py               # do it, asking once
+cd ~/ComfyUI
+curl -LO https://raw.githubusercontent.com/NovaFemme/ComfyUI-NovaAudioPlayer/main/training/nova_ace_setup.py
+python nova_ace_setup.py --dry-run     # shows the plan, changes nothing
+python nova_ace_setup.py
 ```
+
+If your ComfyUI is not at `~/ComfyUI`, `cd` to wherever it is, or pass
+`--comfyui /path/to/ComfyUI`.
 
 It works out whether your PyTorch is CUDA, ROCm, XPU or CPU and installs the
 matching torchcodec; installs the packages ACE-Step's training path needs;
@@ -59,8 +65,8 @@ Useful flags: `--variant`, `--extras adamw8bit,prodigy,lokr`, `--with-inference`
 It ends by running the node pack's **own** checks against what it built, so
 "setup says OK" and "the nodes say OK" are the same statement.
 
-If you installed the pack through ComfyUI-Manager, `install.py` has already
-done the package half for you — only the models are left.
+Installing the pack through ComfyUI-Manager does not install any of this: the
+pack itself installs nothing. The script above is the one step.
 
 **To check without leaving ComfyUI**, drop in **Nova ACE Setup Check 🩺** and
 wire it to a Nova Console. It reports the same things the script does — the

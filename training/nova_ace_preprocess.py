@@ -29,11 +29,11 @@ from typing import Any, Dict, List
 # Relative inside ComfyUI, where the pack is a package. Absolute under
 # dev/tests, which put the pack root on the path themselves.
 try:
-    from ..nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner
+    from ..nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner, check_acestep_repo
     from ..nova_categories import TRAINING
     from ..nova_ace_audio_shim import apply_decode_shim, TORCHCODEC_FIX
 except ImportError:
-    from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner
+    from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner, check_acestep_repo
     from nova_categories import TRAINING
     from nova_ace_audio_shim import apply_decode_shim, TORCHCODEC_FIX
 
@@ -149,16 +149,20 @@ class NovaACEPreprocess:
         # GPU. Checking here costs milliseconds.
         absent = check_remote_code_imports(ckpt, variant)
         if absent:
-            raise ImportError(f"Nova ACE Preprocess: the {VARIANT_DIRS.get(variant, variant)} checkpoint needs", ".join(absent), which is not installed in ComfyUI's Python.\n{describe_remote_code_requirement(absent)}"
+            raise ImportError(
+                "Nova ACE Preprocess: the "
+                + VARIANT_DIRS.get(variant, variant)
+                + " checkpoint needs " + ", ".join(absent)
+                + ", which is not installed in ComfyUI's Python.\n"
+                + describe_remote_code_requirement(absent)
             )
 
-        repo = (acestep_repo_path or "").strip().strip('"')
+        # The folder named here is about to be imported from, so it is checked
+        # first: a real ACE-Step clone, and not somewhere a workflow can write.
+        repo, problem = check_acestep_repo(acestep_repo_path)
+        if problem:
+            raise ValueError(f"Nova ACE Preprocess: {problem}")
         if repo:
-            repo = os.path.abspath(os.path.expanduser(repo))
-            if not os.path.isdir(repo):
-                raise NotADirectoryError(
-                    f"Nova ACE Preprocess: acestep_repo_path {repo} is not a directory."
-                )
             if repo not in sys.path:
                 sys.path.insert(0, repo)
                 log.append(f"Added to sys.path: {repo}")
