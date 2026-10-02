@@ -279,7 +279,13 @@ function widgetColour(palette, ctx) {
     const declared = palette?.colors?.litegraph_base?.WIDGET_BGCOLOR;
     if (!isBlank(declared)) return declared;
     const theme = ctx?.THEMES?.find((t) => t.id === ctx?.preset?.theme);
-    return theme && ctx?.rgba ? ctx.rgba(theme.field, 0.22) : null;
+    if (!theme || !ctx?.rgba) return null;
+    // Glass and Frosted declare no widget colour. A field still needs a box a
+    // label can be read on, so it gets the theme's field colour as a wash:
+    // dark enough to carry light text over a bright wallpaper, and still
+    // see-through. 0.22 was tried first and left values unreadable over white.
+    const finish = ctx?.FINISHES?.find((f) => f.id === ctx?.preset?.finish);
+    return ctx.rgba(theme.field, finish?.id === "glass" ? 0.55 : 0.70);
 }
 
 
@@ -395,7 +401,9 @@ function fitRules(card, host, bang) {
         `${card} *:has(${host}) { flex: 1 1 auto${i}; min-height: 0${i}; }`,
         `${card} ${host} { flex: 1 1 auto${i}; min-height: 0${i}; height: auto${i};`,
         `  display: flex${i}; flex-direction: column${i}; }`,
-        `${card} ${host} > * { flex: 1 1 auto${i}; min-height: 0${i}; }`,
+        // `--nova-min-h` is the minimum a Nova widget host declares for itself
+        // (web/core/vue-size.js). Zero for every other pack's widgets.
+        `${card} ${host} > * { flex: 1 1 auto${i}; min-height: var(--nova-min-h, 0px)${i}; }`,
     ].join("\n");
 }
 
@@ -1117,10 +1125,30 @@ function edgeGeometry(card, surfaces) {
 function rules(card, surfaces, colours, bang, geom) {
     const i = bang ? " !important" : "";
     const { roles } = surfaces;
+    // THE FRONTEND'S OWN VARIABLES, SET ON THE CARD.
+    //
+    // `color` on the card does not reach the text that matters. Widget labels
+    // and slot names carry their own colour class, `text-node-component-slot-text`,
+    // which reads `--node-component-slot-text`; an element that sets its own
+    // colour ignores one inherited from the card. Measured on frontend 1.53.6
+    // under Midnight + Glass: the card said rgb(195, 203, 230) and every label
+    // stayed rgb(160, 160, 160), grey on a see-through body, which is the
+    // unreadable text of the Layer 1 report (B-01).
+    //
+    // Widget fields are the same story (B-12): they take their box from
+    // `--component-node-widget-background`, not from any class this adapter
+    // can name, so the finish's widget colour never arrived and an empty text
+    // field had no visible edge.
+    //
+    // Setting the variables is sturdier than naming classes: they are the
+    // frontend's own contract, and every element that uses them follows.
     const out = [
         `${card} {`,
         `  background-color: ${colours.body}${i};`,
         colours.text ? `  color: ${colours.text}${i};` : "",
+        colours.text ? `  --node-component-slot-text: ${colours.text}${i};` : "",
+        colours.text ? `  --component-node-foreground: ${colours.text}${i};` : "",
+        colours.widget ? `  --component-node-widget-background: ${colours.widget}${i};` : "",
         `}`,
     ].filter(Boolean);
 

@@ -38,6 +38,7 @@
  */
 
 import { app } from "/scripts/app.js";
+import { vueSize, keepMinimumWidth } from "../core/vue-size.js";
 
 /**
  * TWO COPIES OF THIS FILE CANNOT BOTH WIN, AND THE LOSER IS SILENT.
@@ -1010,9 +1011,35 @@ function applyPreset(themeId, finishId) {
     preset.finish = finishById(finishId).id;
     preset.nodeAlpha = finishById(finishId).node;
     palette = buildPreset(preset.theme, preset.finish, palette || baseline);
+    keepWallpaperLegible();
     saveStore();
     applyAll();
     return palette;
+}
+
+/**
+ * A see-through finish over a bright wallpaper leaves text with nothing to be
+ * read against (Layer 1 report, B-01). The node body stays as transparent as
+ * the finish asks for; the wallpaper does the work instead. The first time
+ * Glass or Frosted meets a given wallpaper with both sliders still at zero,
+ * the backdrop is blurred and dimmed to the values the guide recommends.
+ *
+ * Once per wallpaper and finish, and only from zero: someone who sets either
+ * slider, or puts both back to zero afterwards, is not overruled.
+ */
+const LEGIBLE_BLUR = 12;
+const LEGIBLE_DIM = 0.3;
+function keepWallpaperLegible() {
+    const finish = finishById(preset.finish);
+    const seeThrough = finish.body === null && finish.widget === null;
+    if (!seeThrough || !backdrop.image) return false;
+    const key = `${preset.finish}|${backdrop.image}`;
+    if (preset.legibleFor === key) return false;
+    preset.legibleFor = key;
+    if (backdrop.blur > 0 || backdrop.dim > 0) return false;
+    backdrop.blur = LEGIBLE_BLUR;
+    backdrop.dim = LEGIBLE_DIM;
+    return true;
 }
 
 /** Build a palette from what is actually in effect right now. */
@@ -1501,13 +1528,14 @@ async function saveToComfy(name) {
  * content outside the node, so the widget is a pass-through host and the
  * visible panel is sized from node.size on every frame.
  */
-function makeDomHost(inner, initialH) {
+function makeDomHost(inner, initialH, vueMin) {
     const host = document.createElement("div");
     host.style.cssText = "position:relative; overflow:visible; pointer-events:none; width:100%; height:100%;";
     inner.style.cssText += ";position:absolute; left:0; top:0; width:300px;" +
                            `height:${initialH}px; box-sizing:border-box; pointer-events:auto;`;
     host.appendChild(inner);
-    return host;
+    // Nodes 2.0 measures minimum size from the page, not from getMinHeight.
+    return vueSize(host, inner, vueMin);
 }
 
 /**
@@ -2084,6 +2112,18 @@ function buildPanel(node) {
                     const push = () => { store[key] = read(); saveStore(); apply(); };
                     input.addEventListener("input", push);
                     input.addEventListener("change", push);
+                    // A wallpaper chosen while Glass or Frosted is on gets the
+                    // same first-time blur and dim as choosing the finish does.
+                    // On `change`, not `input`: redrawing the rows while the
+                    // name is still being typed would take the focus away.
+                    if (key === "image") {
+                        input.addEventListener("change", () => {
+                            if (!keepWallpaperLegible()) return;
+                            saveStore();
+                            applyBackdrop();
+                            render();
+                        });
+                    }
                     row.appendChild(input);
                     rows.appendChild(row);
                 }
@@ -2355,7 +2395,7 @@ function installBehaviour(proto) {
         let widget;
         try {
             widget = this.addDOMWidget("nova_theme_studio", "HTML",
-                makeDomHost(panel.element, PANEL_MIN_H), {
+                makeDomHost(panel.element, PANEL_MIN_H, { minWidth: 430, minHeight: 300 }), {
                     serialize: false,
                     hideOnZoom: false,
                     getMinHeight: () => PANEL_MIN_H,
@@ -2374,6 +2414,7 @@ function installBehaviour(proto) {
         this._panel = panel;
         widget.computeSize = (width) => [width ?? this.size[0], PANEL_MIN_H + DOM_MARGIN];
         pinDomSize(this, widget, panel.element, PANEL_MIN_H);
+        keepMinimumWidth(this, 430);
         panel.render();
 
         // A node restored from a workflow keeps the size it was saved at; only
@@ -2567,6 +2608,7 @@ app.registerExtension({
             reset() { palette = JSON.parse(JSON.stringify(baseline)); saveStore(); applyAll(); },
             backdrop(patch) {
                 Object.assign(backdrop, patch || {});
+                if (patch && "image" in patch) keepWallpaperLegible();
                 backdrop.blur = clamp(backdrop.blur, 0, 40);
                 backdrop.dim = clamp(backdrop.dim, 0, 0.9);
                 saveStore();
