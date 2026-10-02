@@ -1,11 +1,12 @@
 # ComfyUI-NovaAudioPlayer
 
-An audio player node with twelve live visualisers, a whole-file measurement
+An audio player node with thirteen live visualisers, a whole-file measurement
 strip computed in Python, and a theme system you can drive from inside the node.
 
 The views: waveform, spectrum/EQ, analyzer (goniometer + phase correlation),
 spectrogram, combined, peak/RMS, L/R correlation, frequency bands, combined
-suite, FFT analyzer, RTA analyzer, and the APG artifact meter.
+suite, FFT analyzer, RTA analyzer, the APG artifact meter, and Halo (a
+decorative burst ring, display only).
 
 ## Output
 
@@ -116,9 +117,11 @@ An individual ramp can pin its own space with
 ## The settings drawer
 
 Opened with the gear. It is scoped to the view you are currently looking at:
-switch the view with the pill and the drawer follows. Three sections, one open
-at a time — the active renderer's settings, its colours, and the shared player
-chrome colours. Drag the drawer's left edge to widen it.
+switch the view with the pill and the drawer follows. One section is open at a
+time: the active view's settings, its sequences (decorative views only), its
+colours, the shared player chrome colours, and **Display** (text size, bar
+relief, control hints). Drag the drawer's left edge to widen it. Double-click a
+slider to reset that setting to its default.
 
 Nothing in it has a save button. Every edit applies to the display immediately.
 Where it is *kept* is the **Edits** switch, next to the theme picker:
@@ -140,6 +143,25 @@ never silently discards them; **Reset node** clears them when you want that.
 
 **New** and **Save as** name a theme; that is the only decision that needs
 confirming, and it uses an inline field rather than a browser prompt.
+
+## Sequences (Halo)
+
+Decorative views can record you changing their settings and replay it.
+
+1. Switch to **Halo**, open the drawer, open **Halo · Sequences**.
+2. Click **● Record new…**, type a name, click **Start**.
+3. Change settings. The pauses between changes are recorded. The clock follows
+   the song, so pause the music to think: paused time is not recorded.
+4. Click **■ Stop & save**.
+
+Pick a sequence and click **▶ Play**; it loops, or plays a set number of times.
+Your own settings are not changed, and touching a setting stops playback.
+**🗑** deletes after an "Are you sure?".
+
+Files live in `ComfyUI/user/nova_player/sequences/<view>/<name>.json`. Back the
+folder up, or copy other people's files into it; the list re-reads the folder
+when you choose the view. Settings a file names that this view cannot use are
+skipped.
 
 ## Where settings are stored
 

@@ -181,6 +181,9 @@ ACE-Step install; this pack installs and downloads nothing at runtime.
 
 Drop **Nova Player 🔊** into a workflow and connect any `AUDIO` output.
 
+**New to it? Read the [Nova Player User Guide](docs/NOVA_PLAYER_USER_GUIDE.md)**:
+step by step, with pictures, and a section for when you get stuck.
+
 ### Thirteen views, one button
 
 Cycle them with the pill in the transport row. Every view is a separate module
