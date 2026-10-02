@@ -195,11 +195,33 @@ def _check_where(where: str) -> str:
     return clause
 
 
+def _inside_input(value: str) -> str:
+    """Resolve *value* and require it to stay inside ComfyUI's input folder.
+
+    The same rule Nova Dynamic SQLite Browser applies: a relative value is taken
+    from the input folder, an absolute one is accepted only if it points inside
+    it. Anything else is refused, so this node cannot be used to open, or
+    create, a database anywhere else on the disk.
+    """
+    import folder_paths
+    input_dir = os.path.realpath(folder_paths.get_input_directory())
+    expanded = os.path.expanduser(os.path.expandvars(value))
+    full = os.path.realpath(os.path.join(input_dir, expanded))
+    if full != input_dir and not full.startswith(input_dir + os.sep):
+        raise PermissionError(
+            f"Nova SQLite Reader: {value} is outside ComfyUI's input folder "
+            f"({input_dir}). This node only opens databases inside it. Copy "
+            "the database into the input folder, or use Nova Dynamic "
+            "SQLite Browser, which replaces this node."
+        )
+    return full
+
+
 def _resolve_database(database_path: str, new_folder: str, new_name: str) -> Tuple[str, bool]:
     """Return (path, created_new)."""
     selected = (database_path or "").strip().strip('"').strip("'")
     if selected:
-        path = os.path.abspath(os.path.expanduser(os.path.expandvars(selected)))
+        path = _inside_input(selected)
         if not os.path.isfile(path):
             raise FileNotFoundError(
                 f"Nova SQLite Reader: no database at {path}. Clear the "
@@ -217,7 +239,7 @@ def _resolve_database(database_path: str, new_folder: str, new_name: str) -> Tup
         )
     if not os.path.splitext(name)[1]:
         name += ".db"
-    folder = os.path.abspath(os.path.expanduser(os.path.expandvars(folder)))
+    folder = _inside_input(folder)
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, name)
     created = not os.path.exists(path)

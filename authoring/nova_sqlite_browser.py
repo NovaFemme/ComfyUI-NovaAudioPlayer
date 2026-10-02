@@ -88,15 +88,14 @@ def _first(value):
 
 def _resolve_db_path(value):
     """
-    A relative value names a database inside the input folder, possibly in a
-    sub-folder. It is resolved and then checked to still be inside that folder, so a
-    value like "../../etc/passwd" cannot reach out of it.
+    Every value names a database inside the input folder, possibly in a
+    sub-folder. It is resolved and then checked to still be inside that folder, so
+    neither "../../etc/passwd" nor an absolute path elsewhere on the disk can reach
+    out of it. An absolute path that points inside the input folder is accepted.
     """
     path = str(_first(value) or "").strip()
     if not path or path == NO_DB:
         return ""
-    if os.path.isabs(path):
-        return path                     # an explicit absolute path is the user's own call
     input_dir = os.path.realpath(folder_paths.get_input_directory())
     full = os.path.realpath(os.path.join(input_dir, path.replace("/", os.sep)))
     if full != input_dir and not full.startswith(input_dir + os.sep):
