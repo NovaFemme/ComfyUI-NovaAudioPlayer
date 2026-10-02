@@ -20,14 +20,13 @@ emits was decided upstream, so there is nothing here that can disagree with
 from .comfy_types import BUNDLE_TYPE, kind_for
 from .params import DEFAULTS, KEYS, OUTPUT_NAMES
 
-import sys
-from pathlib import Path
 
-# insert node to root folder into syspath
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-# Clean absolute imports
-from nova_categories import GENERATION
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from ..nova_categories import GENERATION
+except ImportError:
+    from nova_categories import GENERATION
 
 
 class MadowUnpack:

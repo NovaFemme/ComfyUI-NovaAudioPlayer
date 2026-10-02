@@ -5,14 +5,14 @@ import hashlib
 from datetime import datetime, timezone
 from typing import Dict, Any, Tuple, List
 import torch
-import sys
-from pathlib import Path
 
-# insert node to root folder into syspath
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# Clean absolute imports
-from nova_categories import MASTERING
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from ..nova_categories import MASTERING
+except ImportError:
+    from nova_categories import MASTERING
 
 
 try:
@@ -39,9 +39,6 @@ def _true_peak_limit(x: torch.Tensor, sr: int, ceiling_dbtp: float):
         return x, 0.0
     gr = tp - ceiling_dbtp
     return x * _db_to_gain(-gr), gr
-
-
-
 
 
 def _frame_rms_db(x: torch.Tensor, sr: int, win_ms: float = 60.0, hop_ms: float = 10.0):
@@ -170,7 +167,6 @@ def _simulate_final_chain(x, sr, target_lufs, target_true_peak_dbtp):
 
 def _limiter_budget_rank(name: str) -> int:
     return {"PREFERRED": 0, "ACCEPTABLE": 1, "WARNING": 2, "HEAVY": 3}.get(name, 4)
-
 
 
 def _adaptive_safe_crest_target(
@@ -462,8 +458,6 @@ def _adaptive_dynamics_stage(
     }
 
 
-
-
 def _limiter_release_score(gr_db: float):
     budget = _limiter_budget_class(float(gr_db))
     if budget == "PREFERRED":
@@ -629,7 +623,6 @@ def _crest_classification(profile: str, crest: float):
     return "TOO_DYNAMIC", "Substantially above the profile range; likely under-dense for release mastering.", 35.0
 
 
-
 def _adaptive_loudness_validation(achieved_lufs, target_lufs, achieved_tp, target_tp,
                                   final_trim_db, max_trim_db, limiter_gr_db, limiter_budget):
     legacy_status, legacy_note, legacy_score = _loudness_classification(
@@ -701,7 +694,6 @@ def _stereo_classification(corr: float):
     if corr <= 0.95:
         return "PASS", "Positive correlation in a generally safe range.", 100.0
     return "ACCEPTABLE", "Highly correlated/narrow, but mono-safe.", 85.0
-
 
 
 def _adaptive_tonal_validation(
@@ -821,7 +813,6 @@ def _grade(score):
     if score >= 80: return "B"
     if score >= 70: return "C"
     return "D"
-
 
 
 def _canonical_json_sha256(value: Dict[str, Any]) -> str:

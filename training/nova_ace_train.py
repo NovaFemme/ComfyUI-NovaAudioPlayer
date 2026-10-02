@@ -55,14 +55,16 @@ import sys
 import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
-from pathlib import Path
 
-# insert node to root folder into syspath
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# Clean absolute imports
-from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner
-from nova_categories import TRAINING
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from ..nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner
+    from ..nova_categories import TRAINING
+except ImportError:
+    from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner
+    from nova_categories import TRAINING
 
 #: Upstream's preset directory, relative to the acestep package root.
 PRESET_SUBPATH = os.path.join("training_v2", "presets")

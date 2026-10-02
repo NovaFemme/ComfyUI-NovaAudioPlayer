@@ -17,20 +17,21 @@ file are left out of the tensor (they stay in the file list) and the exclusion
 is recorded in `metadata`.
 """
 
-import sys
 import fnmatch
 import json
 import os
 from typing import Any, Dict, List
 import torch # type: ignore
-from pathlib import Path
 
-# insert node to root folder into syspath
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# Clean absolute imports
-from nova_definitions import FILES_TYPE, describe_file, make_files
-from nova_categories import UTILITY_IO
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from ..nova_definitions import FILES_TYPE, describe_file, make_files
+    from ..nova_categories import UTILITY_IO
+except ImportError:
+    from nova_definitions import FILES_TYPE, describe_file, make_files
+    from nova_categories import UTILITY_IO
 
 from ..nova_load_audio import AUDIO_EXTENSIONS, _channel_layout, _decode, _hms, _probe_header,_read_tags, _resolve_bit_depth
 

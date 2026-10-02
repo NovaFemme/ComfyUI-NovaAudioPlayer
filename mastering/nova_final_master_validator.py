@@ -10,14 +10,15 @@ from typing import Any, Dict, List, Tuple
 import torch
 import folder_paths
 
-import sys
 from pathlib import Path
 
-# insert node to root folder into syspath
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# Clean absolute imports
-from nova_categories import ANALYSIS
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from ..nova_categories import ANALYSIS
+except ImportError:
+    from nova_categories import ANALYSIS
 
 try:
     from . import nova_master_archive_index as archive_index
@@ -64,7 +65,6 @@ def _pcm_sha256(x: torch.Tensor) -> str:
 def _canonical_json_sha256(value: Dict[str, Any]) -> str:
     raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
-
 
 
 def _resolve_output_relative_dir(path_value: str, default_relative: str = "") -> Path:

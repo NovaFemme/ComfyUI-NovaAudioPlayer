@@ -15,15 +15,16 @@ import json
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
-import sys
-from pathlib import Path
 
-# insert node to root folder into syspath
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# Clean absolute imports
-from nova_definitions import INSTRUMENTAL, DATASET_TYPE, FILES_TYPE, normalise_sample, banner, file_paths
-from nova_categories import TRAINING
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from ..nova_definitions import INSTRUMENTAL, DATASET_TYPE, FILES_TYPE, normalise_sample, banner, file_paths
+    from ..nova_categories import TRAINING
+except ImportError:
+    from nova_definitions import INSTRUMENTAL, DATASET_TYPE, FILES_TYPE, normalise_sample, banner, file_paths
+    from nova_categories import TRAINING
 
 def _read_tags(path: str) -> Tuple[Dict[str, str], float, int, int]:
     """(lowercased tags, duration seconds, sample rate, channels)."""

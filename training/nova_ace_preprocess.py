@@ -24,15 +24,18 @@ import json
 import os
 import sys
 from typing import Any, Dict, List
-from pathlib import Path
 
-# insert node to root folder into syspath
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# Clean absolute imports
-from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner
-from nova_categories import TRAINING
-from nova_ace_audio_shim import apply_decode_shim, TORCHCODEC_FIX
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from ..nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner
+    from ..nova_categories import TRAINING
+    from ..nova_ace_audio_shim import apply_decode_shim, TORCHCODEC_FIX
+except ImportError:
+    from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner
+    from nova_categories import TRAINING
+    from nova_ace_audio_shim import apply_decode_shim, TORCHCODEC_FIX
 
 INSTALL_HINT = (
     "ACE-Step's training code is not importable.\n"

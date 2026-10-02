@@ -30,14 +30,12 @@ from typing import Any, Dict, List, Optional, Tuple
 # --------------------------------------------------------------------------
 
 
-import sys
-from pathlib import Path
-
-# insert node to root folder into syspath
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-# Clean absolute imports
-from nova_categories import UTILITY_IO
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from ..nova_categories import UTILITY_IO
+except ImportError:
+    from nova_categories import UTILITY_IO
 
 try:
     import torch

@@ -12,14 +12,13 @@ try:
 except ImportError:                       # direct execution / test harness
     import nova_inspector_profiles as _profiles
 
-import sys
-from pathlib import Path
 
-# insert node to root folder into syspath
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-# Clean absolute imports
-from nova_categories import ANALYSIS
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from ..nova_categories import ANALYSIS
+except ImportError:
+    from nova_categories import ANALYSIS
 
 VERSION = "0.2.0"
 SCHEMA = "nova.track_inspector.report"

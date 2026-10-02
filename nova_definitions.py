@@ -28,13 +28,14 @@ import os
 import sys
 from datetime import datetime, timezone
 from typing import Any, Dict, List
-from pathlib import Path
 
-# insert node to root folder into syspath
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# Clean absolute imports
-from nova_categories import TRAINING
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from .nova_categories import TRAINING
+except ImportError:
+    from nova_categories import TRAINING
 
 # region Ace Common Definitions
 

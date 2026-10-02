@@ -7,15 +7,15 @@ from aiohttp import web # type: ignore
 import folder_paths # type: ignore
 from server import PromptServer # type: ignore
 
-import sys
-from pathlib import Path
 
-# insert node to root folder into syspath
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-# Clean absolute imports
-from nova_definitions import TABLE_TYPE
-from nova_categories import DELIVERY
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from ..nova_definitions import TABLE_TYPE
+    from ..nova_categories import DELIVERY
+except ImportError:
+    from nova_definitions import TABLE_TYPE
+    from nova_categories import DELIVERY
 
 # Must match MAX_COLUMN_OUTPUTS in nova_sqlite_browser.js
 MAX_COLUMN_OUTPUTS = 64

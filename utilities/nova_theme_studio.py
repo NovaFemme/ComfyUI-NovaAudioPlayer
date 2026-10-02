@@ -26,14 +26,14 @@ logger = logging.getLogger("NovaThemeStudio")
 # is reorganised, and importing a constant by name means guessing which name it
 # has. Matching on the value finds it whatever it is called, and the literal is
 # only the fallback for a pack laid out differently.
-import sys
-from pathlib import Path
 
-# insert node to root folder into syspath
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# Clean absolute imports
-from nova_categories import UTILITY_IO
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from ..nova_categories import UTILITY_IO
+except ImportError:
+    from nova_categories import UTILITY_IO
 
 
 class NovaThemeStudio:

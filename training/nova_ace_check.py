@@ -28,14 +28,16 @@ import os
 import platform
 import sys
 from typing import Dict, List, Optional, Tuple
-from pathlib import Path
 
-# insert node to root folder into syspath
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# Clean absolute imports
-from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, check_remote_code_imports, describe_checkpoint_requirement, install_command, banner
-from nova_categories import TRAINING
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from ..nova_definitions import VARIANT_DIRS, check_checkpoint_tree, check_remote_code_imports, describe_checkpoint_requirement, install_command, banner
+    from ..nova_categories import TRAINING
+except ImportError:
+    from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, check_remote_code_imports, describe_checkpoint_requirement, install_command, banner
+    from nova_categories import TRAINING
 
 #: Packages ComfyUI's own requirements.txt provides. If one of these is
 #: missing, the ComfyUI install is broken — and "pip install --no-deps torch"
