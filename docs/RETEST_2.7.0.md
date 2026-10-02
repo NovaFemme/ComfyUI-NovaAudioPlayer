@@ -23,6 +23,7 @@ node pack, in both renderers. Not checked: Firefox, the owner's own machine, rgt
 | B-10 | fixed | `31277ba` | All 245 inputs have a tooltip (checked against `/object_info`). |
 | B-11 | fixed | `31277ba` | Display names only: "Nova Final Master Validator ✅", "Nova Save Audio FLAC 24/16-bit ⬇️", "Nova Save Audio WAV PCM16\|PCM24\|FLOAT32 ⬇️". |
 | B-12 | fixed | `77ac46c` | Text fields under Glass/Frosted in Nodes 2.0 have a visible box. |
+| B-12 follow-up (Retest 1) | fixed | `04aa2b1` | Fields were still boxless on the owner's machine: the palette stores the widget background as `transparent` and the adapter's card-level override was not in effect there. Theme Studio now writes the field background and text colour itself, against `[data-node-id]`, whenever the palette's widget colour is blank. Why the adapter's rule was missing on that page is not established. |
 | B-13 | fixed | `a731827` | Load Audio's preview bar is 40 px from the start; the node is the same size before and after a run. |
 | B-14 | fixed | `a731827` | Console in Classic: minimum 211 × 238, text area inside the node (was 211 × 160). |
 | B-15 | fixed | `a731827` | FlowPulse minimum width 400 in both renderers. |
