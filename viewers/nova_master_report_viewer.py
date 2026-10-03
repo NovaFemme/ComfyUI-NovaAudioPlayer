@@ -13,7 +13,7 @@ except ImportError:
 class NovaMasterReportViewer:
     CATEGORY = REPORT
     FUNCTION = "render"
-    RETURN_TYPES = ("NOVA_REPORT",)
+    RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("report_json",)
     OUTPUT_NODE = True
     DESCRIPTION = "Nova Master Report Viewer — a visual dashboard for Nova Audio Master's report_json."
@@ -22,7 +22,7 @@ class NovaMasterReportViewer:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "report_json": ("NOVA_REPORT", {
+                "report_json": ("STRING", {
                     "forceInput": True,
                     "tooltip": "Connect Nova Audio Master report_json here."
                 }),

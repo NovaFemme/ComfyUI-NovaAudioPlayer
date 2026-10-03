@@ -1033,7 +1033,7 @@ def _stereo_class(c,profile):
 class NovaAudioMaster:
     CATEGORY = MASTERING
     FUNCTION = "master"
-    RETURN_TYPES = ("AUDIO", "AUDIO", "STRING", "NOVA_REPORT")
+    RETURN_TYPES = ("AUDIO", "AUDIO", "STRING", "STRING")
     RETURN_NAMES = ("mastered_audio", "original_audio", "report", "report_json")
     DESCRIPTION = ("Nova Audio Master — analyses the source and applies bounded tonal, stereo, "
                    "dynamics, loudness and limiting corrections, with a readable report and a JSON one. "

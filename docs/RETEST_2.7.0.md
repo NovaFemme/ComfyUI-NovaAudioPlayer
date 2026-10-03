@@ -114,6 +114,16 @@ To retest: apply Midnight / Glass with a wallpaper, click Disabled, compare with
 
 **Shelved by the owner for a release after 2.7.0:** everything else still open in the test report, including output tooltips (74 of 130), Theme Studio not overriding colours other packs set on their node classes, the session-long fold retest (fold, switch renderer live twice, toggle the switch, fold again), the fold button in Classic, B-07 (not reproduced), S-01 (frontend), and the theme copy in a workflow overriding an unsaved slider change on reload.
 
+## Handover Revision 4 items, 3 Oct
+
+**B-18, fixed:** Track Inspector Report and Master Report Viewer grew on every mouse move of a resize under Nodes 2.0. Reproduced in a real browser: the loop needs Theme Studio's panel-stretch rules to be active. Without them the frontend's own flex rule shrinks the report and hides the problem; with them the report's pixel height (taken from the node's height) counts as content, so the minimum is always more than the current height. A sideways drag of 60 px took the Inspector from 720 to 1152. Most likely exposed on the owner's machine by `2f0cf24` (R-6), which made those rules apply in workflows where they had not before. Fix as the handover asked: both reports now sit in a host with a fixed CSS minimum and fill it (`web/core/vue-size.js`); under Nodes 2.0 no height is written from the node's size. Minimums: Inspector report 260 high, 360 wide; Master report 72 idle, 320 with a report, 320 wide. After the fix, with the stretch rules forced on, off, and under Midnight / Glass, with and without a report: sideways changes the height by 0, down 100 adds 100, up 60 removes 60, and dragging far up stops at the minimum. Classic measured before and after the change: identical.
+
+**B-19, fixed:** the owner's change was copied from the live folder. It makes every report socket `STRING`: Nova Audio Master's `report_json` output, and the input and output of both report viewers. `NOVA_REPORT` is no longer used as a socket type. This also repairs three links the handover did not list, which were refused for the same reason: Audio Master `report_json` to Master Identity `report_json`, to Final Master Validator `reference_report_json`, and Master Report Viewer `report_json` to Master Identity. New test `dev/tests/test_link_types.py` (11 checks): nine documented connections have equal types on both ends, and no socket type the pack invents is output-only or input-only. It failed on 6 of the 9 connections before the change.
+
+Observation, not changed: Nova Final Master Validator's `sample_rate` output has type `SAMPLE_RATE`, which nothing in this pack accepts (Nova Save Audio WAV takes an INT).
+
+**B-20:** waiting on owner decision D16.
+
 ## Still to do before release
 
 1. Done 3 Oct: the live folder was already clean, and every changed file was copied into it. It matches the branch.

@@ -1,4 +1,5 @@
 import { app } from "/scripts/app.js";
+import { vueSize, keepMinimumWidth } from "../core/vue-size.js";
 
 const EXT = "NovaAudio.TrackInspectorReportViewer";
 (function css(){const id="nova-track-inspector-css";if(document.getElementById(id))return;const l=document.createElement("link");l.id=id;l.rel="stylesheet";l.href=new URL("./nova_track_inspector.css",import.meta.url).href;document.head.appendChild(l)})();
@@ -21,6 +22,7 @@ const section=(t,b)=>`<section class="nti-section"><h3>${esc(t)}</h3>${b}</secti
 function inspectorView(p){const s=p.summary||{},tm=p.track_metrics||{},coh=Number(tm.coherence_score_median||0),local=Number(get(p,"subscores.content_coherence",0)),noise=Number(s.noise_likelihood_percent||0),crit=Number(s.critical_markers||0),warn=Number(s.warning_markers||0),review=Number(s.review_markers||0),concernLoad=crit*18+warn*8+review*3,markerQuality=Math.max(0,100-concernLoad);return hero(p)+`<div class="nti-metrics">${metricCard("Noise Risk",`${num(noise,1)}%`,100-noise)}${metricCard("Markers",num(s.marker_count,0),markerQuality)}${metricCard("Critical",num(crit,0),Math.max(0,100-crit*18))}${metricCard("Sections",num(s.section_count,0),75)}${metricCard("Track RMS",`${num(tm.rms_dbfs,2)} dBFS`,70)}${metricCard("Crest",`${num(tm.crest_db,2)} dB`,Math.max(0,100-Math.abs(Number(tm.crest_db||0)-12)*5))}${metricCard("L/R Corr",num(tm.lr_correlation,3),Math.max(0,Math.min(100,(Number(tm.lr_correlation||0)+.2)/1.2*100)))}${metricCard("Global Coherence",num(coh,1),coh)}</div><div class="nti-coherence-note"><b>Global Coherence ${num(coh,1)}</b> is the median local-stability measure. <b>Local Integrity ${num(local,1)}</b> includes only penalized coherence faults; stable verse/chorus/instrumentation transitions are retained as visual observations rather than treated as defects. Marker colour quality is based on concerns, not observation count.</div>`+section("Waveform + Issue Markers",waveform(p))+section("Integrity Scores",subscores(p))+section("Priority Markers",markerList(p,9999))+`<div class="nti-note">${esc(get(p,"interpretation.note",""))}</div>`}
 function timelineView(p){return hero(p)+section("Waveform + Issue Markers",waveform(p))+`<div class="nti-sparks">${spark(p,"rms_dbfs","Window RMS (dBFS)")}${spark(p,"crest_db","Crest Factor (dB)")}${spark(p,"lr_correlation","Stereo Correlation",-1,1)}${spark(p,"bass_percent","Bass %",0,100)}${spark(p,"mid_percent","Mid %",0,100)}${spark(p,"presence_percent","Presence %",0,100)}${spark(p,"hf_percent","HF %",0,100)}${spark(p,"noise_likelihood_percent","Noise Likelihood %",0,100)}${spark(p,"coherence_score","Coherence Score",0,100)}</div>`}
 function render(p,m){if(!p||typeof p!=="object")return `<div class="nti-empty">No inspector report.</div>`;if(m==="Timeline")return timelineView(p);if(m==="Markers")return hero(p)+section("All Markers",markerList(p,9999));if(m==="Technical")return `<pre class="nti-json">${esc(JSON.stringify(p,null,2))}</pre>`;return inspectorView(p)}
+const NTI_MIN_W=360, NTI_MIN_H=260;
 function root(){const d=document.createElement("div");d.className="nti-root";d.innerHTML=`<div class="nti-empty">Run Nova Track Inspector to render the report.</div>`;return d}
 function widgetValue(node,name,fallback){
   const w=node?.widgets?.find(x=>x?.name===name);
@@ -73,7 +75,22 @@ app.registerExtension({
 
       const el=root();
       this.__ntiRoot=el;
-      const w=this.addDOMWidget?.("nova_track_inspector_report","NTI_REPORT",el,{serialize:false,hideOnZoom:false,getMinHeight:()=>360});
+      // THE REPORT SITS IN A HOST (B-18). Under Nodes 2.0 the frontend works out
+      // a node's minimum height from what is in the card. The report element
+      // used to be the widget itself, with a pixel height taken from the
+      // node's height; once anything let that height count as content, the
+      // minimum became "the current height plus a bit" and the node grew on
+      // every mouse move of a resize. The host carries a fixed CSS minimum and
+      // the report fills it (web/core/vue-size.js), so the node's height is
+      // never fed back into itself. Classic is unchanged: there the report
+      // still takes its height from onResize below.
+      const host=document.createElement("div");
+      host.style.cssText="position:relative;width:100%;height:100%;";
+      host.appendChild(el);
+      vueSize(host,el,{minWidth:NTI_MIN_W,minHeight:NTI_MIN_H});
+      this.__ntiHost=host;
+      keepMinimumWidth(this,NTI_MIN_W);
+      const w=this.addDOMWidget?.("nova_track_inspector_report","NTI_REPORT",host,{serialize:false,hideOnZoom:false,getMinHeight:()=>360});
       if(w){
         this.__ntiWidget=w;
         this.__ntiHeight=440;
@@ -107,6 +124,8 @@ app.registerExtension({
     nodeType.prototype.onResize=function(size){
       const r=resize?.apply(this,arguments),el=this.__ntiRoot,w=this.__ntiWidget;
       if(!el||!w||!size)return r;
+      // Nodes 2.0: the report fills its host; no height is written from the node.
+      if(this.__ntiHost?.closest?.("[data-node-id]"))return r;
       const top=Number.isFinite(Number(w.y))?Number(w.y):185,
             h=Math.max(260,Number(size[1])-top-18);
       this.__ntiHeight=h;

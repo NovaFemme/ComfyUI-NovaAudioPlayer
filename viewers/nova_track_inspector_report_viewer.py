@@ -12,7 +12,7 @@ except ImportError:
 class NovaTrackInspectorReportViewer:
     CATEGORY = REPORT
     FUNCTION = "render"
-    RETURN_TYPES = ("NOVA_REPORT",)
+    RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("inspection_json",)
     OUTPUT_NODE = True
     DESCRIPTION = "Rich viewer for Nova Track Inspector timeline, markers, subscores and verdict."
@@ -21,7 +21,7 @@ class NovaTrackInspectorReportViewer:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "inspection_json": ("NOVA_REPORT", {
+                "inspection_json": ("STRING", {
                     "forceInput": True,
                     "tooltip": "Connect Nova Track Inspector's inspection_json here."}),
                 "view_mode": (["Inspector", "Timeline", "Markers", "Technical"], {
