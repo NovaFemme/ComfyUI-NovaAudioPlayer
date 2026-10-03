@@ -868,8 +868,12 @@ function ensureButton(card, node, on) {
     b.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
-        const now = !isFolded(node, card);
-        setFolded(node, card, now);
+        // The card is looked up at the click, not remembered from when the
+        // button was made: the renderer replaces a card's element, and a mark
+        // aimed at the old one lands nowhere (R-6).
+        const live = b.closest("[data-node-id]") || cardById(node) || card;
+        const now = !isFolded(node, live);
+        setFolded(node, live, now);
         // The links are still drawn on the canvas and their ends have just
         // moved; without this they stay where the slots used to be.
         try { (foldPlan.canvas || window.app?.canvas)?.setDirty?.(true, true); } catch { }
@@ -1339,7 +1343,19 @@ function apply(palette, ctx) {
     const card = cards[0];
 
     const geom = edgeGeometry(card, surfaces);
-    const host = findHosts(pairs);
+    // THE PANELS ARE LEARNT FROM NODES THAT HAVE ONE (test report, R-6).
+    //
+    // `pairs` is the first three cards, which is right for the colours: every
+    // card shares those classes. It is wrong for the panel wrapper and for the
+    // fold, which can only be read off a node with a DOM widget. Since cards
+    // are found by id rather than by what is on screen, the first three are
+    // simply the first three nodes in the graph, and in a workflow that opens
+    // with three plain nodes nothing could be named: the fold button was drawn
+    // and did nothing.
+    const withPanel = allPairs.filter(({ node, card }) =>
+        widgetElements(node).some((el) => el !== card && card.contains(el))).slice(0, 4);
+    const panelPairs = withPanel.length ? withPanel : pairs;
+    const host = findHosts(panelPairs);
 
     // MEASURED ONCE, WITH OUR OWN WORK SWITCHED OFF — and then remembered.
     //
@@ -1365,7 +1381,7 @@ function apply(palette, ctx) {
     watchNodes(graph);
 
     const collapsible = !!ctx?.preset?.collapsible;
-    const levels = collapsible ? collapseLevels(pairs) : [];
+    const levels = collapsible ? collapseLevels(panelPairs) : [];
 
     const write = (bang, withFit) => {
         let css = rules(described.selector, surfaces, colours, bang, geom);
