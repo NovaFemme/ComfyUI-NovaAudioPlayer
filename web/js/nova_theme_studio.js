@@ -990,7 +990,15 @@ function applyNodeAlpha() {
     if (!c || !studioOn()) return;
     c.editor_alpha = clamp(preset.nodeAlpha ?? 1, 0.2, 1);
     c.setDirty(true, true);
+    // Nodes 2.0 cards do not read editor_alpha; the adapter puts the slider
+    // into the body colour instead, so it has to be asked again (R-5).
+    if (v2Applied && alphaSeen !== preset.nodeAlpha) {
+        alphaSeen = preset.nodeAlpha;
+        clearTimeout(alphaTimer);
+        alphaTimer = setTimeout(() => { if (studioOn()) applyPalette(); }, 120);
+    }
 }
+let alphaSeen = null, alphaTimer = null;
 
 /** Apply a theme/finish pair, keeping node_slot and the font sizes. */
 function applyPreset(themeId, finishId) {
@@ -1316,6 +1324,7 @@ function applyPalette() {
                 // files — and when it is missing the adapter reports "no nodes
                 // on the canvas", which reads as a renderer problem rather than
                 // as a graph it was never given.
+                alphaSeen = preset.nodeAlpha;
                 adapter.apply(palette, { app, preset, THEMES, FINISHES, layer, rgba });
             } catch (e) {
                 v2Applied = false;
@@ -2212,7 +2221,9 @@ function buildPanel(node) {
                             "editor_alpha, one alpha over the entire draw. " +
                             "For see-through nodes use a Tinted/Frosted/Glass " +
                             "finish instead; those leave the text crisp. " +
-                            "Choosing any finish puts this back to 1."],
+                            "Choosing any finish puts this back to 1. Under " +
+                            "Nodes 2.0 it fades only the node body, and only " +
+                            "when the palette gives the body a solid colour."],
                     };
                     const label = document.createElement("label");
                     const [text, tip] = LABELS[key] || [key, key];

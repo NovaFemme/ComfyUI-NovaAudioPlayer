@@ -55,7 +55,7 @@ Under **canvas & backdrop**:
 | `blur` | Blurs the wallpaper, 0–40 px. |
 | `dim` | Darkens the wallpaper, 0–0.9. |
 | `hideGrid` | Hides the canvas grid over the wallpaper. |
-| `node opacity` | Fades whole nodes, text included. For see-through nodes use a finish instead; those keep the text crisp. |
+| `node opacity` | Classic: fades whole nodes, text included. Nodes 2.0: fades only the node body, and only when the palette gives the body a solid colour; the text stays crisp. For see-through nodes a finish is still the better tool. Choosing a finish puts this back to 1. |
 
 **A URL is fetched by your browser** each time the page loads, from whatever
 server it names. Use a file in `ComfyUI/input` if you do not want that.

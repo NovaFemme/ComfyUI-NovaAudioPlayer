@@ -65,6 +65,10 @@ Four commits followed the first hand-back, each from a finding in the test agent
 
 To retest: apply Midnight / Glass with a wallpaper, click Disabled, compare with stock ComfyUI Dark (Default) in Nodes 2.0 and in Classic; reload and compare again; click Enabled and confirm the look returns without a reload.
 
+**Retest on `ad9caa3` (test agent):** R-1 and R-2 confirmed fixed on the owner's machine; the switch passes in both renderers. Not yet checked there: the switch position after a reload.
+
+**R-5, fixed:** a palette with a solid body colour and "node opacity" below 1 was see-through in Classic and solid in Nodes 2.0, because the opacity slider is the canvas's `editor_alpha` and the Nodes 2.0 cards never read it. The owner hit this by saving over "Midnight Glass" with a solid body and opacity 0.6. Under Nodes 2.0 the slider is now applied to a body colour the palette declares (body only, text stays crisp). A stored solid colour is still respected rather than replaced by the Glass tint: with opacity at 1 it is solid in both renderers, which is what the palette says. To retest: Midnight / Glass, set NODE_DEFAULT_BGCOLOR to a solid colour, set node opacity to 0.6; the body should be 60% in Nodes 2.0 and follow the slider as it moves.
+
 **Seen on the owner's machine after `a2c3317`:** `novaTheme.renderer()` returns `{"mode":"v2","how":"setting Comfy.VueNodes.Enabled"}`, the `nova-theme-studio-v2` stylesheet is present, and Nova Master Identity shows a box on every text field with readable labels.
 
 **Not explained:** the misdetection never happened on the developer's test server, on the same frontend version.

@@ -282,6 +282,23 @@ function findSurfaces(cards) {
 const isBlank = (v) => !v || v === "transparent" || /rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/.test(v);
 
 /**
+ * THE "NODE OPACITY" SLIDER, UNDER NODES 2.0 (test report, R-5).
+ *
+ * On the canvas that slider is `editor_alpha`, one alpha over the whole node.
+ * The DOM cards never read it, so a palette saved with a solid body colour and
+ * node opacity 0.6 was see-through in Classic and solid in Nodes 2.0. Here the
+ * slider is applied to a body colour the palette declares, and only to the
+ * body: the text stays crisp, which is what the slider was being used for.
+ * A body the finish builds itself (Glass, Frosted, Tinted) already has its own
+ * alpha and is left alone.
+ */
+function faded(colour, ctx) {
+    const a = Number(ctx?.preset?.nodeAlpha);
+    if (!(a >= 0.2 && a < 1)) return colour;
+    return `color-mix(in srgb, ${colour} ${Math.round(a * 100)}%, transparent)`;
+}
+
+/**
  * What the body should be under a DOM renderer.
  *
  * A palette built for the canvas says `transparent` for a glass body, because
@@ -291,7 +308,7 @@ const isBlank = (v) => !v || v === "transparent" || /rgba\(\s*0\s*,\s*0\s*,\s*0\
  */
 function bodyColour(palette, ctx) {
     const declared = palette?.colors?.litegraph_base?.NODE_DEFAULT_BGCOLOR;
-    if (!isBlank(declared)) return declared;
+    if (!isBlank(declared)) return faded(declared, ctx);
 
     const theme = ctx?.THEMES?.find((t) => t.id === ctx?.preset?.theme);
     const finish = ctx?.FINISHES?.find((f) => f.id === ctx?.preset?.finish);
