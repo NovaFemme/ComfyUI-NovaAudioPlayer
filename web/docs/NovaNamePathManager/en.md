@@ -15,16 +15,16 @@ on every graph edit.
 |---|---|
 | `profile` | Saved profiles, read from `profiles/namepath/`. |
 | `profile_action` | What to do with the selection on this run. |
-| `new_profile_name` | Target name for **save as new profile**. |
+| `new_profile_name` | Target name for **save as new**. |
 
 `profile_action` values:
 
-- **use the widgets below** — profiles ignored; the widgets are the truth.
-- **apply selected profile** — outputs come from the profile file. The widget
+- **use widgets** — profiles ignored; the widgets are the truth.
+- **apply profile** — outputs come from the profile file. The widget
   boxes keep whatever you typed; use the Load button if you want to see the
   stored values on the node face.
-- **save to selected profile** — overwrite the selected profile with the widgets.
-- **save as new profile** — write the widgets to `new_profile_name`.
+- **save to profile** — overwrite the selected profile with the widgets.
+- **save as new** — write the widgets to `new_profile_name`.
 
 Profile names allow letters, digits, spaces, dots, dashes and underscores, up to
 64 characters. A profile is a plain JSON file, so it can be edited by hand,

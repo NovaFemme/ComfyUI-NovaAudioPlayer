@@ -33,6 +33,7 @@ import { api } from "/scripts/api.js";
 
 const NODE_CLASS = "NovaLoadAudio";
 const FILE_WIDGET = "audio";
+const PREVIEW_H = 40;         // height of the inline preview bar, in CSS pixels
 const SENTINEL_RE = /^\s*\(no audio files/;
 
 /** "sub/song.wav [input]" -> /view?filename=song.wav&subfolder=sub&type=input */
@@ -64,18 +65,63 @@ function setupNovaLoadAudio(node) {
   player.controls = true;
   player.preload = "none";
   player.style.width = "100%";
+  // THE BAR'S HEIGHT IS RESERVED FROM THE START.
+  //
+  // Under Nodes 2.0 the element is a flex item with a zero basis, and an
+  // <audio> that has loaded nothing yet (preload is "none") was laid out 0 px
+  // tall. The controls took their real height only once the file was touched,
+  // which is after a run: the node grew by the height of the bar and slid over
+  // whatever sat below it. A fixed height makes the node the same size before
+  // and after. 40 px is the height Chromium and Firefox give the controls.
+  player.style.height = `${PREVIEW_H}px`;
+  player.style.minHeight = `${PREVIEW_H}px`;
+  player.style.flex = "0 0 auto";
   player.classList.add("comfy-audio");
 
   const preview = node.addDOMWidget("nova_audio_preview", "audiopreview", player, {
     serialize: false,
+    getMinHeight: () => PREVIEW_H,
   });
   preview.serialize = false;
   if (preview.options) preview.options.serialize = false;
 
-  const refreshPreview = () => {
+  // THE PREVIEW PLAYS THE FILE THE FIELD SHOWS (handover Revision 4, B-22).
+  //
+  // The player's source used to be set when the node was created and when the
+  // selection was changed by hand, and at no other time. Restoring a workflow
+  // writes the saved file name into the widget WITHOUT calling its callback,
+  // so after a reload the field showed the saved file and the player still
+  // held the first file in the list: one track auditioned, another processed.
+  //
+  // It is now refreshed after a workflow is restored as well, and checked
+  // again at the moment of playing, so no path that changes the value can
+  // leave the player on another file.
+  const wantedURL = () => {
     const url = viewURL(fileWidget.value);
-    if (url) player.src = url;
-    else player.removeAttribute("src");
+    return url ? new URL(url, location.href).href : "";
+  };
+  const refreshPreview = () => {
+    const url = wantedURL();
+    if (!url) { player.removeAttribute("src"); return false; }
+    if (player.src === url) return false;       // same file: leave playback alone
+    player.src = url;
+    return true;
+  };
+
+  let correcting = false;
+  player.addEventListener("play", () => {
+    if (correcting || !refreshPreview()) return;
+    // The source was stale and has just been replaced, which stops playback.
+    correcting = true;
+    player.play().catch(() => {}).finally(() => { correcting = false; });
+  });
+
+  const previousConfigure = node.onConfigure;
+  node.onConfigure = function (...args) {
+    const result = previousConfigure?.apply(this, args);
+    refreshPreview();
+    requestAnimationFrame(refreshPreview);     // after the widget values land
+    return result;
   };
 
   const previousCallback = fileWidget.callback;

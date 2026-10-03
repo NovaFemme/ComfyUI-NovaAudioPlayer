@@ -18,6 +18,11 @@ Route map (all under the /nova_player/ namespace the node already owns):
     POST /nova_player/config/renderer/{id}      persist renderer params
     POST /nova_player/config/reload             re-read both files from disk
     DELETE /nova_player/config/theme/{name}     remove a theme
+
+    GET    /nova_player/sequences/{renderer}         list recorded sequences
+    GET    /nova_player/sequences/{renderer}/{name}  one sequence
+    POST   /nova_player/sequences/{renderer}         save {name, sequence}
+    DELETE /nova_player/sequences/{renderer}/{name}  delete one
 """
 
 import io
@@ -27,6 +32,7 @@ import os
 import folder_paths
 
 from .config_manager import manager
+from .sequences import store as sequence_store
 from .peaks_cache import get_cached_peaks, cache_peaks, read_peaks_sidecar
 
 logger = logging.getLogger("NovaAudioPlayer")
@@ -322,6 +328,49 @@ def register_routes() -> bool:
              "version": manager.version},
             status=200 if ok else 400,
         )
+
+    # ------------------------------------------------------------------
+    # Recorded sequences (decorative renderers). See sequences.py.
+    # ------------------------------------------------------------------
+
+    def _seq_reply(ok, result, key):
+        if ok:
+            return web.json_response({"status": "success", key: result})
+        return web.json_response({"status": "error", "message": result},
+                                 status=404 if result == "Not found" else 400)
+
+    @routes.get("/nova_player/sequences/{renderer_id}")
+    async def list_sequences(request):
+        ok, result = sequence_store.list(request.match_info["renderer_id"])
+        if not ok:
+            return _seq_reply(ok, result, "list")
+        return web.json_response({"status": "success", **result})
+
+    @routes.get("/nova_player/sequences/{renderer_id}/{name}")
+    async def read_sequence(request):
+        ok, result = sequence_store.read(request.match_info["renderer_id"],
+                                         request.match_info["name"])
+        return _seq_reply(ok, result, "sequence")
+
+    @routes.post("/nova_player/sequences/{renderer_id}")
+    async def save_sequence(request):
+        try:
+            payload = await request.json()
+        except ValueError:
+            return web.json_response({"status": "error", "message": "Invalid JSON body"},
+                                     status=400)
+        payload = payload if isinstance(payload, dict) else {}
+        ok, result = sequence_store.save(request.match_info["renderer_id"],
+                                         payload.get("name"), payload.get("sequence"))
+        if not ok:
+            return _seq_reply(ok, result, "saved")
+        return web.json_response({"status": "success", **result})
+
+    @routes.delete("/nova_player/sequences/{renderer_id}/{name}")
+    async def delete_sequence(request):
+        ok, result = sequence_store.delete(request.match_info["renderer_id"],
+                                           request.match_info["name"])
+        return _seq_reply(ok, result, "message")
 
     logger.info("[NovaAudioPlayer] Routes registered")
     return True

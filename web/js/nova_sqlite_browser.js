@@ -1,5 +1,6 @@
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
+import { vueSize, keepMinimumWidth, fitHeightInVue } from "../core/vue-size.js";
 
 const BROWSER = "NovaSQLiteBrowserNode";
 const ITERATOR = "NovaSQLiteRowIteratorNode";
@@ -38,7 +39,7 @@ const PINK = "#ff94c2";              // factory accent, used as the reset value
 //
 // Colours live in CSS custom properties so a change repaints every node instantly
 // without rebuilding any DOM. THEME mirrors the same values for the few places that
-// cannot use CSS - the canvas notice box and the link colour. Status colours
+// cannot use CSS - the link colour. Status colours
 // (error / warning / ok) are deliberately not themeable: they carry meaning.
 // ---------------------------------------------------------------------------
 const THEME_DEFAULTS = {
@@ -223,6 +224,29 @@ const getLink = (graph, id) => {
     return typeof links.get === "function" ? links.get(id) : links[id];
 };
 
+/**
+ * Links, read without `input.link` and `output.links`.
+ *
+ * Both are deprecated in the frontend (1.53: "Read connectivity via
+ * node.getInputLink(slot) ..."), and reading them logs a warning each time the
+ * page loads. An input's link comes from `getInputLink()`. An output has no
+ * accessor that gives the target SLOT as well as the target node, and this
+ * file needs the slot to re-wire a column after the outputs are rebuilt, so an
+ * output's links are read from the graph's own link table by origin.
+ */
+const inputLink = (node, slot) => {
+    if (!node || slot == null || slot < 0) return null;
+    if (typeof node.getInputLink === "function") return node.getInputLink(slot) ?? null;
+    return getLink(node.graph, node.inputs?.[slot]?.link);      // frontends before getInputLink
+};
+
+const outputLinks = (node, slot) => {
+    const links = node?.graph?.links;
+    if (!links || slot == null || slot < 0) return [];
+    const all = typeof links.values === "function" ? [...links.values()] : Object.values(links);
+    return all.filter((l) => l && l.origin_id === node.id && l.origin_slot === slot);
+};
+
 const isReroute = (n) => n?.type === "Reroute" || n?.comfyClass === "Reroute";
 
 function hideWidget(w) {
@@ -250,7 +274,7 @@ function wrapCallback(widget, fn) {
  * which made content spill outside the node. The DOM widget is therefore a pass-through "host",
  * and the visible content ("inner") is sized from node.size on every canvas frame.
  */
-function makeDomHost(inner, initialH) {
+function makeDomHost(inner, initialH, vueMin) {
     const host = document.createElement("div");
     host.style.cssText = "position:relative; overflow:visible; pointer-events:none; width:100%; height:100%;";
     inner.style.position = "absolute";
@@ -261,7 +285,8 @@ function makeDomHost(inner, initialH) {
     inner.style.boxSizing = "border-box";
     inner.style.pointerEvents = "auto";
     host.appendChild(inner);
-    return host;
+    // Nodes 2.0 measures minimum size from the page, not from getMinHeight.
+    return vueSize(host, inner, vueMin);
 }
 
 function pinDomSize(node, widget, inner, minH) {
@@ -370,9 +395,9 @@ const slotByName = (list, name) => list?.findIndex((s) => s.name === name) ?? -1
 // Which input a node takes its rows on. The Data Table can be fed by either wire.
 const rowsInputSlot = (node) => {
     const rows = slotByName(node?.inputs, "row_data_json");
-    if (rows >= 0 && node.inputs[rows].link != null) return rows;
+    if (rows >= 0 && inputLink(node, rows)) return rows;
     const table = slotByName(node?.inputs, "table");
-    if (table >= 0 && node.inputs[table].link != null) return table;
+    if (table >= 0 && inputLink(node, table)) return table;
     return rows >= 0 ? rows : table;
 };
 
@@ -385,7 +410,7 @@ function upstreamBrowser(startNode) {
     let node = startNode;
     let slot = rowsInputSlot(node);
     for (let guard = 0; guard < 20 && node && slot >= 0; guard++) {
-        const link = getLink(node.graph, node.inputs[slot]?.link);
+        const link = inputLink(node, slot);
         if (!link) return null;
         const origin = node.graph.getNodeById(link.origin_id);
         if (!origin) return null;
@@ -411,9 +436,7 @@ function downstreamIterators(browserNode) {
     const found = [];
     const visit = (node, slot, depth) => {
         if (depth > 20) return;
-        for (const id of node.outputs?.[slot]?.links ?? []) {
-            const link = getLink(node.graph, id);
-            if (!link) continue;
+        for (const link of outputLinks(node, slot)) {
             const target = node.graph.getNodeById(link.target_id);
             if (!target || found.includes(target)) continue;
             if (VIEWER_CLASSES.has(target.comfyClass)) {
@@ -630,7 +653,7 @@ function dynamicLinkImpact(browserNode) {
         for (const target of directConsumers(node)) {
             if (target.comfyClass === WHERE_FILTER) { walk(target, depth + 1); continue; }
             for (let i = FIXED_OUTPUTS; i < (target.outputs?.length ?? 0); i++) {
-                const n = target.outputs[i].links?.length ?? 0;
+                const n = outputLinks(target, i).length;
                 if (n) { links += n; nodes.add(target); }
             }
         }
@@ -655,7 +678,7 @@ const api_post = async (url, body) => {
     return res.json();
 };
 
-function makeToolbar({ onRefresh, onExecute, host, extra = [] }) {
+function makeToolbar({ onRefresh, onExecute, host, extra = [], refreshTitle }) {
     const bar = document.createElement("div");
     bar.style.cssText = `display:flex; align-items:center; gap:4px; flex:0 0 auto; min-width:0;`;
 
@@ -686,7 +709,7 @@ function makeToolbar({ onRefresh, onExecute, host, extra = [] }) {
         return b;
     };
 
-    const refreshBtn = mk("⟳", "Refresh — rescan databases, tables and columns", onRefresh);
+    const refreshBtn = mk("⟳", refreshTitle || "Refresh — rescan databases, tables and columns", onRefresh);
     const runBtn = mk("▶", "Execute — read the data now and show it below (does not run the workflow)", onExecute);
     const themeBtn = mk("🎨", "Colours — change the node colours for every SQLite node", () => {
         themePopover(typeof host === "function" ? host() : host);
@@ -706,9 +729,7 @@ function directConsumers(node) {
     const found = [];
     const visit = (n, slot, depth) => {
         if (depth > 20) return;
-        for (const id of n.outputs?.[slot]?.links ?? []) {
-            const link = getLink(n.graph, id);
-            if (!link) continue;
+        for (const link of outputLinks(n, slot)) {
             const target = n.graph.getNodeById(link.target_id);
             if (!target || found.includes(target)) continue;
             if (VIEWER_CLASSES.has(target.comfyClass)) found.push(target);
@@ -783,8 +804,15 @@ app.registerExtension({
         const noneBtn = mkBtn("None");
         bar.append(countEl, statusEl, allBtn, noneBtn);
 
+        // Where databases come from. Shown in the panel while no columns are
+        // listed, and always on the refresh button's tooltip.
+        const HINT = "ℹ️ Copy your .db / .sqlite / .sqlite3 files into ComfyUI's input folder, "
+            + "then press ⟳. They appear under database_path.";
+
         const toolbar = makeToolbar({
             host: () => wrap,
+            refreshTitle: "Refresh — rescan the input folder for databases, then reload tables and columns. "
+                + "Copy .db / .sqlite / .sqlite3 files into ComfyUI's input folder first.",
             onRefresh: async () => { await refreshDatabases(); await updateTables(); },
             onExecute: async () => { await previewChain(node); },
         });
@@ -797,12 +825,13 @@ app.registerExtension({
         `;
         wrap.append(toolbar.bar, bar, badges);
 
-        const badgeWidget = node.addDOMWidget("column_badges", "HTML", makeDomHost(wrap, 110), {
+        const badgeWidget = node.addDOMWidget("column_badges", "HTML", makeDomHost(wrap, 110, { minWidth: 300, minHeight: 130 }), {
             getMinHeight: () => 110,
             hideOnZoom: false,
             serialize: false,
         });
         pinDomSize(node, badgeWidget, wrap, 80);
+        keepMinimumWidth(node, 300);
 
         const setStatus = (text, isError = false) => {
             statusEl.textContent = text || "";
@@ -847,9 +876,13 @@ app.registerExtension({
             const sel = new Set(getSelected());
             countEl.textContent = columns.length ? `${sel.size} / ${columns.length} selected` : "";
             if (!columns.length) {
+                // The hint lives here, in the panel. It used to be drawn on the
+                // canvas beside the output slots, where the classic renderer cut
+                // it off and Nodes 2.0, which has no canvas pass, never drew it.
                 badges.innerHTML = `<span style="color:var(--nsq-p-faint); font-size:var(--nsq-size); font-style:italic;">${
                     tableWidget?.value ? "No columns found" : "Select a table..."
-                }</span>`;
+                }</span>
+                <div style="flex:1 1 100%; color:var(--nsq-accent); font-size:var(--nsq-size); line-height:1.4; overflow-wrap:anywhere;">${esc(HINT)}</div>`;
                 return;
             }
             for (const col of columns) {
@@ -1023,71 +1056,6 @@ app.registerExtension({
             if (status) setStatus(status, /error|not found|0 columns|No /i.test(status));
         };
 
-        // --- Notice at the top of the node (drawn in the empty space left of the outputs) ---
-        const NOTICE =
-            "ℹ️ Copy your .db / .sqlite / .sqlite3 files into the ComfyUI input/ folder, " +
-            "then press R to refresh. They will appear in database_path below.";
-        const drawNotice = function (ctx) {
-            if (this.flags?.collapsed || !ctx) return;
-            const slotH = window.LiteGraph?.NODE_SLOT_HEIGHT ?? 20;
-            ctx.save();
-            ctx.font = `${THEME.size + 1}px ${THEME.font}`;
-            const labelW = Math.max(0, ...(this.outputs ?? []).map((o) => ctx.measureText(o.label ?? o.name ?? "").width));
-            const x = 8;
-            const y = 5;
-            const w = this.size[0] - labelW - 36;
-            const h = (this.outputs?.length ?? 0) * slotH - 6;
-            if (w < 90 || h < 24) { ctx.restore(); return; }
-
-            // box
-            ctx.fillStyle = THEME.panel;
-            ctx.strokeStyle = THEME.accent;
-            ctx.lineWidth = 1;
-            ctx.setLineDash([4, 3]);
-            ctx.beginPath();
-            if (ctx.roundRect) ctx.roundRect(x, y, w, h, 6);
-            else ctx.rect(x, y, w, h);
-            ctx.fill();
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // word-wrapped text, clipped to the box
-            ctx.font = `${THEME.size}px ${THEME.font}`;
-            ctx.fillStyle = THEME.accentOnPanel;
-            ctx.textAlign = "left";
-            ctx.textBaseline = "top";
-            const pad = 7;
-            const lineH = 14;
-            const maxW = w - pad * 2;
-            const maxLines = Math.max(1, Math.floor((h - pad * 2 + 2) / lineH));
-            const lines = [];
-            let line = "";
-            for (const word of NOTICE.split(" ")) {
-                const test = line ? `${line} ${word}` : word;
-                if (ctx.measureText(test).width > maxW && line) {
-                    lines.push(line);
-                    line = word;
-                } else {
-                    line = test;
-                }
-            }
-            if (line) lines.push(line);
-            if (lines.length > maxLines) {
-                lines.length = maxLines;
-                let last = lines[maxLines - 1];
-                while (last.length > 1 && ctx.measureText(last + "…").width > maxW) last = last.slice(0, -1);
-                lines[maxLines - 1] = last + "…";
-            }
-            lines.forEach((l, i) => ctx.fillText(l, x + pad, y + pad + i * lineH));
-            ctx.restore();
-        };
-        const origNoticeFg = node.onDrawForeground;
-        node.onDrawForeground = function (ctx) {
-            const r = origNoticeFg?.apply(this, arguments);
-            drawNotice.call(this, ctx);
-            return r;
-        };
-
         render();
         setTimeout(async () => { await refreshDatabases(); await updateTables(); }, 100);
         requestAnimationFrame(() => {
@@ -1122,6 +1090,9 @@ function setupRowViewer(node, mode) {
 
     const toolbar = makeToolbar({
         host: () => shell,
+        refreshTitle: isLoop
+            ? "Refresh — re-read the column selection from the Browser and redraw the current row"
+            : "Refresh — re-read the column selection from the Browser and redraw the row",
         onRefresh: async () => { syncFromUpstream(); node.refreshViewer(); },
         onExecute: async () => { await previewChain(node); },
     });
@@ -1136,13 +1107,14 @@ function setupRowViewer(node, mode) {
     consoleEl.appendChild(content);
     shell.append(toolbar.bar, consoleEl);
 
-    const viewerWidget = node.addDOMWidget("live_viewer", "HTML", makeDomHost(shell, VIEWER_MIN_H), {
+    const viewerWidget = node.addDOMWidget("live_viewer", "HTML", makeDomHost(shell, VIEWER_MIN_H, { minWidth: 300, minHeight: VIEWER_MIN_H }), {
         getMinHeight: () => node._viewerH,
         hideOnZoom: false,
         serialize: false,
     });
     viewerWidget.computeSize = (width) => [width ?? node.size[0], node._viewerH + DOM_MARGIN];
     pinDomSize(node, viewerWidget, shell, 60);
+    keepMinimumWidth(node, 300);
 
     // Preview: show the row this node would produce for the given upstream rows
     node._novaPreviewWith = async (rowsJson) => {
@@ -1185,7 +1157,8 @@ function setupRowViewer(node, mode) {
             const estimate = 40 + Math.max(1, currentColumns().length) * 17;
             const contentH = (measured > 0 ? measured : estimate) + 18 + TOOLBAR_H; // padding + border + toolbar
             node._viewerH = Math.min(VIEWER_MAX_H, Math.max(VIEWER_MIN_H, contentH));
-            node._wantFit = true;
+            // Nodes 2.0 has no onDrawForeground pass to do the fit in.
+            if (!fitHeightInVue(node, viewerWidget.element, node._viewerH)) node._wantFit = true;
             node.setDirtyCanvas(true, true);
             app.canvas?.draw(true, true);
         });
@@ -1257,9 +1230,7 @@ function setupRowViewer(node, mode) {
         const saved = {};
         for (let i = node.outputs.length - 1; i >= FIXED_OUTPUTS; i--) {
             const out = node.outputs[i];
-            saved[out.name] = (out.links ?? [])
-                .map((id) => getLink(node.graph, id))
-                .filter(Boolean)
+            saved[out.name] = outputLinks(node, i)
                 .map((l) => ({ target: l.target_id, slot: l.target_slot }));
             node.removeOutput(i);
         }
@@ -1488,6 +1459,7 @@ app.registerExtension({
 
         const toolbar = makeToolbar({
             host: () => wrap,
+            refreshTitle: "Refresh — re-read the columns from the Browser and redraw the grid",
             onRefresh: async () => { syncFromUpstream(); refresh(); },
             onExecute: async () => { await previewChain(node); },
         });
@@ -1511,13 +1483,14 @@ app.registerExtension({
         wrap.append(toolbar.bar, bar, builder, grid);
 
         node._viewerH = TABLE_MIN_H;
-        const viewerWidget = node.addDOMWidget("where_builder", "HTML", makeDomHost(wrap, TABLE_MIN_H), {
+        const viewerWidget = node.addDOMWidget("where_builder", "HTML", makeDomHost(wrap, TABLE_MIN_H, { minWidth: 380, minHeight: TABLE_MIN_H }), {
             getMinHeight: () => node._viewerH,
             hideOnZoom: false,
             serialize: false,
         });
         viewerWidget.computeSize = (width) => [width ?? node.size[0], node._viewerH + DOM_MARGIN];
         pinDomSize(node, viewerWidget, wrap, 120);
+        keepMinimumWidth(node, 380);
 
         // Keep clicks, typing and grid scrolling inside the widgets instead of panning the canvas
         wrap.addEventListener("pointerdown", (e) => e.stopPropagation());
@@ -1732,6 +1705,42 @@ app.registerExtension({
             return ids.slice(Math.min(ia, ib), Math.max(ia, ib) + 1);
         };
 
+        // --- keeping the rest of the chain in step with the selection --------
+        /**
+         * SELECTING ROWS IS AN EDIT TO THIS NODE'S OUTPUT, so the nodes fed by
+         * it are stale the moment the selection changes. Until now only ▶ told
+         * them otherwise, which meant a Single Row node downstream went on
+         * showing a row nobody had selected any more. Changing the selection
+         * now runs exactly what ▶ runs.
+         *
+         * Debounced, because dragging across rows changes the selection on
+         * every pointermove, and each run is a round trip for every node
+         * downstream. It also refuses to run for a selection it has already
+         * run for, so a click that puts the selection back where it was — or a
+         * drag that ends where it started — costs nothing.
+         */
+        const selectionKey = () => [...selection].sort((a, b) => a - b).join(",");
+        let firedFor = selectionKey();   // the state on load is not a change
+        let fireTimer = null;
+        let firing = false;
+
+        const runChain = async () => {
+            // A run already in flight is left to finish: starting a second
+            // would have two walks of the same chain writing over each other.
+            if (firing) { fireTimer = setTimeout(runChain, 120); return; }
+            const key = selectionKey();
+            if (key === firedFor) return;
+            firing = true;
+            try { await previewChain(node); firedFor = key; }
+            catch { /* leave firedFor alone so the next change tries again */ }
+            finally { firing = false; }
+        };
+
+        const fireSelection = () => {
+            clearTimeout(fireTimer);
+            fireTimer = setTimeout(runChain, 120);
+        };
+
         let dragging = null;   // { mode: "add" | "remove" }
 
         const onRowPointerDown = (e, tr) => {
@@ -1764,6 +1773,7 @@ app.registerExtension({
                 else if (act === "invert") selection = new Set(ids.filter((i) => !selection.has(i)));
                 paintSelection();
                 renderGrid();     // the # column and the header banner both change
+                fireSelection();
                 return;
             }
             const tr = e.target.closest?.("tr.nsq-row");
@@ -1790,6 +1800,9 @@ app.registerExtension({
             dragging = null;
             if (e?.pointerId != null) gridContent.releasePointerCapture?.(e.pointerId);
             renderGrid();   // refresh the header tally and the # numbering
+            // The end of the gesture, not each step of it: one run per click or
+            // drag, however many rows it passed over.
+            fireSelection();
         };
         gridContent.addEventListener("pointerup", endDrag);
         gridContent.addEventListener("pointercancel", endDrag);
@@ -1800,7 +1813,8 @@ app.registerExtension({
                 const gridH = Math.min(TABLE_MAX_H, (gridContent.offsetHeight || 40) + 18);
                 const needed = builderH + gridH + 30 + TOOLBAR_H; // bars + gaps + toolbar
                 node._viewerH = Math.min(TABLE_MAX_H, Math.max(TABLE_MIN_H, needed));
-                node._wantFit = true;
+                // Nodes 2.0 has no onDrawForeground pass to do the fit in.
+                if (!fitHeightInVue(node, viewerWidget.element, node._viewerH)) node._wantFit = true;
                 node.setDirtyCanvas(true, true);
                 app.canvas?.draw(true, true);
             });
@@ -1814,7 +1828,16 @@ app.registerExtension({
                 ? `${active} condition${active === 1 ? "" : "s"}${state.length > active ? ` (${state.length - active} off)` : ""}`
                 : "no filter - all rows");
             if (selection.size) bits.push(`${selection.size} selected`);
-            if (modeWidget?.value === OUTPUT_MODES[1]) bits.push("output: selected only");
+            // SAYING WHY A SELECTION APPEARS TO DO NOTHING.
+            //
+            // In "matching rows" mode the highlight is only a highlight: every
+            // matching row leaves the node whatever is selected, so a node
+            // downstream shows the same thing after a click as before it. That
+            // is correct, and it is indistinguishable from broken unless the
+            // node says so — which, until now, it did not.
+            const selectedOnly = modeWidget?.value === OUTPUT_MODES[1];
+            if (selectedOnly) bits.push("output: selected only");
+            else if (selection.size) bits.push('highlight only — set output_rows to "selected rows" to send it on');
             noteEl.textContent = bits.join(" · ");
             noteEl.title = noteEl.textContent;
         };

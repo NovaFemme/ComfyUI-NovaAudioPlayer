@@ -1,4 +1,4 @@
-# Save Audio WAV PCM16 | PCM24 | FLOAT32
+# Nova Save Audio WAV PCM16 | PCM24 | FLOAT32
 
 Writes an AUDIO input to a RIFF/WAVE file in 16-bit PCM, 24-bit PCM or 32-bit
 IEEE float.
@@ -96,6 +96,6 @@ most graphs end at this node.
 
 - One audio item per node: a batch with more than one item is rejected rather
   than silently writing only the first.
-- WAV only. For FLAC use **Save Audio FLAC 24-bit**.
+- WAV only. For FLAC use **Nova Save Audio FLAC 24/16-bit**.
 - Samples outside [-1, 1] are clamped in the integer encodings; use `FLOAT_32`
   if you need to preserve overs.

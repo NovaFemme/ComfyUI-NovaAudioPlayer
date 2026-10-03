@@ -141,6 +141,46 @@ TRIMMED_KEYS = frozenset({"caption.prompt", "caption.lyrics"})
 # clobber a seed the user is deliberately holding (spec 2).
 DEFAULT_EXCLUDES = [SEED_KEY]
 
+#: One line of help per parameter, shown as the widget's tooltip. Keyed like
+#: PARAMS. A parameter without an entry simply has no tooltip.
+TOOLTIPS = {
+    "apg.eta": "APG: how much of the guidance that runs parallel to the prediction is kept. "
+               "0 removes it; above 1.0 amplifies it, and a warning is raised.",
+    "apg.norm_threshold": "APG: caps the size of the guidance update. 0 turns the cap off.",
+    "apg.momentum": "APG: running average applied to the guidance from step to step. "
+                    "Negative values damp it.",
+    "sched.shift": "Shift of the noise schedule. Higher spends more of the steps at high noise.",
+    "ksampler.steps": "Number of sampling steps.",
+    "ksampler.cfg": "Guidance scale of the sampler. Not the same parameter as text_cfg_scale.",
+    "ksampler.sampler_name": "The sampling algorithm.",
+    "ksampler.scheduler": "How the noise levels are spaced across the steps.",
+    "ksampler.denoise": "How much of the latent is re-generated. 1.0 is a full generation.",
+    "ksampler.seed": "The random seed. Set the control below it to fixed to reproduce a take, "
+                     "or randomize to sweep. context records the seed the run used.",
+    "caption.prompt": "The caption: genre, instruments, voice, mood. A BPM or a key written "
+                      "here is checked against the bpm and keyscale widgets.",
+    "caption.lyrics": "The lyrics, with section tags such as [verse] and [chorus]. "
+                      "Leave empty for an instrumental.",
+    "music.bpm": "Tempo in beats per minute.",
+    "music.duration": "Length of the track in seconds. Checked against latent_seconds when that is wired.",
+    "music.timesignature": "Beats per bar, as the text encoder expects it.",
+    "music.language": "Language of the lyrics, as the text encoder's language code.",
+    "music.keyscale": "Key and scale, e.g. E minor.",
+    "text.cfg_scale": "Guidance scale of the text encoder's language model, which writes the "
+                      "audio codes. A different stage from the sampler's cfg.",
+    "lm.temperature": "Randomness of the language model. Lower is more predictable.",
+    "lm.top_p": "Nucleus sampling: keep the most likely tokens up to this total probability. 1.0 turns it off.",
+    "lm.top_k": "Keep only the k most likely tokens. 0 turns it off. Use one truncation method at a time.",
+    "lm.min_p": "Drop tokens less likely than this share of the top token. 0 turns it off. "
+                "Use one truncation method at a time.",
+    "lm.generate_audio_codes": "On: the language model writes audio codes for the sampler to follow. "
+                               "Off: that stage is skipped.",
+    "file.prefix": "First part of the file name. file_path is assembled as folder/prefix<separator>name.",
+    "file.name": "Last part of the file name.",
+    "file.folder": "Folder part of file_path. Empty leaves it out.",
+    "file.separator": "Text placed between prefix and name.",
+}
+
 KEYS = [p[0] for p in PARAMS]
 OUTPUT_NAMES = tuple(p[2] for p in PARAMS)
 DEFAULTS = {p[0]: p[4] for p in PARAMS}

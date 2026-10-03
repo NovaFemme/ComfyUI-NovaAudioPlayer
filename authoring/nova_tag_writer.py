@@ -26,16 +26,15 @@ import os
 import re
 from typing import Any, Dict, List, Tuple
 
+
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
 try:
-    from .nova_authoring_common import (
-        DELIVERY_CATEGORY as AUTHORING_CATEGORY, AUTHORING_VERSION, FILES_TYPE, TABLE_TYPE,
-        banner, file_paths, render_value,
-    )
-except ImportError:  # standalone / direct execution
-    from nova_authoring_common import (
-        DELIVERY_CATEGORY as AUTHORING_CATEGORY, AUTHORING_VERSION, FILES_TYPE, TABLE_TYPE,
-        banner, file_paths, render_value,
-    )
+    from ..nova_categories import DELIVERY
+    from ..nova_definitions import FILES_TYPE, TABLE_TYPE, banner, file_paths, render_value
+except ImportError:
+    from nova_categories import DELIVERY
+    from nova_definitions import FILES_TYPE, TABLE_TYPE, banner, file_paths, render_value
 
 # Columns whose obvious lowercase form is not the right tag name.
 TAG_ALIASES = {
@@ -193,8 +192,8 @@ def _write_mp4(handle, tags: Dict[str, str]) -> Tuple[List[str], List[str]]:
 
 
 def _write_id3(path: str, tags: Dict[str, str]) -> Tuple[List[str], List[str]]:
-    from mutagen.id3 import ID3, COMM, USLT, TXXX, ID3NoHeaderError
-    import mutagen.id3 as id3
+    from mutagen.id3 import ID3, COMM, USLT, TXXX, ID3NoHeaderError # type: ignore
+    import mutagen.id3 as id3 # type: ignore
 
     try:
         frames = ID3(path)
@@ -225,13 +224,13 @@ def _write_id3(path: str, tags: Dict[str, str]) -> Tuple[List[str], List[str]]:
 
 def _write_tags(path: str, tags: Dict[str, str]) -> Tuple[List[str], List[str], str]:
     """Return (written_tags, unsupported_tags, format_label)."""
-    import mutagen
-    from mutagen.flac import FLAC
-    from mutagen.mp4 import MP4
-    from mutagen.oggvorbis import OggVorbis
-    from mutagen.oggopus import OggOpus
-    from mutagen.oggflac import OggFLAC
-    from mutagen.mp3 import MP3
+    import mutagen # type: ignore
+    from mutagen.flac import FLAC # type: ignore
+    from mutagen.mp4 import MP4 # type: ignore
+    from mutagen.oggvorbis import OggVorbis # type: ignore
+    from mutagen.oggopus import OggOpus # type: ignore
+    from mutagen.oggflac import OggFLAC # type: ignore
+    from mutagen.mp3 import MP3 # type: ignore
 
     extension = os.path.splitext(path)[1].lower()
     if extension in (".flac",):
@@ -257,7 +256,7 @@ def _write_tags(path: str, tags: Dict[str, str]) -> Tuple[List[str], List[str], 
 
 
 class NovaTagWriter:
-    CATEGORY = AUTHORING_CATEGORY
+    CATEGORY = DELIVERY
     FUNCTION = "write"
     RETURN_TYPES = ("STRING", "INT", "INT", FILES_TYPE)
     RETURN_NAMES = ("console", "written_count", "skipped_count", "files")
@@ -268,7 +267,7 @@ class NovaTagWriter:
         "The same batch, passed through so you can chain Nova Tag Reader to verify.",
     )
     DESCRIPTION = (
-        f"Nova Tag Writer v{AUTHORING_VERSION} — writes each database row onto the "
+        f"Nova Tag Writer — writes each database row onto the "
         "matching audio file, matched by the FileName column."
     )
 
@@ -276,7 +275,7 @@ class NovaTagWriter:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "table": (TABLE_TYPE, {"tooltip": "Rows from Nova SQLite Reader."}),
+                "table": (TABLE_TYPE, {"tooltip": "Rows from the table output of Nova Dynamic SQLite Browser or Nova SQLite Data Table & Filter."}),
                 "files": (FILES_TYPE, {"tooltip": "Batch from Nova Batch Load Audio."}),
                 "filename_column": ("STRING", {
                     "default": "FileName",
@@ -315,7 +314,7 @@ class NovaTagWriter:
         columns: List[str] = list((table or {}).get("columns") or [])
         paths = file_paths(files)
 
-        log: List[str] = [banner(f"NOVA TAG WRITER v{AUTHORING_VERSION}")]
+        log: List[str] = [banner(f"NOVA TAG WRITER")]
         if dry_run:
             log.append("DRY RUN — nothing will be written to disk.")
         log.append(f"Database : {(table or {}).get('database_path', '(none)')}")

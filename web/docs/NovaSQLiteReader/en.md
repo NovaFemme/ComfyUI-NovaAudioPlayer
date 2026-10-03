@@ -1,7 +1,16 @@
 # Nova SQLite Reader
 
-Opens a SQLite database **read-only** and returns one table as a `NOVA_TABLE`
-payload, ready for Nova Tag Writer.
+> **Deprecated.** Use **Nova Dynamic SQLite Browser** to read a table, **Nova
+> SQLite Data Table & Filter** to filter rows, and **Nova SQLite Row Iterator &
+> Splitter** or **Nova SQLite Single Row Filter** for one row at a time. This
+> node still works, and will be removed in a later release.
+
+Reads one table from a SQLite database and returns it as a `NOVA_TABLE`
+payload, ready for Nova Tag Writer. Queries run **read-only**. The one thing the
+node can write is a new, empty database, when `database_path` is left empty.
+
+**The database must be inside ComfyUI's `input` folder** (a sub-folder is
+fine). A path anywhere else is refused, for opening and for creating.
 
 ## Start here if you don't have a database
 
@@ -14,7 +23,8 @@ need to build anything.
 examples/nova_album_example.db
 ```
 
-Copy it somewhere of your own — `~/Databases/my_album.db`, anywhere. Work on the
+Copy it into ComfyUI's `input` folder — `input/Album Databases/my_album.db`,
+for example. Work on the
 copy, not the file in the pack, or an update will overwrite it.
 
 **2. Point `database_path` at your copy** and set `table_name` to `albums`.
@@ -61,11 +71,11 @@ returned all 6 rows of `album01`. See "The placeholder is not a value" below.*
 
 | Widget | Default | Purpose |
 |---|---|---|
-| `database_path` | empty | Full path to an existing `.db`. |
+| `database_path` | empty | An existing `.db` inside ComfyUI's `input` folder, e.g. `Album Databases/my_album.db`. |
 | `table_name` | `albums` | The table to read. |
 | `columns` | `*` | `*` or a comma-separated list. |
 | `where` | empty | Raw SQL filter, without the `WHERE` keyword. |
-| `new_database_folder` | empty | Used **only** when `database_path` is empty. |
+| `new_database_folder` | empty | A folder inside ComfyUI's `input` folder. Used **only** when `database_path` is empty. |
 | `new_database_name` | empty | Creates an empty database and returns 0 rows. |
 
 ## Outputs
@@ -77,7 +87,7 @@ ComfyUI list output, one string per column, so it fans out to list-aware nodes.
 
 The `where` box shows greyed example text:
 
-    Artist = 'crazy gecko' AND Genre LIKE '%Metal%'
+    Artist = 'Example Artist' AND Genre LIKE '%Rock%'
 
 That is a hint, not content. While it looks filled in the field is empty and
 every row is returned. Click in and type to make it real.
@@ -108,7 +118,7 @@ or a reloaded graph.
 
 ```
 where:  Title = 'Nine Hours North'
-->      { "track_title": "Nine Hours North", "artist_name": "crazy gecko",
+->      { "track_title": "Nine Hours North", "artist_name": "Example Artist",
           "album_title": "High Water Sessions", "track_number": 5,
           "release_year": 2026, "copyright_owner": "..." }
 ->      archive_name  05_CG_Nine-Hours-North_Master_24-48.wav

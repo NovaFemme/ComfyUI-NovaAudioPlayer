@@ -23,7 +23,6 @@
 import { app } from "/scripts/app.js";
 import { config } from "./core/config.js";
 import { PlayerHost } from "./core/host.js";
-import { minimumNodeSize } from "./core/layout.js";
 
 // The pack's second node registers its own extension. Imported here because
 // ComfyUI loads exactly one entry point per WEB_DIRECTORY, so anything not
@@ -90,7 +89,9 @@ function ensureHost(node, data) {
         hideOnZoom: false,
         getValue: () => host.serialise(),
         setValue: (v) => host.restore(v),
-        getMinHeight: () => minimumNodeSize(host.stereo)[1],
+        // The host's own figure, so it includes the stats strip when open and
+        // agrees with the CSS min-height the host pins on its element.
+        getMinHeight: () => host.minimumSize()[1],
     });
 
     host.widget = widget;

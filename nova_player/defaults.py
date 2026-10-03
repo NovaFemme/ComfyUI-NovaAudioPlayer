@@ -155,6 +155,10 @@ DEFAULT_COLOR_CONFIG = {
                 # -- halo (decorative burst ring) ------------------------
                 "halo.bg":               "#05030dff",
                 "halo.core":             "#fff4d8",
+                "halo.spike.low":        "#7a1496",   # quiet spikes
+                "halo.spike.mid":        "#e2207c",
+                "halo.spike.high":       "#ffb62a",   # loud spikes
+                "halo.spike.tip":        "#ffe860",   # "Gradient" blends toward this
                 "halo.bubble.a":         "#29c6e0",
                 "halo.bubble.b":         "#3ecf5c",
                 "halo.bubble.c":         "#e0304f",
@@ -202,15 +206,6 @@ DEFAULT_COLOR_CONFIG = {
                     [230, "#ffdc00"],
                     [255, "#ffffff"],
                 ],
-                "halo": [
-                    [0,   "#3a0a6e"],
-                    [60,  "#9b1aa8"],
-                    [110, "#e0207a"],
-                    [155, "#ff3b2f"],
-                    [195, "#ff8a1a"],
-                    [230, "#ffe03a"],
-                    [255, "#fffbe8"],
-                ],
             },
         },
 
@@ -243,6 +238,10 @@ DEFAULT_COLOR_CONFIG = {
                 "mode.combined":         "#155e63",
                 "halo.bg":               "#01060cff",
                 "halo.core":             "#e0f6ff",
+                "halo.spike.low":        "#1560b0",
+                "halo.spike.mid":        "#1fa6d6",
+                "halo.spike.high":       "#22d3a7",
+                "halo.spike.tip":        "#c8fff0",
                 "panel.accent":          "#38bdf8",
             },
             "ramps": {
@@ -252,14 +251,6 @@ DEFAULT_COLOR_CONFIG = {
                     [110, "#0b6d8f"],
                     [170, "#22d3a7"],
                     [215, "#a8f0d8"],
-                    [255, "#ffffff"],
-                ],
-                "halo": [
-                    [0,   "#0a1f5e"],
-                    [70,  "#1560b0"],
-                    [130, "#1fa6d6"],
-                    [185, "#22d3a7"],
-                    [230, "#a8f0d8"],
                     [255, "#ffffff"],
                 ],
             },

@@ -1,6 +1,6 @@
 # Example workflows
 
-Seven workflows, grouped the way the node menu is. Each ships twice — a `.json`
+Eight workflows, grouped the way the node menu is. Each ships twice — a `.json`
 and a `.png` template. **Drag either onto the ComfyUI canvas and it loads**; the
 PNG carries the whole graph in its metadata, it is not just a picture.
 
@@ -10,6 +10,7 @@ PNG carries the whole graph in its metadata, it is not just a picture.
 | | Nova Audio Master Comparison Validation | this pack only |
 | **Delivery & Metadata** | Nova Audio Tag Reader | this pack only |
 | | Nova Audio Tag Writer | this pack only |
+| | Nova Dynamic SQLite Browser Nodes (`.json` only) | this pack only, and a SQLite database in ComfyUI's input folder |
 | **LoRA Training** | Nova Ace-Step 1.5 LoRA Pre-Processor And Training | this pack + ACE-Step 1.5 |
 | **Generation & Synthesis** | Ace-Step XL SFT — Prompt and Lyrics to Audio | ACE-Step models + `easy seed` |
 | | Ace-Step XL SFT — …Using Lora | the above + the LoRA |
@@ -32,7 +33,7 @@ nodes exist for:
 3. **Nova Master Report Viewer** renders that report in the canvas — and every
    view exports as a PNG from its right-click menu.
 4. **Nova Master Identity** turns the report into release and archive identity.
-5. **Save Audio WAV** writes the file.
+5. **Nova Save Audio WAV** writes the file.
 6. **Nova Final Master Validator** answers the question that matters after a
    write: *did the file you saved still reproduce the master you approved?*
 

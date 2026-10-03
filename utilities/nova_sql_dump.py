@@ -40,6 +40,14 @@ import re
 from aiohttp import web
 from server import PromptServer
 
+
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from ..nova_categories import UTILITY_IO
+except ImportError:
+    from nova_categories import UTILITY_IO
+
 # OPTIONAL, AND IT HAS TO BE.
 #
 # __init__.py imports this module to register the node, so a hard `import
@@ -51,12 +59,6 @@ try:
     import pymysql
 except ImportError:                                     # pragma: no cover
     pymysql = None
-
-try:
-    from ..nova_categories import UTILITY_IO
-except ImportError:  # direct execution / test harness
-    from nova_categories import UTILITY_IO
-
 
 # --- The whole connection, fixed. Nothing here comes from a node or a request. --
 DB_HOST = "127.0.0.1"

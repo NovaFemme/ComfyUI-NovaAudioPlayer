@@ -42,7 +42,7 @@ ComfyUI/input/audio/library/tracks.sqlite3
 
 Databases in sub-folders appear in the dropdown by their relative path (`audio/library/tracks.sqlite3`), with top-level databases listed first. The scan goes up to six levels deep and skips hidden folders.
 
-After copying a file in, press **⟳** on the node's toolbar to rescan — no ComfyUI restart or **R** refresh needed. For safety, a relative path that tries to climb out of the input folder is refused; an absolute path is honoured, on the assumption that you meant it.
+After copying a file in, press **⟳** on the node's toolbar to rescan — no ComfyUI restart or **R** refresh needed. For safety, only databases inside the input folder are opened: a path that climbs out of it, or an absolute path that points anywhere else, is refused.
 
 ---
 
@@ -369,7 +369,7 @@ Process the tracks of a single artist rather than the whole library.
 
 1. In the **Browser**, select **Title**, **Artist** and **FileName**.
 2. Connect `row_data_json` to the **Data Table & Filter**.
-3. Press **+ Condition** and set `Artist` · `equals` · `crazy gecko`. The grid shows the matching rows and the header reads, for example, `6 / 19 rows`.
+3. Press **+ Condition** and set `Artist` · `equals` · `Example Artist`. The grid shows the matching rows and the header reads, for example, `6 / 19 rows`.
 4. Connect the Data Table's `row_data_json` to the **Row Iterator**, and set `stop_at_row = -1` with `auto_loop` on.
 5. Press **Run**. The iterator loops over the 6 matching rows only.
 
@@ -377,7 +377,7 @@ Process the tracks of a single artist rather than the whole library.
 
 Find the recent tracks of two artists that still need lyrics.
 
-1. `Artist` · `in list` · `crazy gecko, Anton`
+1. `Artist` · `in list` · `Example Artist, Second Artist`
 2. `AND` · `release_year` · `greater or equal` · `2019`
 3. `AND` · `Lyrics` · `is empty`
 
@@ -401,7 +401,7 @@ Nova Batch Load Audio ──────────files───►
 ```
 
 1. In the **Browser**, select the columns you want written as tags, including `FileName`.
-2. Filter down to the tracks you want, for example `Artist` · `equals` · `crazy gecko`.
+2. Filter down to the tracks you want, for example `Artist` · `equals` · `Example Artist`.
 3. Connect the Data Table's `table` output to the Tag Writer's `table` input.
 4. Only the matching rows are tagged. The database and table names travel with the payload, so they still appear in the Tag Writer log.
 

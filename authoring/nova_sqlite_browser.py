@@ -3,25 +3,19 @@ import json
 import sqlite3
 from contextlib import closing
 
-from aiohttp import web
-import folder_paths
-from server import PromptServer
+from aiohttp import web # type: ignore
+import folder_paths # type: ignore
+from server import PromptServer # type: ignore
 
-try:
-    from .nova_authoring_common import (DELIVERY)
-except ImportError:  # standalone / direct execution
-    from nova_authoring_common import (DELIVERY)
 
-# NOVA_TABLE is the payload the rest of the pack passes around (Nova Tag Writer,
-# Nova Tag Reader, ...). Imported so this file always matches the pack's own value.
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
 try:
-    from .nova_authoring_common import TABLE_TYPE
+    from ..nova_definitions import TABLE_TYPE
+    from ..nova_categories import DELIVERY
 except ImportError:
-    try:
-        from nova_authoring_common import TABLE_TYPE
-    except ImportError:
-        TABLE_TYPE = "NOVA_TABLE"
-
+    from nova_definitions import TABLE_TYPE
+    from nova_categories import DELIVERY
 
 # Must match MAX_COLUMN_OUTPUTS in nova_sqlite_browser.js
 MAX_COLUMN_OUTPUTS = 64
@@ -94,15 +88,14 @@ def _first(value):
 
 def _resolve_db_path(value):
     """
-    A relative value names a database inside the input folder, possibly in a
-    sub-folder. It is resolved and then checked to still be inside that folder, so a
-    value like "../../etc/passwd" cannot reach out of it.
+    Every value names a database inside the input folder, possibly in a
+    sub-folder. It is resolved and then checked to still be inside that folder, so
+    neither "../../etc/passwd" nor an absolute path elsewhere on the disk can reach
+    out of it. An absolute path that points inside the input folder is accepted.
     """
     path = str(_first(value) or "").strip()
     if not path or path == NO_DB:
         return ""
-    if os.path.isabs(path):
-        return path                     # an explicit absolute path is the user's own call
     input_dir = os.path.realpath(folder_paths.get_input_directory())
     full = os.path.realpath(os.path.join(input_dir, path.replace("/", os.sep)))
     if full != input_dir and not full.startswith(input_dir + os.sep):
@@ -281,12 +274,12 @@ def _match(row, condition, case_sensitive):
         if a is None or b is None:
             a, b = cell_cmp, wanted_cmp
         if operator == "greater than":
-            return a > b
+            return a > b # type: ignore
         if operator == "greater or equal":
-            return a >= b
+            return a >= b # type: ignore
         if operator == "less than":
-            return a < b
-        return a <= b
+            return a < b # type: ignore
+        return a <= b # type: ignore
 
     if operator == "contains":
         return wanted_cmp in cell_cmp
@@ -426,12 +419,25 @@ class NovaSQLiteBrowserNode:
         tables = _all_known_tables() or [""]
         return {
             "required": {
-                "database_path": (db_files, {"default": db_files[0]}),
-                "table_name": (tables, {"default": tables[0]}),
+                "database_path": (db_files, {
+                    "default": db_files[0],
+                    "tooltip": "A SQLite database inside ComfyUI's input folder, sub-folders included. "
+                               "Copy the file there, then press the refresh button on the node.",
+                }),
+                "table_name": (tables, {
+                    "default": tables[0],
+                    "tooltip": "The table to read. The list follows the database chosen above.",
+                }),
                 # Hidden in the UI, driven by the column badges (JSON list of selected columns)
-                "selected_columns": ("STRING", {"default": "", "multiline": False}),
+                "selected_columns": ("STRING", {
+                    "default": "", "multiline": False,
+                    "tooltip": "Set by the column chips on the node: the columns to output, as a JSON list.",
+                }),
             }
         }
+
+    DESCRIPTION = ("Pick a SQLite database in ComfyUI's input folder, a table and its columns, "
+                   "and output the rows.")
 
     RETURN_TYPES = (ROWS_TYPE, "LIST", "STRING", "INT", "INT", TABLE_TYPE)
     RETURN_NAMES = ("row_data_json", "column_names_list", "column_names_json", "column_count", "row_count", "table")
@@ -512,11 +518,14 @@ class NovaSQLiteSingleRowNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "row_data_json": (ROWS_TYPE, {}),
+                "row_data_json": (ROWS_TYPE, {
+                    "tooltip": "Rows from Nova Dynamic SQLite Browser or Nova SQLite Data Table & Filter."}),
                 "row_index": ("INT", {"default": 0, "min": 0, "max": 999999, "step": 1,
                                       "tooltip": "Row to show (0-based). Ignored when only one row is received."}),
             }
         }
+
+    DESCRIPTION = "Outputs each column of one chosen row, and the whole row as JSON."
 
     # Fixed outputs + a pool of STRING slots. The UI only shows one slot per selected column.
     RETURN_TYPES = ("STRING", "INT", "INT") + ("STRING",) * MAX_COLUMN_OUTPUTS
@@ -603,15 +612,24 @@ class NovaSQLiteRowIteratorNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "row_data_json": (ROWS_TYPE, {}),
-                "row_index": ("INT", {"default": 0, "min": 0, "max": 999999, "step": 1}),
+                "row_data_json": (ROWS_TYPE, {
+                    "tooltip": "Rows from Nova Dynamic SQLite Browser or Nova SQLite Data Table & Filter."}),
+                "row_index": ("INT", {"default": 0, "min": 0, "max": 999999, "step": 1,
+                                      "tooltip": "The row this run outputs (0-based). With auto_loop on it "
+                                                 "moves by one after each run."}),
                 "stop_at_row": ("INT", {"default": -1, "min": -1, "max": 999999, "step": 1,
                                         "tooltip": "-1 = last row (increment) / first row (decrement)"}),
-                "loop_mode": (LOOP_MODES, {"default": "increment"}),
+                "loop_mode": (LOOP_MODES, {"default": "increment",
+                                           "tooltip": "increment: step forward one row per run. "
+                                                      "decrement: step back one row per run. "
+                                                      "fixed: stay on row_index."}),
                 "auto_loop": ("BOOLEAN", {"default": True,
                                           "tooltip": "Automatically queue the next row until the loop finishes"}),
             }
         }
+
+    DESCRIPTION = ("Steps through rows one run at a time and outputs each column of the "
+                   "current row.")
 
     # Fixed outputs + a pool of STRING slots. The UI only shows one slot per selected column.
     RETURN_TYPES = ("INT", "INT", "BOOLEAN") + ("STRING",) * MAX_COLUMN_OUTPUTS
@@ -724,9 +742,11 @@ class NovaSQLiteWhereFilterNode:
         return {
             "required": {
                 # Hidden in the UI, driven by the condition builder (JSON list of conditions)
-                "where_json": ("STRING", {"default": "[]", "multiline": False}),
+                "where_json": ("STRING", {"default": "[]", "multiline": False,
+                                          "tooltip": "Set by the condition builder on the node: the conditions, as a JSON list."}),
                 # Hidden in the UI, driven by clicking rows in the grid (JSON list of source row numbers)
-                "selected_rows": ("STRING", {"default": "[]", "multiline": False}),
+                "selected_rows": ("STRING", {"default": "[]", "multiline": False,
+                                             "tooltip": "Set by clicking rows in the grid: the highlighted rows, as a JSON list."}),
                 "output_rows": (OUTPUT_MODES, {"default": OUTPUT_MODES[0],
                                                "tooltip": "Which rows leave this node: everything the conditions match, "
                                                           "or only the rows highlighted in the grid."}),
@@ -742,6 +762,9 @@ class NovaSQLiteWhereFilterNode:
                 "table": (TABLE_TYPE, {"tooltip": "A NOVA_TABLE from any pack node, so its rows can be filtered too."}),
             },
         }
+
+    DESCRIPTION = ("Shows rows in a grid, filters them with conditions, and outputs the "
+                   "matching or selected rows.")
 
     RETURN_TYPES = (ROWS_TYPE, "STRING", "INT", "INT", "STRING", TABLE_TYPE, "INT")
     RETURN_NAMES = ("row_data_json", "rows_json", "matched_rows", "total_rows", "where_clause", "table", "selected_rows")

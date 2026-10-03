@@ -480,7 +480,7 @@ import json, sys, importlib.util
 pack, ckpt, variant = sys.argv[1], sys.argv[2], sys.argv[3]
 sys.path.insert(0, pack)
 spec = importlib.util.spec_from_file_location(
-    "nova_ace_common", pack + "/training/nova_ace_common.py")
+    "nova_definitions", pack + "/nova_definitions.py")
 mod = importlib.util.module_from_spec(spec)
 try:
     spec.loader.exec_module(mod)
@@ -576,7 +576,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     OUT.ok(f"torch              {info['version']}  [{backend}]")
 
     pack = comfy / "custom_nodes" / "comfyui-novaaudioplayer"
-    if (pack / "training" / "nova_ace_common.py").is_file():
+    if (pack / "nova_definitions.py").is_file():
         OUT.ok(f"Nova pack          {pack}")
     else:
         OUT.warn(f"Nova pack not found at {pack} — verification will be skipped")

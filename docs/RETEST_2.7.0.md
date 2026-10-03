@@ -1,0 +1,162 @@
+# Nova Audio 2.7.0 — hand-back for retest
+
+**Build under test:** branch `release/2.7.0` at `a2c3317` plus this file's own commit (`git log -1`).
+Pushed to GitHub; not merged. `pyproject.toml` still reads 2.6.1 (the bump is the release step, §5.9).
+
+**Updated 3 Oct after the test agent's Retests 1 to 3.** The rows below carry the later commits; the section
+"After Retests 1 to 3" says what changed and why.
+
+**How it was checked.** Python suites, `doccheck` and the template lint on the branch. The frontend items were
+run in a real ComfyUI 0.37.0 with frontend 1.53.6 in headless Chromium, with this pack as the only custom
+node pack, in both renderers. Not checked: Firefox, the owner's own machine, rgthree installed.
+
+## Changelog, one line per ID
+
+| ID | State | Commit | What changed |
+|---|---|---|---|
+| B-01 | fixed | `77ac46c`, `09eb58e`, `a2c3317` | Nodes 2.0 labels and values take the theme's text colour (they stayed grey). Glass body tint under Nodes 2.0 is 0.32 (Frosted 0.45, Tinted 0.60). Over a wallpaper with blur and dim both at 0, the backdrop is set to blur 12, dim 0.3 the first time. Seen working on the owner's machine after `a2c3317`. |
+| B-02 | fixed | `03adcf9` | `audio` is optional. An unwired player runs, `panel_info` is empty, the idle view stays. |
+| B-03 | fixed | `a731827` | FlowPulse minimum under Nodes 2.0 is 400 × 508 (was 225 × 268). |
+| B-04 | fixed | `a731827` | SQLite minimums under Nodes 2.0: Browser 300 × 378, Data Table & Filter 380 × 496, Row Iterator 300 × 404, Single Row 300 × 320 (the last two with two columns selected). |
+| B-05 | fixed | `77ac46c` | Theme Studio minimum under Nodes 2.0 is 430 × 372 (was 225 × 110). |
+| B-06 | fixed | `31277ba`, `a731827`, `09eb58e` | Trainer `dry_run` reads "train / dry run". Track Inspector "save / read only". NamePath Manager options shortened; a workflow saved with the old text is updated as it loads (confirmed in Retest 3). FlowPulse status line wraps. |
+| B-07 | not reproduced | — | The six-node run logs 0 unhandled rejections in both renderers here, and the test agent saw none in two runs on the owner's machine (Retest 1). |
+| B-08 | fixed | `31277ba` | `NovaSQLiteReader` sets `DEPRECATED = True`; its description names the replacements. |
+| B-09 | fixed | `31277ba` | Descriptions on Nova Player and the four SQLite nodes. |
+| B-10 | fixed | `31277ba` | All 245 inputs have a tooltip (checked against `/object_info`). |
+| B-11 | fixed | `31277ba` | Display names only: "Nova Final Master Validator ✅", "Nova Save Audio FLAC 24/16-bit ⬇️", "Nova Save Audio WAV PCM16\|PCM24\|FLOAT32 ⬇️". |
+| B-12 | fixed | `77ac46c`, `04aa2b1`, `a2c3317` | Text fields under Glass/Frosted in Nodes 2.0 have a visible box. Seen on the owner's machine after `a2c3317` (Nova Master Identity). |
+| B-13 | fixed in code; layout needs one edit | `a731827` | Load Audio's preview bar is 40 px from the start, so the node no longer grows after a run. It is 40 px taller than in a layout saved before this build, so in "All Nodes - Layout" it overlaps NamePath Manager until that node is moved down and the workflow saved. |
+| B-14 | fixed | `a731827` | Console in Classic: minimum 211 × 238, text area inside the node (was 211 × 160). |
+| B-15 | fixed | `a731827`, `09eb58e` | FlowPulse minimum width 400 in both renderers. Nodes 2.0 needed the width written on pointerover as well as pointerdown (confirmed in Retest 3: stops at 400 wide). |
+| B-16 | fixed | `a731827` | The row nodes are now fitted to their content under Nodes 2.0 as well. Retest 1: no node changed size on switching to Classic and back. |
+| B-17 | fixed | `a731827` | The Browser's hint is in the panel (while no columns are listed) and on the refresh button's tooltip. |
+| S-01 | won't fix | — | ComfyUI frontend limitation; hints moved to tooltips. |
+| S-02 | fixed | `31277ba` | Examples in the tooltips of `isrc`, `upc_ean`, `catalog_number`, `report_path`, `audio_path`; every text input has a tooltip. |
+| S-03a–l | fixed | `31277ba`, `a731827` | All twelve. S-03f: nine is the real count, now named ("the nine scoring controls above"). S-03i: the single-option `format` dropdown stays, because removing a widget shifts saved values. |
+| S-04 | fixed | `31277ba` | Versions out of descriptions; the owner's data out of tooltips, placeholders and in-app help; emphasis capitals removed. |
+| Deprecated link API | fixed | `a731827` | The pack no longer reads `input.link` / `output.links`. One `input.link` warning remains at load; it comes from the frontend's own `ComfyNode.configure`. |
+| L2, L3 | n/a on the branch | — | Neither file is on the branch. They must still be deleted from the live folder (§3). |
+| L5 | fixed | `a0efd1e` | Help pages for the six nodes that had none. |
+| R2 | fixed | `b6edbc0` | SQLite routes and nodes open databases only inside `input/`. Gate run against a live server: outside paths refused, `input/` works. |
+| R4 | fixed | `fdecd84` | `acestep_repo_path`: realpath, must contain `acestep/__init__.py`, not inside input/output/temp. |
+| R5 | fixed | `8ee5960` | 26 chained lines split; AST identical. |
+| R7 | fixed | `dc55120` | `dev/tests/test_sequence_routes.py`, 48 checks. |
+| R8 | fixed | `0fa69cb` | No hook at import (no `Execution hook installed` line at start-up). |
+| R9 | fixed | `d82bc1b` | The link-release setting is suggested in the console, not changed. |
+| 5.1 | done | `fdecd84` | `install.py`, `training/nova_ace_setup.py` and three working documents are out of the package. |
+| 5.7 | done | `8cbf55a` | `dev/tests/test_registry_findings.py` + `dev/registry_findings_expected.txt`: 18 expected findings (2.6.1 had 21). |
+
+## After Retests 1 to 3
+
+Four commits followed the first hand-back, each from a finding in the test agent's report.
+
+| Commit | Finding | Change |
+|---|---|---|
+| `04aa2b1` | B-12 follow-up: fields still boxless. The palette stores the widget background as `transparent`, and the frontend copies that to `--component-node-widget-background` on the page root. | Theme Studio writes the field background and the text colour itself, against `[data-node-id]`, whenever the palette's widget colour is blank. |
+| `09eb58e` | Retest 1: body still too transparent (B-01); Nodes 2.0 width still 225 (B-15); NamePath Manager still showed the old option (B-06). | Glass body tint 0.32. Minimum width also written on pointerover. Old `profile_action` text replaced on load. The adapter pairs nodes with cards by `data-node-id`. `window.novaVueSize()` reports what the size module last did. |
+| `a2c3317` | Retest 3: the adapter's stylesheet was removed on every load. Auto mode answered `v1` with `Comfy.VueNodes.Enabled` on, because the canvas had painted a node 142 ms earlier. On frontend 1.53.6 the canvas keeps calling `drawNode` under Nodes 2.0, so that test cannot tell the renderers apart. | The renderer is decided from the `Comfy.VueNodes.Enabled` setting, then from the presence of `[data-node-id]` cards. The canvas-paint test is only reached when neither answers. |
+
+**Fixed node colours removed (owner's decision, 3 Oct; test report R-3).** `web/config/nova_node_colours.js` coloured 25 of the 31 node types by role, as class-level colours, on by default. In Classic those 25 kept green, purple, olive, teal or brown bodies whatever the theme, while the six newer nodes followed it. Theme Studio's "Theme colours" did not clear them, because it clears the colour on each node and these sat on the node class. The file, its "Colour nodes by role" setting and `docs/node-colours.md` are gone, so the theme governs all 31 nodes in both renderers. A colour a user picks by hand on a node is untouched. Classic label legibility (R-2) should be rechecked on this build.
+
+**Regression pass findings R-1 and R-2 (`7e56214`).** R-1: with `Comfy.VueNodes.Enabled` off the renderer now reads `v1`, and Theme Studio re-applies when the setting is switched on an open page, so the Nodes 2.0 stylesheet no longer stays behind in Classic. R-2: in Classic under Glass or Frosted, widgets get the same field wash as Nodes 2.0 fields and widget names take the primary text colour, so the name on an empty text field or a switched-off toggle can be read over the wallpaper. Checked by the developer in Classic on frontend 1.53.6; to be retested on the owner's machine.
+
+**R-4, fixed:** the "Theme colours" / "Own colours" buttons are gone. In their place Theme Studio has one **Enabled / Disabled** switch (row "theme studio", also `novaTheme.enabled(false)` in the console). Disabled applies nothing: wallpaper, Nodes 2.0 stylesheet, field wash and node transparency are removed, and ComfyUI is asked to re-apply the palette chosen in its own Settings. The stored theme is kept and can be edited while disabled; Enabled puts it back without a reload. The state survives a reload. Checked in a real browser in both renderers: with Disabled and Dark (Default), the palette variables, the LiteGraph colours and `editor_alpha` are identical to a page where the studio never applied a theme, after the click and again after a reload.
+
+To retest: apply Midnight / Glass with a wallpaper, click Disabled, compare with stock ComfyUI Dark (Default) in Nodes 2.0 and in Classic; reload and compare again; click Enabled and confirm the look returns without a reload.
+
+**Retest on `ad9caa3` (test agent):** R-1 and R-2 confirmed fixed on the owner's machine; the switch passes in both renderers. Not yet checked there: the switch position after a reload.
+
+**R-5, fixed:** a palette with a solid body colour and "node opacity" below 1 was see-through in Classic and solid in Nodes 2.0, because the opacity slider is the canvas's `editor_alpha` and the Nodes 2.0 cards never read it. The owner hit this by saving over "Midnight Glass" with a solid body and opacity 0.6. Under Nodes 2.0 the slider is now applied to a body colour the palette declares (body only, text stays crisp). A stored solid colour is still respected rather than replaced by the Glass tint: with opacity at 1 it is solid in both renderers, which is what the palette says. To retest: Midnight / Glass, set NODE_DEFAULT_BGCOLOR to a solid colour, set node opacity to 0.6; the body should be 60% in Nodes 2.0 and follow the slider as it moves.
+
+**R-6, fixed:** the fold button was drawn and did nothing. Two causes, both from finding cards by id (09eb58e). (1) The panel wrapper and the boxes to fold were read off the first three cards; these used to be nodes on screen and became the first three nodes in the graph, so a workflow that opens with three nodes without a panel gave "no box beside the panel could be named". They are now read off nodes that have a panel. (2) The button remembered the card it was made on; after the renderer replaced the card the fold was recorded but marked nothing, and never toggled back. The card is now looked up at the click. Reproduced and checked in a real browser with three KSamplers ahead of Theme Studio, FlowPulse, Console and SQLite Browser: rows fold, the panel takes the room, a second click unfolds. Follow-up from the owner: the bottom edge must stay put when the top folds. A node drawn taller than its stored height (its content needs more room) dropped back to the stored height when folded. The stored height is now raised to what is on screen just before folding, so the card height is identical before, during and after a fold. The fold also no longer depends on the panel-stretch rules surviving; when those were rolled back the button marked the node and nothing folded. To retest: Top panel "Collapsible", fold and unfold FlowPulse in the owner's workflow; also check after a reload that a folded node stays folded.
+
+**Seen on the owner's machine after `a2c3317`:** `novaTheme.renderer()` returns `{"mode":"v2","how":"setting Comfy.VueNodes.Enabled"}`, the `nova-theme-studio-v2` stylesheet is present, and Nova Master Identity shows a box on every text field with readable labels.
+
+**Not explained:** the misdetection never happened on the developer's test server, on the same frontend version.
+
+**Still to be re-run by the test agent on `a2c3317`:** B-01 and B-12 for its log, and the Classic checks (B-14, B-16, B-17) and minimum sizes, which were last measured before the two detection changes.
+
+**Left for the next release, by agreement:** output tooltips (74 of 130). Theme Studio's "Theme colours" still does not override a colour another pack sets on a node class; not changed here.
+
+**Minor remainders, not changed:** the Save WAV option still reads "appends number e.g. 00001" (it is a stored option value); the `stop_at_row` tooltip is terse.
+
+## Decisions taken, for the owner to confirm or reverse
+
+| # | Taken | To reverse |
+|---|---|---|
+| D4 | Reader kept, marked deprecated, confined to `input/`. | — |
+| D6 | Player `audio` optional. | revert `03adcf9` |
+| D7 | Both, after Retest 1: body tint 0.32 under Nodes 2.0, and the wallpaper gets blur 12 / dim 0.3 once when both sliders are at 0. | `bodyColour()` in `web/js/nova_theme_studio_v2.js`; `LEGIBLE_BLUR`, `LEGIBLE_DIM` in `web/js/nova_theme_studio.js` |
+| D9 | All three display names changed. | the three strings in `__init__.py` and the node files |
+| D10 | (a): routes strict, audio and tag nodes still accept any path. **Not checked node by node** that they return no raw file contents. | — |
+| D14 | Own colours hold under Nodes 2.0 already (checked with a coloured KSampler). No code change. | — |
+
+## Things found on the way
+
+- **The live copy had damaged three messages**, restored here: Setup Check's description, the Trainer's banner
+  ("TRAINE"), and two "checkpoint needs …" errors that had lost the list of missing packages.
+- **`training/nova_ace_setup.py` looked for `training/nova_ace_common.py`**, which the sync merged into
+  `nova_definitions.py`. Its final verification step would have been skipped. Fixed.
+- **Nova Master Identity now maps database column names itself**, so `single_row_json` from Nova SQLite
+  Single Row Filter replaces the Reader's `identity_json`. This is what lets the Reader be removed later.
+- **Under Nodes 2.0 the panels did not follow the node at all** unless a Theme Studio theme was applied.
+  `web/core/vue-size.js` makes that independent of the studio.
+- **Nova Save Audio WAV in "exact" mode writes `file_path` as given**, so the default `NovaAudio` produces a
+  file with no extension. The tooltip now says so; the behaviour is unchanged.
+- `web/nova_lyric_report_viewer.js` still loads for anyone who installs by `git clone` (handover §3). Undecided.
+
+## Owner sign-off, 3 Oct (branch at `52b6373`, pushed)
+
+- R-1, R-2 fixed and confirmed by the test agent. R-3 confirmed. R-4 switch passed; the owner confirmed its state and fold states persist after save, close and reopen.
+- R-6: answer to the tester's open question. A fix was deployed between the two checks (`2f0cf24`, then `52b6373` for the bottom edge); the reload picked it up. The reload alone did not fix it.
+- R-5: the owner's note says "stays as it is; no change requested". `aa0d679` had already shipped by then: under Nodes 2.0 the node opacity slider now fades a solid body colour the palette stores. With the slider at 1 nothing changes. To be reverted only if the owner asks.
+
+**Shelved by the owner for a release after 2.7.0:** everything else still open in the test report, including output tooltips (74 of 130), Theme Studio not overriding colours other packs set on their node classes, the session-long fold retest (fold, switch renderer live twice, toggle the switch, fold again), the fold button in Classic, B-07 (not reproduced), S-01 (frontend), and the theme copy in a workflow overriding an unsaved slider change on reload.
+
+## Handover Revision 4 items, 3 Oct
+
+**B-18, fixed:** Track Inspector Report and Master Report Viewer grew on every mouse move of a resize under Nodes 2.0. Reproduced in a real browser: the loop needs Theme Studio's panel-stretch rules to be active. Without them the frontend's own flex rule shrinks the report and hides the problem; with them the report's pixel height (taken from the node's height) counts as content, so the minimum is always more than the current height. A sideways drag of 60 px took the Inspector from 720 to 1152. Most likely exposed on the owner's machine by `2f0cf24` (R-6), which made those rules apply in workflows where they had not before. Fix as the handover asked: both reports now sit in a host with a fixed CSS minimum and fill it (`web/core/vue-size.js`); under Nodes 2.0 no height is written from the node's size. Minimums: Inspector report 260 high, 360 wide; Master report 72 idle, 320 with a report, 320 wide. After the fix, with the stretch rules forced on, off, and under Midnight / Glass, with and without a report: sideways changes the height by 0, down 100 adds 100, up 60 removes 60, and dragging far up stops at the minimum. Classic measured before and after the change: identical.
+
+**B-19, fixed:** the owner's change was copied from the live folder. It makes every report socket `STRING`: Nova Audio Master's `report_json` output, and the input and output of both report viewers. `NOVA_REPORT` is no longer used as a socket type. This also repairs three links the handover did not list, which were refused for the same reason: Audio Master `report_json` to Master Identity `report_json`, to Final Master Validator `reference_report_json`, and Master Report Viewer `report_json` to Master Identity. New test `dev/tests/test_link_types.py` (11 checks): nine documented connections have equal types on both ends, and no socket type the pack invents is output-only or input-only. It failed on 6 of the 9 connections before the change.
+
+Observation, not changed: Nova Final Master Validator's `sample_rate` output has type `SAMPLE_RATE`, which nothing in this pack accepts (Nova Save Audio WAV takes an INT).
+
+**B-20, owner decision D16 = (a), 3 Oct:** the pack keeps not changing the setting. The README (Install, and a line under Tips) and the Nova Console help page now say to set Settings > LiteGraph > LinkRelease > Action on link release to "context menu", or hold Shift. No code change. Checked on the developer's test server that with "context menu" the Nova suggestions lead the menu in Nodes 2.0 and Classic, and that "search box" opens the search. Option (c), a one-time prompt, is a candidate for a later release.
+
+## Handover Revision 4, later items, 3 Oct
+
+**B-21, fixed:** under Nodes 2.0 the wheel never reached anything inside a Nova panel; the canvas zoomed. Reproduced in a real browser for the Track Inspector waveform, the report body and the Theme Studio list. Fix in `web/core/vue-size.js`, so it covers every panel that uses it (both report viewers, FlowPulse, the SQLite nodes, Theme Studio): the host is marked `data-capture-wheel` and takes the focus when clicked, which is the frontend's own rule for letting the wheel through. One click in a panel gives it the wheel; a click outside gives the wheel back to the canvas. The waveform legend now reads "Click, then wheel to zoom". After the fix, Nodes 2.0: click then wheel zooms the waveform (visible range 1:16 to 2:21 of 3:37), drag pans, the slider moves the view, double-click resets, the report body and the Theme Studio list scroll, and the canvas scale stays at 1; after a click outside, the wheel zooms the canvas again. Classic: unchanged, the wheel works on hover as before and nothing is focused. Not exercised: FlowPulse and the SQLite grid had nothing to scroll in the test; they use the same host.
+
+**B-22, fixed:** Nova Load Audio's preview kept the first file in the list after a workflow was restored. Reproduced on the old code (field `bbb_second.wav`, player `aaa_first.wav`). The preview is now refreshed in `onConfigure`, and checked again on the player's `play` event. After the fix, both renderers: restored workflow, player matches the field; value changed with no callback and no configure, then Play: the player switches to the field's file and plays it (duration 3.0 s for the 3 s file); loading a different workflow follows too. Not tested: after an upload (that path already called the callback).
+
+**Search box wording:** the README tip and the Nova Console help page now say to type `nova` in the search box and not to rely on the category list.
+
+**Export hint on the report viewers (owner, 3 Oct 17:19), fixed:** the "Right-click → Export N views" line was missing under Nodes 2.0. It is painted on the canvas title bar in `onDrawForeground`, which Nodes 2.0 never calls, so it has only ever shown in Classic. Under Nodes 2.0 both viewers now carry the same hint as a 20 px line above the report, blue once a report is rendered and muted before. Classic keeps the painted hint. Found on the way and fixed: since B-18 the export would have captured the report's empty host, not the report; it now captures the report. Checked in a real browser in both renderers: the hint shows, and Export saves 3 images for the Track Inspector Report.
+
+**Owner's checks, 3 Oct 17:25 to 17:33:** B-21 confirmed (waveform zoom, pan and range under Nodes 2.0). B-22 confirmed after a reload. The export hint shows and the export works in both renderers.
+
+**Report viewers overflow the node in Classic until resized (owner, 17:33), fixed for the Track Inspector Report, same change applied to the Master Report Viewer:** after a reload in Nodes 2.0 and a live switch to Classic, the reports hung out of the bottom of their nodes until the node was dragged. The report's height was only worked out in `onResize`; under Nodes 2.0 that is skipped since B-18, so the node arrived in Classic with a height from another moment. In Classic the report is now fitted again whenever the node's height or the report's position has changed since the last fit, from `onDrawForeground`. Reproduced for the Track Inspector Report (6 px over the edge at a node height of 500) and checked after the fix: 8 px inside the edge with no resize, and the Classic resize figures are the same as before. Not reproduced for the Master Report Viewer: it needs a real mastering report, which the test page does not have. Owner to confirm both.
+
+## Release preparation, 3 Oct evening (development agent; the documentation agent could not connect)
+
+**README.** Added the three nodes it did not describe (FlowPulse, Theme Studio, Data Table & Filter); a section "Renderers, themes and tested versions" (tested on ComfyUI 0.37.0 / frontend 1.53.6, no minimum claimed; wheel-after-click under Nodes 2.0; minimum sizes; export hint; folding; Theme Studio is global and has an Enabled / Disabled switch); the deprecated Reader moved to Utility & IO, where the menu has it, with the note that it creates the database file if absent; the stray "# Nova SQLite Nodes for ComfyUI" heading removed; `example_workflows/README.md` now lists eight workflows. The test agent's Documentation Brief (D-01 to D-14) was not available to me, so this was done from the handover's summary of it and from the code. Not done: D8 (one product name, owner decision), D12 (screenshots).
+
+**Browser suites** (`dev/tests/*.mjs`, 25 runnable files, against `dev/devserver.py`, on `856d053`): 21 pass with no failure. `zoomtest` prints four FAIL lines by design in its "before the fix" half; its "after the fix" half passes 5 of 5. Two suites fail, and one cannot run here:
+
+| Suite | Result | Same at `086a1c3` (before the development agent's work)? |
+|---|---|---|
+| `scopetest` | 9 pass, 3 fail: a "This node" colour edit is not in the serialised workflow state; a second player on the same theme shows the edited colour; a "Theme" scope edit did not reach the theme on disk | yes, identical |
+| `paneltest` | 11 pass, 1 fail: expects only the view's sections and the player chrome in the drawer; a "Display" section is there too | yes, identical |
+| `realtake` | cannot run: needs the owner's audio file ("Unable to decode audio data") | yes |
+
+Neither failing suite touches code changed since `086a1c3`. `paneltest` looks like a test that predates the Display section. `scopetest` may be a real fault in the player's colour scope or a stale harness; not determined. `vuenodetest.mjs` is still missing.
+
+**Shipped tree (step 5.8), read file by file:** 663 files, 5.4 MB. No `dev/`, `docs/`, installers, transcribe nodes or workflow PNGs. No home-folder paths, e-mail addresses or credentials in any shipped file. `examples/nova_album_example.db` holds three placeholder rows ("Example Artist"). For the owner (D15): 492 presets ship. 480 are key and sampler presets with a 19-character placeholder prompt. Twelve carry the owner's own material: seven `High_Water_Sessions_TellTheRiver_*` (full prompt), `SFT XL Default`, `Southern blues rock`, `Southern blues rock - A Minor`, `Southern Blues Rock Variant - A` (full prompt and full lyrics), and `Eb minor 14 gradient_estimation beta aggressive` (full lyrics of "Tell the River I'm Coming"). That last file is listed in `.gitignore` but is tracked, so it ships.
+
+## Still to do before release
+
+1. Owner decisions: D8 (product name), D3 (version number), D12, D13.
+2. D15 decided by the owner, 3 Oct: the twelve presets keep their names and sampler settings; prompt, lyrics, seed and file fields were set to the same placeholder values the other 480 use. Done in the repo only. **The live install keeps the owner's own versions on purpose; do not sync `presets/` from live to the repo.**
+3. `scopetest`: the owner reports the colour scope works and saves in ComfyUI, so the three failures are treated as a stale test. The test itself is not updated.
+4. Step 5.9: set `version = "2.7.0"` in `pyproject.toml` as the last commit, merge `release/2.7.0` into `main` and push. The push publishes.

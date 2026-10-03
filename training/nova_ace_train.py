@@ -56,20 +56,15 @@ import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
+
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
 try:
-    from .nova_ace_common import (
-        ACE_VERSION, TRAINING_CATEGORY, VARIANT_DIRS,
-        check_checkpoint_tree, describe_checkpoint_requirement,
-        check_remote_code_imports, describe_remote_code_requirement,
-    )
-    from ..authoring.nova_authoring_common import banner
-except ImportError:  # direct execution / test harness
-    from nova_ace_common import (
-        ACE_VERSION, TRAINING_CATEGORY, VARIANT_DIRS,
-        check_checkpoint_tree, describe_checkpoint_requirement,
-        check_remote_code_imports, describe_remote_code_requirement,
-    )
-    from nova_authoring_common import banner
+    from ..nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner, check_acestep_repo
+    from ..nova_categories import TRAINING
+except ImportError:
+    from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner, check_acestep_repo
+    from nova_categories import TRAINING
 
 #: Upstream's preset directory, relative to the acestep package root.
 PRESET_SUBPATH = os.path.join("training_v2", "presets")
@@ -397,7 +392,7 @@ def quote_command(argv: List[str]) -> str:
 # ---------------------------------------------------------------------------
 
 class NovaACELoRATrainer:
-    CATEGORY = TRAINING_CATEGORY
+    CATEGORY = TRAINING
     FUNCTION = "train"
     RETURN_TYPES = ("STRING", "STRING", "INT", "STRING")
     RETURN_NAMES = ("lora_dir", "output_dir", "exit_code", "console")
@@ -409,7 +404,7 @@ class NovaACELoRATrainer:
         "Run log — wire into Nova Console.",
     )
     DESCRIPTION = (
-        f"Nova ACE LoRA Trainer v{ACE_VERSION} — runs ACE-Step's corrected "
+        f"Nova ACE LoRA Trainer — runs ACE-Step's corrected "
         "training loop over preprocessed tensors, as a cancellable child "
         "process so a multi-hour run cannot block or crash ComfyUI."
     )
@@ -451,7 +446,7 @@ class NovaACELoRATrainer:
                 }),
                 "learning_rate": ("FLOAT", {
                     "default": 0.0, "min": 0.0, "max": 0.01, "step": 0.00001, "round": False,
-                    "tooltip": "0 = from the preset (1e-4).",
+                    "tooltip": "Step size of the optimizer. 0 = use the preset's value (1e-4). Set a value here to override the preset.",
                 }),
                 "epochs": ("INT", {
                     "default": 0, "min": 0, "max": 100000,
@@ -459,7 +454,7 @@ class NovaACELoRATrainer:
                 }),
                 "batch_size": ("INT", {
                     "default": 0, "min": 0, "max": 64,
-                    "tooltip": "0 = from the preset.",
+                    "tooltip": "Samples per optimizer step. 0 = use the preset's value (1). A larger batch needs more VRAM; gradient_accumulation raises the effective batch without it.",
                 }),
                 "gradient_accumulation": ("INT", {
                     "default": 0, "min": 0, "max": 256,
@@ -486,8 +481,8 @@ class NovaACELoRATrainer:
                     "tooltip": "bf16 matches the bf16 checkpoints.",
                 }),
                 "dry_run": ("BOOLEAN", {
-                    "default": False, "label_on": "show command only", "label_off": "train",
-                    "tooltip": "Run every pre-flight check and print the exact command, without starting it.",
+                    "default": False, "label_on": "dry run", "label_off": "train",
+                    "tooltip": "train: start training. dry run: run every pre-flight check and print the exact command, without starting it.",
                 }),
                 # APPENDED, not inserted. ComfyUI serialises a node's widget
                 # values positionally, so slotting a new widget in beside the
@@ -636,7 +631,7 @@ class NovaACELoRATrainer:
               gradient_accumulation, save_every, optimizer,
               gradient_checkpointing, device, precision, dry_run,
               warmup_steps=0, acestep_repo_path="", resume_from="", **kwargs):
-        log: List[str] = [banner(f"NOVA ACE LORA TRAINER v{ACE_VERSION}")]
+        log: List[str] = [banner("NOVA ACE LORA TRAINER")]
 
         def clean(value):
             return os.path.abspath(os.path.expanduser((value or "").strip().strip('"'))) \
@@ -645,7 +640,12 @@ class NovaACELoRATrainer:
         tensors = clean(tensor_dir)
         out = clean(output_dir)
         ckpt = clean(checkpoint_dir)
-        repo = clean(acestep_repo_path)
+        # Resolved and checked before anything uses it: this folder goes on the
+        # child's PYTHONPATH, so it must be a real ACE-Step clone and not a
+        # folder a workflow can write to.
+        repo, repo_problem = check_acestep_repo(acestep_repo_path)
+        if repo_problem:
+            raise ValueError(f"Nova ACE LoRA Trainer: {repo_problem}")
         resume = clean(resume_from)
 
         # -- Pre-flight. Everything that can be known before a model loads --
@@ -679,10 +679,6 @@ class NovaACELoRATrainer:
                 + " checkpoint needs " + ", ".join(absent)
                 + ", which is not installed in ComfyUI's Python.\n"
                 + describe_remote_code_requirement(absent)
-            )
-        if repo and not os.path.isdir(repo):
-            raise NotADirectoryError(
-                f"Nova ACE LoRA Trainer: acestep_repo_path {repo} is not a directory."
             )
 
         # Find acestep HERE rather than letting the child fail on the import.

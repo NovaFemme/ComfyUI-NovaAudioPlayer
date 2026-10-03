@@ -14,16 +14,15 @@ import json
 import os
 from typing import Any, Dict, List
 
+
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
 try:
-    from .nova_authoring_common import (
-        DELIVERY_CATEGORY as AUTHORING_CATEGORY, AUTHORING_VERSION, FILES_TYPE,
-        banner, file_paths, render_value,
-    )
-except ImportError:  # standalone / direct execution
-    from nova_authoring_common import (
-        DELIVERY_CATEGORY as AUTHORING_CATEGORY, AUTHORING_VERSION, FILES_TYPE,
-        banner, file_paths, render_value,
-    )
+    from ..nova_categories import DELIVERY
+    from ..nova_definitions import FILES_TYPE, banner, file_paths, render_value
+except ImportError:
+    from nova_categories import DELIVERY
+    from nova_definitions import FILES_TYPE, banner, file_paths, render_value
 
 DEFAULT_FIELDS = "tracknumber, title, artist, album, date, genre, comment, copyright, encodedby, lyrics"
 
@@ -61,7 +60,7 @@ def _flatten(value: Any) -> str:
 
 
 def _read_one(path: str) -> Dict[str, Any]:
-    import mutagen
+    import mutagen # type: ignore
 
     handle = mutagen.File(path)
     if handle is None:
@@ -95,7 +94,7 @@ def _read_one(path: str) -> Dict[str, Any]:
 
 
 class NovaTagReader:
-    CATEGORY = AUTHORING_CATEGORY
+    CATEGORY = DELIVERY
     FUNCTION = "read"
     RETURN_TYPES = ("STRING", "STRING", "INT", FILES_TYPE)
     RETURN_NAMES = ("console", "tags_json", "file_count", "files")
@@ -106,7 +105,7 @@ class NovaTagReader:
         "The same batch, passed through.",
     )
     DESCRIPTION = (
-        f"Nova Tag Reader v{AUTHORING_VERSION} — lists the tags actually stored on "
+        f"Nova Tag Reader — lists the tags actually stored on "
         "each file in the batch."
     )
 
@@ -140,7 +139,7 @@ class NovaTagReader:
         requested = [f.strip().lower() for f in (fields or "").split(",") if f.strip()]
         want_all = not requested or "*" in requested
 
-        log: List[str] = [banner(f"NOVA TAG READER v{AUTHORING_VERSION}")]
+        log: List[str] = [banner(f"NOVA TAG READER")]
         log.append(f"Batch : {(files or {}).get('root', '(none)')}  ({len(paths)} file(s))")
         log.append("")
 

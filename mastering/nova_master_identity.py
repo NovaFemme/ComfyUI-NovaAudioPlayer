@@ -5,10 +5,15 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict
 
+
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
 try:
     from ..nova_categories import MASTERING
-except ImportError:  # imported as a module rather than as part of the pack
+    from ..nova_definitions import identity_fields_from_row
+except ImportError:
     from nova_categories import MASTERING
+    from nova_definitions import identity_fields_from_row
 
 VERSION = "0.2.6"
 
@@ -53,15 +58,35 @@ def _parse_fields(value: str) -> Dict[str, Any]:
     except Exception as exc:
         raise ValueError(
             "Nova Master Identity: identity_fields_json is not valid JSON "
-            f"({exc}). Wire it from Nova SQLite Reader's identity_json output "
-            "with column_set set to 'identity'."
+            f"({exc}). Wire it from Nova SQLite Single Row Filter's single_row_json "
+            "output, or type a JSON object of field name to value."
         ) from exc
     if not isinstance(parsed, dict):
         raise ValueError(
             "Nova Master Identity: identity_fields_json must be a JSON object "
             "of field name to value."
         )
-    return parsed
+    return _map_columns(parsed)
+
+
+def _map_columns(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Accept a raw database row as well as a ready-made field payload.
+
+    Nova SQLite Reader's identity preset mapped column names (Title, Artist,
+    Album, ISRC ...) onto this node's field names before handing the row over.
+    That node is deprecated, and the nodes that replace it hand over the row as
+    it is in the table. So the same mapping is applied here: a row from Nova
+    SQLite Single Row Filter works without a translation step in between. A
+    payload already keyed by field names passes through unchanged, and keys the
+    map does not know are kept, so nothing that worked before is dropped.
+    """
+    try:
+        mapped = identity_fields_from_row(row)
+    except Exception:
+        return row
+    merged = dict(row)
+    merged.update(mapped)
+    return merged
 
 
 def _coerce_field(name: str, value: Any) -> Any:
@@ -98,50 +123,81 @@ class NovaMasterIdentity:
     FUNCTION = "enrich"
     RETURN_TYPES = ("STRING", "STRING", "STRING")
     RETURN_NAMES = ("identity_json", "fingerprint_json", "archive_name")
-    DESCRIPTION = "Nova Master Identity v0.2.6: publishing, catalogue and mastering provenance."
+    DESCRIPTION = ("Nova Master Identity — turns a mastering report into release and archive identity: "
+                   "catalogue fields, provenance fingerprints and an archive file name. It does not touch the audio.")
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "report_json": ("STRING", {"multiline": True, "default": ""}),
-                "artist_name": ("STRING", {"default": ""}),
-                "track_title": ("STRING", {"default": ""}),
+                "report_json": ("STRING", {"multiline": True, "default": "",
+                    "tooltip": "Nova Audio Master's report_json. The identity and the fingerprints are bound to this report."}),
+                "artist_name": ("STRING", {"default": "",
+                    "tooltip": "Artist or band name, as it should appear on the release."}),
+                "track_title": ("STRING", {"default": "",
+                    "tooltip": "Title of this track. Also used in the archive file name."}),
             },
             "optional": {
-                "artist_initials": ("STRING", {"default": ""}),
-                "track_number": ("INT", {"default": 1, "min": 1, "max": 999}),
-                "version": ("STRING", {"default": "Master"}),
-                "album_title": ("STRING", {"default": ""}),
-                "catalog_number": ("STRING", {"default": ""}),
-                "isrc": ("STRING", {"default": ""}),
-                "publisher": ("STRING", {"default": ""}),
-                "label": ("STRING", {"default": ""}),
-                "mastering_engineer": ("STRING", {"default": ""}),
-                "mastering_company": ("STRING", {"default": "Nova Audio Master"}),
-                "copyright_owner": ("STRING", {"default": ""}),
-                "release_year": ("INT", {"default": 2026, "min": 1900, "max": 2200}),
-                "composer": ("STRING", {"default": ""}),
-                "producer": ("STRING", {"default": ""}),
-                "mix_engineer": ("STRING", {"default": ""}),
-                "project_name": ("STRING", {"default": ""}),
-                "territory": ("STRING", {"default": ""}),
-                "language": ("STRING", {"default": ""}),
-                "explicit_flag": ("BOOLEAN", {"default": False}),
-                "upc_ean": ("STRING", {"default": ""}),
-                "work_id": ("STRING", {"default": ""}),
-                "client_reference": ("STRING", {"default": ""}),
-                "notes": ("STRING", {"multiline": True, "default": ""}),
-                "target_bit_depth": (["24", "16"], {"default": "24"}),
-                "target_sample_rate": (["48000", "44100", "96000"], {"default": "48000"}),
+                "artist_initials": ("STRING", {"default": "",
+                    "tooltip": "Short form of the artist name for the archive file name, e.g. NA. Empty: derived from artist_name."}),
+                "track_number": ("INT", {"default": 1, "min": 1, "max": 999,
+                    "tooltip": "Position on the album. Leads the archive file name as two digits, e.g. 02."}),
+                "version": ("STRING", {"default": "Master",
+                    "tooltip": "Which version this is, e.g. Master, Radio Edit, Instrumental. Part of the archive file name."}),
+                "album_title": ("STRING", {"default": "",
+                    "tooltip": "Album or release title."}),
+                "catalog_number": ("STRING", {"default": "",
+                    "tooltip": "Your label's catalogue number for the release, e.g. NOVA-001."}),
+                "isrc": ("STRING", {"default": "",
+                    "tooltip": "International Standard Recording Code: 12 characters, e.g. US-S1Z-26-00001. Hyphens are optional."}),
+                "publisher": ("STRING", {"default": "",
+                    "tooltip": "Music publisher, if any."}),
+                "label": ("STRING", {"default": "",
+                    "tooltip": "Record label, if any."}),
+                "mastering_engineer": ("STRING", {"default": "",
+                    "tooltip": "Who mastered the track."}),
+                "mastering_company": ("STRING", {"default": "Nova Audio Master",
+                    "tooltip": "Studio or tool credited with the mastering."}),
+                "copyright_owner": ("STRING", {"default": "",
+                    "tooltip": "Owner of the sound recording copyright (the name only, without the year or the symbol)."}),
+                "release_year": ("INT", {"default": 2026, "min": 1900, "max": 2200,
+                    "tooltip": "Year of release, four digits."}),
+                "composer": ("STRING", {"default": "",
+                    "tooltip": "Who wrote the music. Separate several names with commas."}),
+                "producer": ("STRING", {"default": "",
+                    "tooltip": "Who produced the track."}),
+                "mix_engineer": ("STRING", {"default": "",
+                    "tooltip": "Who mixed the track."}),
+                "project_name": ("STRING", {"default": "",
+                    "tooltip": "Your own name for the project or session this master belongs to."}),
+                "territory": ("STRING", {"default": "",
+                    "tooltip": "Where the release is cleared for, e.g. Worldwide, or a list of country codes."}),
+                "language": ("STRING", {"default": "",
+                    "tooltip": "Language of the lyrics, e.g. English, or an ISO code such as en. Empty for an instrumental."}),
+                "explicit_flag": ("BOOLEAN", {"default": False,
+                    "tooltip": "On when the lyrics are explicit. Recorded in the identity; nothing is changed in the audio."}),
+                "upc_ean": ("STRING", {"default": "",
+                    "tooltip": "Barcode of the release: a 12-digit UPC or a 13-digit EAN, digits only, e.g. 012345678905."}),
+                "work_id": ("STRING", {"default": "",
+                    "tooltip": "Identifier of the composition, e.g. an ISWC such as T-123.456.789-0."}),
+                "client_reference": ("STRING", {"default": "",
+                    "tooltip": "The client's own reference or job number, if you master for someone else."}),
+                "notes": ("STRING", {"multiline": True, "default": "",
+                    "tooltip": "Free text kept with the identity record, e.g. a mastering note."}),
+                "target_bit_depth": (["24", "16"], {"default": "24",
+                    "tooltip": "The bit depth the release is meant to have. Recorded only: this node converts nothing. The save node decides what is written."}),
+                "target_sample_rate": (["48000", "44100", "96000"], {"default": "48000",
+                    "tooltip": "The sample rate the release is meant to have, in Hz. Recorded only: this node does not resample."}),
                 "identity_fields_json": ("STRING", {
                     "multiline": True,
                     "default": "",
                     "tooltip": (
-                        "Field values from a database, normally wired from Nova SQLite "
-                        "Reader's identity_json output with its column_set set to "
-                        "'identity'. Every field it carries replaces the widget below "
-                        "it, so the catalogue stays the single source of truth and "
+                        "Field values from a database, as a JSON object. Wire Nova SQLite "
+                        "Single Row Filter's single_row_json (rows from Nova Dynamic SQLite "
+                        "Browser), or the deprecated Nova SQLite Reader's identity_json. "
+                        "Columns are matched by name: Title, Artist, Album, ISRC and so on, "
+                        "or this node's own field names. Every field it carries replaces the "
+                        "widget of the same name, so the catalogue stays the single source of truth and "
                         "nothing has to be retyped after a browser reset. Blank values "
                         "are ignored, and fields it does not mention keep whatever the "
                         "widgets say."

@@ -25,21 +25,16 @@ import os
 import sys
 from typing import Any, Dict, List
 
+
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
 try:
-    from .nova_ace_common import (
-        ACE_VERSION, DATASET_TYPE, TRAINING_CATEGORY, VARIANT_DIRS,
-        check_checkpoint_tree, describe_checkpoint_requirement,
-        check_remote_code_imports, describe_remote_code_requirement,
-    )
-    from ..authoring.nova_authoring_common import banner
-    from .nova_ace_audio_shim import apply_decode_shim, TORCHCODEC_FIX
-except ImportError:  # direct execution / test harness
-    from nova_ace_common import (
-        ACE_VERSION, DATASET_TYPE, TRAINING_CATEGORY, VARIANT_DIRS,
-        check_checkpoint_tree, describe_checkpoint_requirement,
-        check_remote_code_imports, describe_remote_code_requirement,
-    )
-    from nova_authoring_common import banner
+    from ..nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner, check_acestep_repo
+    from ..nova_categories import TRAINING
+    from ..nova_ace_audio_shim import apply_decode_shim, TORCHCODEC_FIX
+except ImportError:
+    from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, describe_checkpoint_requirement, check_remote_code_imports, describe_remote_code_requirement, banner, check_acestep_repo
+    from nova_categories import TRAINING
     from nova_ace_audio_shim import apply_decode_shim, TORCHCODEC_FIX
 
 INSTALL_HINT = (
@@ -53,7 +48,7 @@ INSTALL_HINT = (
 
 
 class NovaACEPreprocess:
-    CATEGORY = TRAINING_CATEGORY
+    CATEGORY = TRAINING
     FUNCTION = "preprocess"
     RETURN_TYPES = ("STRING", "INT", "INT", "STRING")
     RETURN_NAMES = ("tensor_dir", "processed", "failed", "console")
@@ -65,7 +60,7 @@ class NovaACEPreprocess:
         "Run log — wire into Nova Console.",
     )
     DESCRIPTION = (
-        f"Nova ACE Preprocess v{ACE_VERSION} — runs ACE-Step's own two-pass tensor "
+        f"Nova ACE Preprocess — runs ACE-Step's own two-pass tensor "
         "generation over a Nova dataset. Prepares training data; does not train."
     )
 
@@ -124,7 +119,7 @@ class NovaACEPreprocess:
 
     def preprocess(self, dataset_json, output_dir, checkpoint_dir, variant,
                    max_duration, device, precision, acestep_repo_path="", **kwargs):
-        log: List[str] = [banner(f"NOVA ACE PREPROCESS v{ACE_VERSION}")]
+        log: List[str] = [banner(f"NOVA ACE PREPROCESS")]
 
         dataset = os.path.abspath(os.path.expanduser((dataset_json or "").strip().strip('"')))
         out = os.path.abspath(os.path.expanduser((output_dir or "").strip().strip('"')))
@@ -162,19 +157,18 @@ class NovaACEPreprocess:
                 + describe_remote_code_requirement(absent)
             )
 
-        repo = (acestep_repo_path or "").strip().strip('"')
+        # The folder named here is about to be imported from, so it is checked
+        # first: a real ACE-Step clone, and not somewhere a workflow can write.
+        repo, problem = check_acestep_repo(acestep_repo_path)
+        if problem:
+            raise ValueError(f"Nova ACE Preprocess: {problem}")
         if repo:
-            repo = os.path.abspath(os.path.expanduser(repo))
-            if not os.path.isdir(repo):
-                raise NotADirectoryError(
-                    f"Nova ACE Preprocess: acestep_repo_path {repo} is not a directory."
-                )
             if repo not in sys.path:
                 sys.path.insert(0, repo)
                 log.append(f"Added to sys.path: {repo}")
 
         try:
-            from acestep.training_v2.preprocess import preprocess_audio_files
+            from acestep.training_v2.preprocess import preprocess_audio_files # type: ignore
         except ImportError as exc:
             raise ImportError(f"Nova ACE Preprocess: {INSTALL_HINT}\n  ({exc})") from exc
 
@@ -201,7 +195,7 @@ class NovaACEPreprocess:
         print("\n".join(log))
 
         try:
-            from comfy.utils import ProgressBar
+            from comfy.utils import ProgressBar # type: ignore
             bar = ProgressBar(max(1, len(samples)))
         except Exception:
             bar = None

@@ -22,7 +22,7 @@ WHAT IT DELIBERATELY DOES NOT DO
 * It does not clone ACE-Step.
 * It does not touch PyTorch. Every install is pinned against the torch already
   present, so nothing can decide your ROCm or CPU build is wrong.
-* It never fails the install. The other 24 nodes in this pack have nothing to
+* It never fails the install. The other nodes in this pack have nothing to
   do with LoRA training and must stay usable, so a problem here is reported
   loudly and the exit status stays 0.
 

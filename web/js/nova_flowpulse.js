@@ -1,5 +1,6 @@
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
+import { vueSize, keepMinimumWidth } from "../core/vue-size.js";
 
 const FLOWPULSE = "NovaFlowPulseNode";
 
@@ -279,7 +280,13 @@ function hideWidget(w) {
 
 // The DOM widget is a pass-through host; the content is sized from node.size each
 // frame so nothing spills outside the node while it is dragged or resized.
-function makeDomHost(inner, initialH) {
+// Smallest size at which nothing in the dashboard is hidden or clipped: the
+// header row with its three buttons, the three tiles, one row of the node table
+// and the footer. Used by both renderers.
+const MIN_NODE_W = 400;
+const VUE_MIN = { minWidth: MIN_NODE_W, minHeight: 240 };
+
+function makeDomHost(inner, initialH, vueMin) {
     const host = document.createElement("div");
     host.style.cssText = "position:relative; overflow:visible; pointer-events:none; width:100%; height:100%;";
     Object.assign(inner.style, {
@@ -287,7 +294,8 @@ function makeDomHost(inner, initialH) {
         height: `${initialH}px`, boxSizing: "border-box", pointerEvents: "auto",
     });
     host.appendChild(inner);
-    return host;
+    // Nodes 2.0 measures minimum size from the page, not from getMinHeight.
+    return vueSize(host, inner, vueMin);
 }
 
 /**
@@ -566,12 +574,24 @@ app.registerExtension({
         wrap.append(bar, tiles, controls, body, foot);
 
         node._viewerH = 430;
-        const widget = node.addDOMWidget("flowpulse", "HTML", makeDomHost(wrap, 430), {
+        const widget = node.addDOMWidget("flowpulse", "HTML", makeDomHost(wrap, 430, VUE_MIN), {
             getMinHeight: () => node._viewerH,
             hideOnZoom: false,
             serialize: false,
         });
         widget.computeSize = (w) => [w ?? node.size[0], node._viewerH + 10];
+
+        // The header row (status, colours, Pause, Reset, Save log) needs about
+        // 400 px. The classic renderer clamps a resize against computeSize(),
+        // so the node's minimum width is stated there; Nodes 2.0 gets the same
+        // figure through VUE_MIN.
+        const baseComputeSize = node.computeSize;
+        node.computeSize = function (...args) {
+            const size = baseComputeSize.apply(this, args);
+            size[0] = Math.max(size[0], MIN_NODE_W);
+            return size;
+        };
+        keepMinimumWidth(node, MIN_NODE_W);
         pinDomSize(node, widget, wrap, 240);
 
         wrap.addEventListener("pointerdown", (e) => e.stopPropagation());
@@ -722,16 +742,34 @@ app.registerExtension({
 
             summaryEl.textContent = `${sorted.length} node(s) · ${fmtSecs(totalTime)} inside nodes · click a row for detail`;
 
-            let h = `<table style="width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums;">
-                <thead><tr style="color:var(--nfp-ink3); font-size:calc(var(--nfp-size) - 2px); letter-spacing:.6px;">
+            // TABLE-LAYOUT: FIXED, and the widths below are the whole reason.
+            //
+            // With the browser's default `auto` layout every column is measured
+            // from its content on every render, and this table re-renders on
+            // every poll. A node name a few characters longer, a figure going
+            // from "5 ms" to "1.23 s", the running marker appearing — any of
+            // them re-measured the whole table and the NODE column visibly grew
+            // and shrank several times a second while a graph ran.
+            //
+            // Fixed layout reads the widths once from the first row: the
+            // measured columns get a size that fits their widest realistic
+            // value, NODE takes whatever is left, and content can no longer
+            // move anything. Long names ellipsis instead, which they already
+            // did. The body scrolls horizontally if the node is made narrower
+            // than the fixed columns need.
+            let h = `<table style="width:100%; border-collapse:collapse; table-layout:fixed;
+                            font-variant-numeric:tabular-nums;">
+                <thead><tr style="color:var(--nfp-ink3); font-size:calc(var(--nfp-size) - 2px); letter-spacing:.6px;
+                            white-space:nowrap;">
                     <th style="text-align:left; padding:0 6px 4px 4px;">NODE</th>
-                    <th style="text-align:right; padding:0 6px 4px;">CALLS</th>
-                    <th style="text-align:right; padding:0 6px 4px;">TOTAL</th>
-                    <th style="text-align:right; padding:0 6px 4px;">AVG</th>
-                    <th style="text-align:right; padding:0 6px 4px; color:${SERIES.cpu};">CPU</th>
-                    <th style="text-align:right; padding:0 6px 4px; color:${SERIES.ram};">PEAK RAM</th>
-                    <th style="text-align:right; padding:0 6px 4px; color:${SERIES.ram};">Δ RAM</th>
-                    <th style="text-align:right; padding:0 4px 4px;" title="Bytes read + written">I/O</th>
+                    <th style="text-align:right; padding:0 6px 4px; width:48px;">CALLS</th>
+                    <th style="text-align:right; padding:0 6px 4px; width:66px;">TOTAL</th>
+                    <th style="text-align:right; padding:0 6px 4px; width:62px;">AVG</th>
+                    <th style="text-align:right; padding:0 6px 4px; width:46px; color:${SERIES.cpu};">CPU</th>
+                    <th style="text-align:right; padding:0 6px 4px; width:76px; overflow:hidden;
+                               text-overflow:ellipsis; color:${SERIES.ram};">PEAK RAM</th>
+                    <th style="text-align:right; padding:0 6px 4px; width:72px; color:${SERIES.ram};">Δ RAM</th>
+                    <th style="text-align:right; padding:0 4px 4px; width:66px;" title="Bytes read + written">I/O</th>
                 </tr></thead><tbody>`;
 
             for (const r of sorted) {
@@ -740,9 +778,14 @@ app.registerExtension({
                 const live = meta?.current === r.id;
                 const delta = r.rss_delta || 0;
                 h += `<tr data-id="${esc(r.id)}" class="nfp-row" style="cursor:pointer; border-top:1px solid var(--nfp-grid);">
-                    <td style="padding:4px 6px 4px 4px; max-width:210px;">
+                    <td style="padding:4px 6px 4px 4px; overflow:hidden;">
                         <div style="display:flex; align-items:center; gap:5px; min-width:0;">
-                            ${live ? `<span style="color:var(--nfp-accent);">●</span>` : ""}
+                            <!-- ALWAYS PRESENT, sometimes invisible. Adding and
+                                 removing the running marker shifted the name
+                                 sideways every time the executing node changed;
+                                 hiding it instead keeps its box. -->
+                            <span style="flex:0 0 auto; color:var(--nfp-accent);
+                                  visibility:${live ? "visible" : "hidden"};">●</span>
                             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${esc(nodeLabel(r.id))} — ${esc(nodeType(r.id))}">${esc(nodeLabel(r.id))}</span>
                         </div>
                         <div style="height:3px; margin-top:3px; background:var(--nfp-grid); border-radius:2px; overflow:hidden;">
@@ -890,7 +933,9 @@ app.registerExtension({
                     : `gpu: off${meta.gpu?.note ? ` — ${meta.gpu.note}` : ""}`);
                 if (meta.last_log) bits.push(`log: ${meta.last_log.split(/[\\/]/).pop()}`);
             }
-            foot.innerHTML = `<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(bits.join("  ·  "))}</span>`;
+            // Wraps rather than being cut off: at the node's default width the
+            // line ran past the edge and its last part (the GPU note) was lost.
+            foot.innerHTML = `<span style="flex:1; min-width:0; white-space:normal; overflow-wrap:anywhere; line-height:1.35;">${esc(bits.join("  ·  "))}</span>`;
             if (meta?.gpu?.risky) {
                 foot.innerHTML += `<span style="color:${STATUS.warning}; white-space:nowrap;"
                     title="Polling the compute runtime during a run can abort ComfyUI on ROCm. Switch gpu_telemetry to 'auto (safe)' if the process aborts.">⚠ torch GPU mode</span>`;

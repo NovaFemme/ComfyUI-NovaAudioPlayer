@@ -17,7 +17,7 @@ This module aggregates the per-node mappings so the pack's root __init__.py
 needs a single import.
 """
 
-from .nova_load_audio import (
+from ..nova_load_audio import (
     NODE_CLASS_MAPPINGS as _LOAD_AUDIO_CLASSES,
     NODE_DISPLAY_NAME_MAPPINGS as _LOAD_AUDIO_NAMES,
 )
@@ -37,7 +37,7 @@ from .nova_tag_reader import (
     NODE_CLASS_MAPPINGS as _TAG_READER_CLASSES,
     NODE_DISPLAY_NAME_MAPPINGS as _TAG_READER_NAMES,
 )
-from .nova_console import (
+from ..utilities.nova_console import (
     NODE_CLASS_MAPPINGS as _CONSOLE_CLASSES,
     NODE_DISPLAY_NAME_MAPPINGS as _CONSOLE_NAMES,
 )

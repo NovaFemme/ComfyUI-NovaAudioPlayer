@@ -7,13 +7,17 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
-
 import torch
 import folder_paths
 
+from pathlib import Path
+
+
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
 try:
     from ..nova_categories import ANALYSIS
-except ImportError:  # imported as a module rather than as part of the pack
+except ImportError:
     from nova_categories import ANALYSIS
 
 try:
@@ -61,7 +65,6 @@ def _pcm_sha256(x: torch.Tensor) -> str:
 def _canonical_json_sha256(value: Dict[str, Any]) -> str:
     raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
-
 
 
 def _resolve_output_relative_dir(path_value: str, default_relative: str = "") -> Path:
@@ -478,26 +481,36 @@ class NovaFinalMasterValidator:
     FUNCTION = "validate"
     RETURN_TYPES = ("AUDIO", "SAMPLE_RATE", "STRING", "STRING", "STRING","STRING","STRING")
     RETURN_NAMES = ("candidate_audio", "sample_rate", "validation_report", "validation_json", "verdict","archive_audio_path","archive_report_path")
-    DESCRIPTION = "Nova Final Master Validator v0.3.1: bit-exact and measurement-based reproduction/integrity validation."
+    DESCRIPTION = ("Nova Final Master Validator — checks a master against its archived mastering report: "
+                   "bit-exact where the file allows it, measurement-based otherwise.")
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "candidate_audio": ("AUDIO",),
+                "candidate_audio": ("AUDIO", {
+                    "tooltip": "The master to check. On a mastering pass, the audio straight from Nova Audio "
+                               "Master; on a validation pass, the saved file loaded back from disk."
+                }),
                 "reference_report_json": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "tooltip": "Optional. Leave empty to auto-load the matching report JSON from Path using the selected WAV filename."
+                    "tooltip": "Optional. Wire Nova Audio Master's report_json on a mastering pass. Leave empty on a validation pass and the matching report is loaded from report_path, found by archive_name or by the candidate's own file name."
                 }),
             },
             "optional": {
-                "tolerance_multiplier": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 5.0, "step": 0.1}),
+                "tolerance_multiplier": ("FLOAT", {
+                    "default": 1.0, "min": 0.5, "max": 5.0, "step": 0.1,
+                    "tooltip": "Scales every measurement tolerance at once. Leave it at 1.0 unless you have a reason: it can turn a real failure into a pass as easily as the reverse."
+                }),
                 "reference_format": (["PCM_16", "PCM_24", "FLOAT_32"], {
                     "default": "PCM_16",
                     "tooltip": "Delivery format recorded in the validation report. Archives written by v0.3.0 and earlier were named with this format, and are still found whatever it is set to, so it no longer has to match to locate a report."
                 }),
-                "save_reference_json": ("BOOLEAN", {"default": False}),
+                "save_reference_json": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "On: files the reference report in report_path under archive_name. Turn it on for the mastering pass, off for a validation pass."
+                }),
                 "archive_name": ("STRING", {
                     "default": "",
                     "multiline": False,
@@ -506,12 +519,12 @@ class NovaFinalMasterValidator:
                 "report_path": ("STRING", {
                     "default": "NovaAudioMasters/Reports",
                     "multiline": False,
-                    "tooltip": "Folder relative to ComfyUI/output. Save location for reference JSON, leave blank to save directly in output."
+                    "tooltip": "Folder relative to ComfyUI/output where the reference JSON is saved and looked up, e.g. NovaAudioMasters/Reports. Leave blank to use the output folder itself."
                 }),
                 "audio_path": ("STRING", {
                     "default": "NovaAudioMasters/Audio",
                     "multiline": False,
-                    "tooltip": "Folder relative to ComfyUI/output. Save location for mastered Audio, leave blank to save directly in output."
+                    "tooltip": "Folder relative to ComfyUI/output where the mastered audio is saved, e.g. NovaAudioMasters/Audio. Leave blank to use the output folder itself."
                 }),
                 "identity_selector": ("STRING", {
                     "default": "",
@@ -888,4 +901,4 @@ class NovaFinalMasterValidator:
         return candidate_audio, sr, "\n".join(lines), json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False), verdict, audio_file_name, report_file_name
 
 NODE_CLASS_MAPPINGS = {"NovaFinalMasterValidator": NovaFinalMasterValidator}
-NODE_DISPLAY_NAME_MAPPINGS = {"NovaFinalMasterValidator": "Nova Final Master Validator"}
+NODE_DISPLAY_NAME_MAPPINGS = {"NovaFinalMasterValidator": "Nova Final Master Validator ✅"}

@@ -1,0 +1,38 @@
+# What the Registry's scanner is expected to match in the published package,
+# and why each match is acceptable. Checked by dev/tests/test_registry_findings.py:
+# a finding that is not listed here fails the test, and so does a line here that
+# no longer matches anything.
+#
+# Format, one finding per line:   file || rule || the line of code || why
+# The line of code is matched with whitespace collapsed; line numbers are not
+# used, so edits elsewhere in the file do not break the match.
+#
+# The installer (install.py, training/nova_ace_setup.py) is not listed because
+# it is not published: both are in .comfyignore. On 2.6.1 they were nine of the
+# 21 findings.
+
+# --- SQLite: every path is confined to ComfyUI's input folder first (dev/tests/test_path_rules.py)
+authoring/nova_sqlite_browser.py || sqlite || with closing(sqlite3.connect(os.path.join(folder_paths.get_input_directory(), f))) as conn: || Lists the SQLite files found by walking ComfyUI's input folder; the path is built from that walk, not from the caller.
+authoring/nova_sqlite_browser.py || sqlite || with closing(sqlite3.connect(path)) as conn: || path comes from _resolve_db_path(), which resolves it with realpath and refuses anything outside the input folder.
+authoring/nova_sqlite_browser.py || sqlite || with closing(sqlite3.connect(db_path)) as conn: || db_path comes from _resolve_db_path() in the get_tables and get_columns routes; same confinement to the input folder.
+authoring/nova_sqlite_reader.py || sqlite || connection = sqlite3.connect(path) # creates the file if absent || Deprecated node. Creates a new database only inside the input folder: the folder goes through _inside_input() first.
+authoring/nova_sqlite_reader.py || sqlite || connection = sqlite3.connect(uri, uri=True) || Deprecated node. Opens mode=ro, and only a path _inside_input() has confined to the input folder.
+
+# --- Training: one child process, argv list, no shell
+training/nova_ace_train.py || subprocess || proc = subprocess.Popen( || Runs sys.executable -m acestep.training_v2.cli.train_fixed with an argv list and no shell. Installs nothing. acestep_repo_path is validated by check_acestep_repo() before it reaches PYTHONPATH.
+
+# --- Read-only environment read
+utilities/nova_memory_probe.py || environ || cfg[env] = os.environ[env] || Reads a fixed list of PyTorch/ROCm variable names to report them; never writes the environment. Accepted on 2.3.x.
+
+# --- SQL Dump: local, no credentials
+utilities/nova_sql_dump.py || pymysql || connection = db.connect( || Connects only to 127.0.0.1 as nova_logger, an account with no password and INSERT on one table. The node has no host, user or password inputs.
+
+# --- JavaScript .connect( is the WebAudio node graph and a litegraph link, not a network call
+web/core/audio-engine.js || js-connect || source.connect(splitter); || WebAudio: routes the audio element into the channel splitter. Approved in 2.3.x.
+web/core/audio-engine.js || js-connect || splitter.connect(analyserL, 0); || WebAudio: left channel to its analyser.
+web/core/audio-engine.js || js-connect || splitter.connect(analyserR, 1); || WebAudio: right channel to its analyser.
+web/core/audio-engine.js || js-connect || source.connect(gain); || WebAudio: audio element to the volume gain node.
+web/core/audio-engine.js || js-connect || source.connect(analyserL); || WebAudio: mono source to the left analyser.
+web/core/audio-engine.js || js-connect || source.connect(analyserR); || WebAudio: mono source to the right analyser.
+web/core/audio-engine.js || js-connect || gain.connect(ctx.destination); || WebAudio: gain node to the speakers.
+web/js/nova_sqlite_browser.js || js-connect || if (t) node.connect(FIXED_OUTPUTS + i, t, l.slot); || LiteGraph: re-links a node output after the column outputs are rebuilt. A canvas link, not a connection.

@@ -179,24 +179,27 @@ const FLIP_FLAG = "Nova.LinkRelease.contextMenuApplied";
 
 /**
  * Installs from frontend 1.24.1 onward default a plain link release to the
- * fuzzy search box, which puts the curated menu behind Shift. Switch it once,
- * then never again — if the user changes it back, that choice stands.
+ * fuzzy search box, which puts the curated menu behind Shift.
+ *
+ * This used to switch the user's setting to "context menu" once. A node pack
+ * has no business changing a ComfyUI setting the user did not ask it to
+ * change, so it now only says, once, where the setting is. Reading a setting
+ * is all this does; nothing is written to ComfyUI's settings.
  */
-function preferContextMenuOnce() {
+function suggestContextMenuOnce() {
   try {
     if (localStorage.getItem(FLIP_FLAG)) return;
     const settings = app.ui?.settings;
-    if (!settings?.setSettingValue) return;
-    if (settings.getSettingValue?.(LINK_RELEASE_SETTING) !== CONTEXT_MENU) {
-      settings.setSettingValue(LINK_RELEASE_SETTING, CONTEXT_MENU);
+    if (settings?.getSettingValue?.(LINK_RELEASE_SETTING) !== CONTEXT_MENU) {
       console.log(
-        "[Nova] link release set to 'context menu' — change it under " +
-          "Settings > LiteGraph > LinkRelease > Action on link release"
+        "[Nova] tip: to get the Nova suggestions when you drop a link on the " +
+          "canvas, set Settings > LiteGraph > LinkRelease > Action on link " +
+          "release to 'context menu'. With the default they are behind Shift."
       );
     }
     localStorage.setItem(FLIP_FLAG, "1");
   } catch (err) {
-    console.warn("[Nova] could not set the link-release action", err);
+    console.warn("[Nova] could not read the link-release action", err);
   }
 }
 
@@ -212,7 +215,7 @@ app.registerExtension({
   async setup() {
     try {
       install();
-      preferContextMenuOnce();
+      suggestContextMenuOnce();
     } catch (err) {
       console.error("[Nova] suggestion setup failed", err);
     }

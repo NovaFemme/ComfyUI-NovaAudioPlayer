@@ -48,16 +48,17 @@ import struct
 import hashlib
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
+import torch  # type: ignore
 
-import torch
 
-VERSION = "1.0.0"
-
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
 try:
-    from ..nova_categories import UTILITY_IO
-except ImportError:  # direct execution / test harness
+    from .nova_categories import UTILITY_IO
+except ImportError:
     from nova_categories import UTILITY_IO
 
+VERSION = "1.0.0"
 CATEGORY = UTILITY_IO
 
 # ---------------------------------------------------------------------------
@@ -315,7 +316,7 @@ def _decode_torchaudio(path: str) -> Tuple[torch.Tensor, int, Dict[str, Any]]:
 
 def _decode_pyav(path: str) -> Tuple[torch.Tensor, int, Dict[str, Any]]:
     import av  # type: ignore
-    import numpy as np
+    import numpy as np # type: ignore
 
     chunks: List["np.ndarray"] = []
     info: Dict[str, Any] = {"backend": "pyav"}
@@ -702,10 +703,10 @@ class NovaLoadAudio:
         "Bits per sample of the source (0 when the source is lossy/compressed).",
     )
     DESCRIPTION = (
-        f"Nova Load Audio v{VERSION} — standalone audio file loader. "
+        "Nova Load Audio — standalone audio file loader. "
         "Decodes via soundfile / torchaudio / PyAV (first one available), "
         "and reports filename, sample rate, duration, extension, full metadata and "
-        "bit depth. CPU-only float32, safe on AMD ROCm (RX 9070 XT) and CUDA alike."
+        "bit depth. CPU-only float32, safe on AMD ROCm and CUDA alike."
     )
 
     @classmethod
@@ -929,7 +930,7 @@ class NovaLoadAudio:
                 "output_dtype": "float32",
                 "gpu_agnostic": True,
                 "note": "CPU float32 output; no CUDA/HIP-specific code paths. "
-                        "Verified-safe pattern for AMD ROCm (RX 9070 XT / gfx1201).",
+                        "Verified-safe pattern for AMD ROCm.",
             },
             "decoder_attempts": attempts,
             "warnings": warnings,

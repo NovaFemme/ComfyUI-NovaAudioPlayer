@@ -1,0 +1,239 @@
+/**
+ * vue-size.js — minimum sizes for Nova's DOM-widget nodes under Nodes 2.0.
+ *
+ * WHY THE CLASSIC MINIMUMS DO NOTHING THERE
+ * -----------------------------------------
+ * On the classic (canvas) renderer a node's minimum size comes from
+ * `computeSize()` and each DOM widget's `getMinHeight()`, and the panel inside
+ * the widget is resized from `node.size` on every `onDrawForeground`. Nodes 2.0
+ * (the Vue renderer) uses none of that. Read from the frontend's resize code,
+ * v1.53.6 (`useNodeResize.ts`):
+ *
+ *   minimum HEIGHT  the node card's rendered height with `--node-height` set
+ *                   to 0px — the natural height of whatever is in normal flow
+ *   minimum WIDTH   the card's INLINE `min-width` style, or 225 px
+ *
+ * Every Nova DOM widget is a pass-through host with the visible panel
+ * positioned absolutely inside it. An absolutely positioned element adds
+ * nothing to its parent's natural height, so the node measured as nearly empty
+ * and could be dragged down to 225 px wide and a few rows tall, with the panel
+ * hanging out of it. And with no `onDrawForeground` pass the panel never
+ * followed the node at all: it kept the pixel size it was created with.
+ *
+ * WHAT THIS DOES
+ * --------------
+ * `vueSize(host, panel, { minWidth, minHeight })` marks the two elements. From
+ * then on, and only inside a Nodes 2.0 card (`[data-node-id]`):
+ *
+ *   - the host has a CSS `min-height`, which IS in flow, so the frontend's
+ *     own measurement now includes it;
+ *   - the panel fills the host (`inset: 0`) instead of keeping its remembered
+ *     pixel size, so it follows the node when the node is resized;
+ *   - the card gets an inline `min-width` for the length of a resize. It is
+ *     written on `pointerdown`, in the capture phase, which runs before the
+ *     frontend's own handler reads it, and removed when the pointer leaves. Vue
+ *     replaces and reuses card elements, and a value written at that moment
+ *     cannot be stale.
+ *
+ * On the classic renderer a DOM widget is not inside a `[data-node-id]`
+ * element, so none of the rules match and nothing changes there.
+ *
+ * It does not depend on Nova Theme Studio. The studio's Nodes 2.0 adapter
+ * stretches panels too, for any pack's nodes; its rules and these agree.
+ */
+
+const STYLE_ID = "nova-vue-size";
+const HOST = "nova-dom-host";
+const PANEL = "nova-dom-panel";
+
+/** The frontend's own floor (MIN_NODE_WIDTH). Nothing below it needs writing. */
+const FRONTEND_MIN_WIDTH = 225;
+
+function widthFor(card) {
+    let width = 0;
+    for (const host of card.querySelectorAll(`.${HOST}[data-nova-min-w]`)) {
+        width = Math.max(width, Number(host.dataset.novaMinW) || 0);
+    }
+    return width;
+}
+
+/** The card this module last wrote a min-width on, so it can be taken off again. */
+let marked = null;
+
+/** What happened last, for `novaVueSize()` in the console. */
+const seen = { event: null, nodeId: null, width: 0, wrote: false };
+
+function mark(event) {
+    const card = event.target?.closest?.("[data-node-id]");
+    if (!card) return;
+    const width = widthFor(card);
+    seen.event = event.type;
+    seen.nodeId = card.dataset.nodeId;
+    seen.width = width;
+    seen.wrote = width > FRONTEND_MIN_WIDTH;
+    if (marked && marked !== card) marked.style.removeProperty("min-width");
+    if (seen.wrote) {
+        card.style.minWidth = `${width}px`;
+        marked = card;
+    } else if (marked === card) {
+        // The element now belongs to a node with no minimum of its own.
+        card.style.removeProperty("min-width");
+        marked = null;
+    }
+}
+
+// WRITTEN WHEN THE POINTER ARRIVES, AND AGAIN WHEN IT GOES DOWN.
+//
+// `pointerdown` alone was not enough on every machine: Retest 1 of 2.7.0
+// measured the minimum heights working and the minimum widths not (FlowPulse
+// 225 x 508). The pointer has to enter a node before its corner can be
+// grabbed, so the value is also written on `pointerover`, which is well ahead
+// of any resize. Both paths do the same thing and either is sufficient.
+const onPointerDown = mark;
+const onPointerOver = mark;
+
+// TAKEN OFF AGAIN WHEN THE POINTER LEAVES THE NODE. Vue reuses a card element for
+// another node, and a min-width left behind made the next node on that element
+// 430 px wide whatever it was: measured, a Nova Console created after a Theme
+// Studio node. The frontend only reads the value while a resize is in progress,
+// so it has no reason to outlive one.
+function onPointerUp(event) {
+    if (!marked) return;
+    // Still over the same node: leave it for the next grab. It is taken off
+    // when the pointer moves to another node (see mark()) or leaves this one.
+    if (event?.type === "pointerup" && marked.contains(event.target)) return;
+    marked.style.removeProperty("min-width");
+    marked = null;
+}
+
+function onPointerOut(event) {
+    if (!marked || event.buttons) return;              // not in the middle of a drag
+    const to = event.relatedTarget;
+    if (to && marked.contains(to)) return;             // still inside the card
+    if (!marked.contains(event.target)) return;
+    marked.style.removeProperty("min-width");
+    marked = null;
+}
+
+function install() {
+    if (typeof document === "undefined" || document.getElementById(STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    // `!important` on both, for one reason each. The host's min-height has to
+    // survive the studio adapter's own `min-height: 0` on the same element. The
+    // panel's box is set by INLINE styles the node's own code writes, and no
+    // ordinary rule outranks an inline one.
+    style.textContent = `
+[data-node-id] .${HOST} { min-height: var(--nova-min-h, 0px) !important; }
+.${HOST}:focus { outline: none; }
+[data-node-id] .${HOST} > .${PANEL} {
+    position: absolute !important; inset: 0 !important;
+    width: auto !important; height: auto !important;
+}`;
+    document.head.appendChild(style);
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("pointerover", onPointerOver, true);
+    document.addEventListener("pointerout", onPointerOut, true);
+    document.addEventListener("pointerup", onPointerUp, true);
+    document.addEventListener("pointercancel", onPointerUp, true);
+    // For a tester: what this module last saw and did.
+    window.novaVueSize = () => ({
+        ...seen,
+        hosts: document.querySelectorAll(`.${HOST}`).length,
+        markedNodeId: marked?.dataset?.nodeId ?? null,
+        markedMinWidth: marked?.style?.minWidth ?? null,
+    });
+}
+
+/**
+ * @param host   the element handed to `addDOMWidget`
+ * @param panel  the absolutely positioned panel inside it
+ * @param min    `{ minWidth, minHeight }` in CSS pixels at zoom 1. `minHeight`
+ *               is the panel's own; the rows above it are measured by the
+ *               frontend. `minWidth` is the whole node's.
+ */
+export function vueSize(host, panel, { minWidth = 0, minHeight = 0 } = {}) {
+    install();
+    host.classList.add(HOST);
+    panel.classList.add(PANEL);
+    if (minHeight > 0) host.style.setProperty("--nova-min-h", `${Math.round(minHeight)}px`);
+    if (minWidth > 0) host.dataset.novaMinW = String(Math.round(minWidth));
+    takeWheelWhenClicked(host);
+    return host;
+}
+
+/**
+ * THE WHEEL, UNDER NODES 2.0 (handover Revision 4, B-21).
+ *
+ * Every node card sits inside a pane whose capture-phase wheel handler sends
+ * the wheel to the canvas before anything inside the node hears it. A list in
+ * a panel could not be scrolled and the Track Inspector's waveform could not
+ * be zoomed: the canvas zoomed instead. The frontend leaves one way through
+ * (v1.53.6, `useCanvasInteractions.ts`): the wheel is left alone when it
+ * happens inside an element marked `data-capture-wheel="true"` that holds the
+ * focused element. Its own 3D viewer uses exactly this.
+ *
+ * So the host is marked, made focusable, and focused when it is clicked. One
+ * click in a panel hands it the wheel; a click anywhere else gives the wheel
+ * back to the canvas. On the classic renderer the wheel already reaches the
+ * panel, and nothing is focused there.
+ */
+function takeWheelWhenClicked(host) {
+    if (host.dataset.captureWheel === "true") return;
+    host.dataset.captureWheel = "true";
+    host.addEventListener("pointerdown", () => {
+        if (!host.closest("[data-node-id]")) return;
+        // Made focusable here and not before, so that on the classic renderer
+        // a click in a panel still leaves the focus where it always was.
+        if (!host.hasAttribute("tabindex")) host.tabIndex = -1;
+        // A field that takes the focus itself does so after this, on its own
+        // mousedown, and it is inside the host, which serves just as well.
+        if (host.contains(document.activeElement) && document.activeElement !== document.body) return;
+        host.focus({ preventScroll: true });
+    }, true);
+}
+
+/**
+ * Keep a node from being narrower than its minimum when it is created and
+ * when it is restored from a workflow — one saved before the minimum existed,
+ * for instance. The resize handle is covered by the rules above; this covers
+ * the two moments a size arrives without a resize. Safe on both renderers, and
+ * it does nothing when the node is already wide enough.
+ */
+export function keepMinimumWidth(node, minWidth) {
+    if (!node || !(minWidth > 0)) return;
+    const widen = () => {
+        const width = node.size?.[0] ?? 0;
+        if (width > 0 && width < minWidth) node.setSize([minWidth, node.size[1]]);
+    };
+    const onConfigure = node.onConfigure;
+    node.onConfigure = function (...args) {
+        const result = onConfigure?.apply(this, args);
+        requestAnimationFrame(widen);
+        return result;
+    };
+    requestAnimationFrame(widen);
+}
+
+/**
+ * Make a node exactly as tall as its panel needs, under Nodes 2.0.
+ *
+ * The classic renderer does this inside `onDrawForeground`, from the widget's
+ * `y`. Neither exists under Nodes 2.0, so the difference is measured on the
+ * page instead: how tall the host is now against how tall the panel wants to
+ * be. `offsetHeight` is in CSS pixels before the canvas zoom, which is the
+ * unit `node.size` is in.
+ *
+ * Returns false on the classic renderer, where the host is not inside a node
+ * card, so the caller can fall back to its own path.
+ */
+export function fitHeightInVue(node, host, wantHeight) {
+    const card = host?.closest?.("[data-node-id]");
+    if (!card || !node?.size) return false;
+    const delta = Math.round(wantHeight - host.offsetHeight);
+    if (Math.abs(delta) > 2) {
+        node.setSize([node.size[0], Math.max(1, node.size[1] + delta)]);
+        node.setDirtyCanvas?.(true, true);
+    }
+    return true;
+}

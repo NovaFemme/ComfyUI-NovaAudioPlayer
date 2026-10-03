@@ -84,6 +84,35 @@ if (table) {
   ck("the README's view table was found", false, "table shape changed — update this check");
 }
 
+// -- the node count ------------------------------------------------------------
+// "Twenty-five nodes" stayed in the README's first line, in pyproject.toml's
+// description and so on the Registry listing while the pack grew to 31. The
+// literal table in __init__.py is what ComfyUI registers, so it is the truth.
+const initPy = read("__init__.py");
+const classMap = initPy.match(/NODE_CLASS_MAPPINGS\s*=\s*\{([^}]*)\}/s);
+if (classMap) {
+  const NODES = (classMap[1].match(/^\s*"[A-Za-z0-9_]+"\s*:/gm) || []).length;
+  const ONES = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+  const TENS = { 2: "twenty", 3: "thirty", 4: "forty", 5: "fifty" };
+  const spell = n => n < 17 ? WORDS[n]
+    : n < 20 ? ["seventeen", "eighteen", "nineteen"][n - 17]
+    : TENS[Math.floor(n / 10)] + (n % 10 ? "-" + ONES[n % 10] : "");
+  const nodeWord = spell(NODES);
+  console.log(`\nnode count (__init__.py registers ${NODES}, "${nodeWord}")\n`);
+  const NODE_RE = /\b((?:twenty|thirty|forty|fifty)(?:-[a-z]+)?|\d+)\s+nodes\b(?=\s+for making music)/gi;
+  const pyproject = read("pyproject.toml");
+  const description = (pyproject.match(/^description\s*=\s*"([^"]*)"/m) || [, ""])[1];
+  for (const [name, text] of [["README.md", readme], ["pyproject.toml description", description]]) {
+    const found = [...text.matchAll(NODE_RE)].map(m => m[1].toLowerCase());
+    const wrong = found.filter(f => f !== nodeWord && f !== String(NODES));
+    ck(`${name} says "${nodeWord} nodes"`, found.length > 0 && wrong.length === 0,
+       found.length ? (wrong.length ? `found ${wrong.map(w => `"${w}"`).join(", ")}` : `${found.length} mention(s)`)
+                    : "(no count stated — the check is idle, which is a failure)");
+  }
+} else {
+  ck("NODE_CLASS_MAPPINGS was found in __init__.py", false, "table shape changed — update this check");
+}
+
 // -- Madow's parameter and output counts -------------------------------------
 // The README said "23 outputs" for a release after the four file.* fields
 // landed. The table in madow/params.py is the source of truth for both numbers.

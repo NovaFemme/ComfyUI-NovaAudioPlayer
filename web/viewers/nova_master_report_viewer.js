@@ -1,5 +1,9 @@
 // Nova Master Report Viewer v0.2.4 - Nova Report Viewer interaction standard
-import { app } from "../../scripts/app.js";
+import { app } from "/scripts/app.js";
+import { vueSize, keepMinimumWidth } from "../core/vue-size.js";
+
+/** True when this node is drawn by Nodes 2.0 (its report is inside a node card). */
+const inVueCard = (node) => !!node?.__novaReportHost?.closest?.("[data-node-id]");
 
 const EXT_NAME = "NovaAudio.MasterReportViewer";
 
@@ -662,10 +666,22 @@ app.registerExtension({
                 }
             }
 
+            // THE REPORT SITS IN A HOST (B-18). Under Nodes 2.0 the host carries a
+            // fixed CSS minimum and the report fills it (web/core/vue-size.js).
+            // The report's height is no longer taken from the node's height
+            // there, which is what made the node grow on every mouse move of
+            // a resize once a report was shown. Classic is unchanged.
+            const host = document.createElement("div");
+            host.style.cssText = "position:relative;width:100%;height:100%;";
+            host.appendChild(root);
+            vueSize(host, root, { minWidth: 320, minHeight: 72 });
+            this.__novaReportHost = host;
+            keepMinimumWidth(this, 320);
+
             const widget = this.addDOMWidget?.(
                 "nova_master_report",
                 "NOVA_REPORT",
-                root,
+                host,
                 {
                     serialize: false,
                     hideOnZoom: false,
@@ -715,6 +731,8 @@ app.registerExtension({
             const widget = this.__novaReportWidget;
             const root = this.__novaReportRoot;
             if (!widget || !root) return r;
+            // Nodes 2.0: the report fills its host; no height is written from the node.
+            if (inVueCard(this)) return r;
 
             // widget.y is the actual layout position of the report area after the
             // regular controls. Subtracting that from the requested node height
@@ -748,6 +766,27 @@ app.registerExtension({
             return r;
         };
 
+        // CLASSIC: THE REPORT FOLLOWS THE NODE WITHOUT WAITING FOR A RESIZE.
+        // See the same note in nova_track_inspector.js. The classic renderer
+        // paints every node; when the node's height, the report's position or
+        // whether a report is shown has changed since the last fit, the
+        // report is fitted again. Nodes 2.0 never calls this.
+        const originalDraw = nodeType.prototype.onDrawForeground;
+        nodeType.prototype.onDrawForeground = function () {
+            const r = originalDraw?.apply(this, arguments);
+            try {
+                const widget = this.__novaReportWidget;
+                if (widget && !this.flags?.collapsed) {
+                    const key = `${Math.round(this.size?.[1] || 0)}|${Math.round(Number(widget.y) || 0)}|${this.__novaReportActive ? 1 : 0}`;
+                    if (key !== this.__novaFitKey) {
+                        this.__novaFitKey = key;
+                        this.onResize?.(this.size);
+                    }
+                }
+            } catch { /* a fit must never break drawing the node */ }
+            return r;
+        };
+
         const originalExecuted = nodeType.prototype.onExecuted;
         nodeType.prototype.onExecuted = function (message) {
             const r = originalExecuted?.apply(this, arguments);
@@ -767,11 +806,13 @@ app.registerExtension({
                 // into the user-sized report viewport. Until this point the idle
                 // placeholder stays compact and does not cover the node.
                 this.__novaReportActive = true;
+                // A shown report needs more room than the idle placeholder.
+                this.__novaReportHost?.style.setProperty("--nova-min-h", "320px");
                 const widget = this.__novaReportWidget;
                 const nodeHeight = Number(this.size?.[1]);
                 const widgetTop = Number(widget?.y);
                 const top = Number.isFinite(widgetTop) && widgetTop > 0 ? widgetTop : 150;
-                if (Number.isFinite(nodeHeight) && nodeHeight > 0) {
+                if (!inVueCard(this) && Number.isFinite(nodeHeight) && nodeHeight > 0) {
                     const desired = Math.max(320, nodeHeight - top - 14);
                     this.__novaReportHeight = desired;
                     root.style.height = `${desired}px`;

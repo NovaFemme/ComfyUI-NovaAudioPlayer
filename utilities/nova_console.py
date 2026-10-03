@@ -19,15 +19,15 @@ in a list too; `_first` unwraps them.
 import json
 from typing import Any, List
 
-try:
-    from .nova_authoring_common import (
-        ANY_TYPE, UTILITY_CATEGORY, AUTHORING_VERSION,
-    )
-except ImportError:  # standalone / direct execution
-    from nova_authoring_common import (
-        ANY_TYPE, UTILITY_CATEGORY, AUTHORING_VERSION,
-    )
 
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from ..nova_definitions import ANY_TYPE
+    from ..nova_categories import UTILITY_IO
+except ImportError:
+    from nova_definitions import ANY_TYPE
+    from nova_categories import UTILITY_IO
 
 def _first(value: Any, fallback: Any = None) -> Any:
     if isinstance(value, list):
@@ -81,7 +81,7 @@ def _render(value: Any) -> str:
 
 
 class NovaConsole:
-    CATEGORY = UTILITY_CATEGORY
+    CATEGORY = UTILITY_IO
     FUNCTION = "show"
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("text",)
@@ -89,7 +89,7 @@ class NovaConsole:
     INPUT_IS_LIST = True
     OUTPUT_TOOLTIPS = ("The rendered text, so you can chain another console or a save node.",)
     DESCRIPTION = (
-        f"Nova Console v{AUTHORING_VERSION} — displays any input on the node face and "
+        f"Nova Console — displays any input on the node face and "
         "in the server log."
     )
 

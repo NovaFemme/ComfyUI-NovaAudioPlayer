@@ -103,6 +103,17 @@ export function needsOf(id) {
     return r.needs || { freq: true, time: true, peaks: true };
 }
 
+/**
+ * Does this renderer offer recorded sequences (core/sequences.js)?
+ * Decorative renderers opt in with `sequences: true` in their module — see
+ * _template_decorative.js. Measurement views never should: a meter whose
+ * settings change by themselves is a meter you cannot read.
+ */
+export function supportsSequences(id) {
+    const r = BY_ID.get(id);
+    return !!(r && r.sequences === true && r.params && Object.keys(r.params).length);
+}
+
 /** Every colour role any renderer declares — used to group the panel. */
 export function rolesByRenderer() {
     const out = {};

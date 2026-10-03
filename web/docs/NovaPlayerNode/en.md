@@ -21,6 +21,9 @@ synthetic signal so the visualisers show what they do, and the badge row reads
 clip bundled with the pack through the real analyser, so what you see is an
 actual measurement rather than a mock-up.
 
+The `audio` input is optional. A workflow with an unwired player still runs:
+the node stays in this idle view and its `panel_info` output is empty.
+
 Nothing loads or plays until you press it. Wire an `AUDIO` in and the demo
 stops for good. `ui.idle_demo: false` in the system config turns the animation
 off.
@@ -33,7 +36,7 @@ decision rather than by accident.
 This node measures, and its own SAT row reads `0.0000%` on a 320k mp3 — the
 number does not fail, it stops meaning anything. Offering a lossy download from
 the measurement node would hand you a file its own panel cannot read honestly.
-For delivery use **Save Audio FLAC 24-bit** or **Save Audio WAV
+For delivery use **Nova Save Audio FLAC 24/16-bit** or **Nova Save Audio WAV
 PCM16|PCM24|FLOAT32**; this arrow is for auditioning what you are measuring.
 
 If you want an mp3, the WAV is one ffmpeg command away.
@@ -117,9 +120,11 @@ An individual ramp can pin its own space with
 ## The settings drawer
 
 Opened with the gear. It is scoped to the view you are currently looking at:
-switch the view with the pill and the drawer follows. Three sections, one open
-at a time — the active renderer's settings, its colours, and the shared player
-chrome colours. Drag the drawer's left edge to widen it.
+switch the view with the pill and the drawer follows. One section is open at a
+time: the active view's settings, its sequences (decorative views only), its
+colours, the shared player chrome colours, and **Display** (text size, bar
+relief, control hints). Drag the drawer's left edge to widen it. Double-click a
+slider to reset that setting to its default.
 
 Nothing in it has a save button. Every edit applies to the display immediately.
 Where it is *kept* is the **Edits** switch, next to the theme picker:
@@ -141,6 +146,25 @@ never silently discards them; **Reset node** clears them when you want that.
 
 **New** and **Save as** name a theme; that is the only decision that needs
 confirming, and it uses an inline field rather than a browser prompt.
+
+## Sequences (Halo)
+
+Decorative views can record you changing their settings and replay it.
+
+1. Switch to **Halo**, open the drawer, open **Halo · Sequences**.
+2. Click **● Record new…**, type a name, click **Start**.
+3. Change settings. The pauses between changes are recorded. The clock follows
+   the song, so pause the music to think: paused time is not recorded.
+4. Click **■ Stop & save**.
+
+Pick a sequence and click **▶ Play**; it loops, or plays a set number of times.
+Your own settings are not changed, and touching a setting stops playback.
+**🗑** deletes after an "Are you sure?".
+
+Files live in `ComfyUI/user/nova_player/sequences/<view>/<name>.json`. Back the
+folder up, or copy other people's files into it; the list re-reads the folder
+when you choose the view. Settings a file names that this view cannot use are
+skipped.
 
 ## Where settings are stored
 

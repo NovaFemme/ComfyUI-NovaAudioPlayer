@@ -19,8 +19,8 @@ merely reports what is missing, and prints the command you would run yourself,
 is what the standards ask for instead.
 
 The cost of that honesty is that this node can only ever tell you. Fixing is
-``install.py`` at the pack root (run for you when the pack is installed or
-updated) or ``training/nova_ace_setup.py`` (run by you, once).
+the setup script, ``nova_ace_setup.py``, fetched from GitHub and run by you,
+once. SETUP_COMMAND below is what the node prints.
 """
 
 import importlib.util
@@ -29,20 +29,25 @@ import platform
 import sys
 from typing import Dict, List, Optional, Tuple
 
+
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
 try:
-    from .nova_ace_common import (
-        ACE_VERSION, TRAINING_CATEGORY, VARIANT_DIRS,
-        check_checkpoint_tree, check_remote_code_imports,
-        describe_checkpoint_requirement, install_command,
-    )
-    from ..authoring.nova_authoring_common import banner
-except ImportError:  # direct execution / test harness
-    from nova_ace_common import (
-        ACE_VERSION, TRAINING_CATEGORY, VARIANT_DIRS,
-        check_checkpoint_tree, check_remote_code_imports,
-        describe_checkpoint_requirement, install_command,
-    )
-    from nova_authoring_common import banner
+    from ..nova_definitions import VARIANT_DIRS, check_checkpoint_tree, check_remote_code_imports, describe_checkpoint_requirement, install_command, banner, check_acestep_repo
+    from ..nova_categories import TRAINING
+except ImportError:
+    from nova_definitions import VARIANT_DIRS, check_checkpoint_tree, check_remote_code_imports, describe_checkpoint_requirement, install_command, banner, check_acestep_repo
+    from nova_categories import TRAINING
+
+#: The one command that sets training up. The script is not shipped in the
+#: installed pack, so it is fetched from GitHub first.
+SETUP_COMMAND = (
+    "  cd ~/ComfyUI\n"
+    "  curl -LO https://raw.githubusercontent.com/NovaFemme/ComfyUI-NovaAudioPlayer/"
+    "main/training/nova_ace_setup.py\n"
+    "  python nova_ace_setup.py --dry-run     # shows the plan, changes nothing\n"
+    "  python nova_ace_setup.py"
+)
 
 #: Packages ComfyUI's own requirements.txt provides. If one of these is
 #: missing, the ComfyUI install is broken — and "pip install --no-deps torch"
@@ -83,7 +88,7 @@ def _torch_report() -> Tuple[List[str], Optional[str]]:
     when torch itself will not import, which is fatal for everything here."""
     lines: List[str] = []
     try:
-        import torch
+        import torch # type: ignore
     except Exception as exc:                       # pragma: no cover
         return ([f"  torch          NOT IMPORTABLE — {exc}",
                  "                 Nothing in this pack can run. That is a broken "
@@ -112,7 +117,7 @@ def _torch_report() -> Tuple[List[str], Optional[str]]:
 def _decoder_report(backend: Optional[str]) -> Tuple[List[str], bool]:
     """torchcodec is how torchaudio >= 2.9 decodes. Returns (lines, blocking)."""
     try:
-        from torchcodec.decoders import AudioDecoder  # noqa: F401
+        from torchcodec.decoders import AudioDecoder  # type: ignore # noqa: F401
         return ["  audio decode   torchcodec loads correctly"], False
     except ImportError:
         state = "not installed"
@@ -141,7 +146,7 @@ def _decoder_report(backend: Optional[str]) -> Tuple[List[str], bool]:
 
 
 class NovaACESetupCheck:
-    CATEGORY = TRAINING_CATEGORY
+    CATEGORY = TRAINING
     FUNCTION = "check"
     RETURN_TYPES = ("BOOLEAN", "STRING")
     RETURN_NAMES = ("ready", "console")
@@ -151,9 +156,8 @@ class NovaACESetupCheck:
         "The full report — wire into Nova Console.",
     )
     DESCRIPTION = (
-        f"Nova ACE Setup Check v{ACE_VERSION} — reports whether this machine can "
-        "preprocess and train, before you spend GPU time finding out. Installs "
-        "and downloads nothing."
+        "Nova ACE Setup Check — reports whether this machine can preprocess and "
+        "train, before you spend GPU time finding out. Installs and downloads nothing."
     )
 
     @classmethod
@@ -184,15 +188,14 @@ class NovaACESetupCheck:
         return float("nan")   # the environment can change under a saved workflow
 
     def check(self, checkpoint_dir, variant, acestep_repo_path="", **kwargs):
-        log: List[str] = [banner(f"NOVA ACE SETUP CHECK v{ACE_VERSION}")]
+        log: List[str] = [banner(f"NOVA ACE SETUP CHECK")]
         blocking: List[str] = []
         advisory: List[str] = []
         fix_packages: List[str] = []
 
         ckpt = os.path.abspath(os.path.expanduser((checkpoint_dir or "").strip().strip('"'))) \
             if (checkpoint_dir or "").strip() else ""
-        repo = os.path.abspath(os.path.expanduser((acestep_repo_path or "").strip().strip('"'))) \
-            if (acestep_repo_path or "").strip() else ""
+        repo, repo_problem = check_acestep_repo(acestep_repo_path)
 
         # -- environment ----------------------------------------------------
         log.append("ENVIRONMENT")
@@ -215,6 +218,12 @@ class NovaACESetupCheck:
             log.append("                 no acestep/ package inside — is this the "
                        "clone root?")
             blocking.append("acestep_repo_path has no acestep/ package in it")
+        elif repo_problem:
+            # Not a clone (no acestep/__init__.py), or inside ComfyUI's input,
+            # output or temp folder. Report it; never import from it.
+            log.append(f"  repo path      {repo}")
+            log.append(f"                 REFUSED — {repo_problem}")
+            blocking.append("acestep_repo_path is not a usable ACE-Step clone")
         else:
             if repo and repo not in sys.path:
                 sys.path.insert(0, repo)
@@ -236,7 +245,8 @@ class NovaACESetupCheck:
                 log.append("  importable     NO")
                 log.append("                 Clone https://github.com/ace-step/ACE-Step-1.5 "
                            "and set acestep_repo_path,")
-                log.append("                 or run training/nova_ace_setup.py")
+                log.append("                 or run the setup script (the command is at "
+                           "the end of this report)")
                 blocking.append("ACE-Step is not importable")
         log.append("")
 
@@ -338,8 +348,7 @@ class NovaACESetupCheck:
 
         log.append("")
         log.append("Full setup, including the model downloads:")
-        log.append("  python custom_nodes/comfyui-novaaudioplayer/training/"
-                   "nova_ace_setup.py")
+        log.append(SETUP_COMMAND)
 
         text = "\n".join(log)
         print(text)

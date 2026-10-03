@@ -1,7 +1,7 @@
 # Nova Tag Writer
 
 Writes each database row onto its audio file. Takes a `NOVA_TABLE` from Nova
-SQLite Reader and a `NOVA_FILES` batch from Nova Batch Load Audio.
+Dynamic SQLite Browser (its `table` output) and a `NOVA_FILES` batch from Nova Batch Load Audio.
 
 ![The reader and loader feeding Nova Tag Writer](images/tag-chain.png)
 *Worth studying: the `column_map` box shows grey placeholder text, so it was
@@ -13,7 +13,7 @@ EMPTY when this ran. The proof is the log's own `Tags :` line —
 
 | Widget | Default | Purpose |
 |---|---|---|
-| `table` | — | Rows from Nova SQLite Reader. |
+| `table` | — | Rows from the `table` output of Nova Dynamic SQLite Browser or Nova SQLite Data Table & Filter. |
 | `files` | — | Batch from Nova Batch Load Audio. |
 | `filename_column` | `FileName` | The column holding the file name each row belongs to. |
 | `skip_columns` | `Length` | Comma-separated columns to leave out. |

@@ -1,6 +1,6 @@
 # Nova Audio Player
 
-**Twenty-five nodes for making music with ACE-Step in ComfyUI** — generation
+**Thirty-one nodes for making music with ACE-Step in ComfyUI** — generation
 parameters, corrective mastering, measurement you can trust, report viewers,
 delivery, and LoRA training.
 
@@ -28,6 +28,13 @@ git clone https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer.git
 ```
 
 Restart ComfyUI. Everything lands under **▶️ Nova Audio** in the node menu.
+
+**One ComfyUI setting worth changing.** When you drag a link from an output and
+drop it on empty canvas, the pack puts the Nova nodes that fit at the top of
+the suggestion menu. ComfyUI's default opens the node search instead, and the
+menu is behind **Shift**. To get the menu on a plain drop, set **Settings >
+LiteGraph > LinkRelease > Action on link release** to **context menu**. The
+pack does not change this setting for you.
 
 ### Requirements
 
@@ -68,6 +75,9 @@ the rest are being filled in.
 | **Nova Console 🖥️** | Prints whatever you wire into it, in the node. The debugging node you end up using constantly. |
 | **Nova Memory Probe (RAM/VRAM) 🧠** | Reports host RAM and device VRAM at that point in the graph, with deltas since the probe's previous run. Read-only — it never unloads or frees anything. |
 | **Nova NamePath Manager 🧭** | Holds every path a delivery workflow needs in one node and stores the whole set as a named profile. |
+| **Nova FlowPulse 💓** | A live dashboard of where a workflow spends its time: every node that runs is timed and sampled for CPU, RAM, disk and, where a backend exists, GPU. No inputs or outputs; drop it on the canvas and run. Logs to `csv`, `json` or `markdown`. |
+| **Nova Theme Studio 🎨** | Recolours the whole ComfyUI interface from one palette and can put a wallpaper behind the graph. **The theme is global:** it applies to every node from every pack and stays applied after the node is deleted. One **Enabled / Disabled** switch turns all of it off. [More below →](#renderers-themes-and-tested-versions) |
+| **Nova SQLite Reader 🗃️ [DEPRECATED]** | Deprecated: use **Nova Dynamic SQLite Browser** and the SQLite nodes under Delivery & Metadata. Still works: reads a table out of a SQLite database inside ComfyUI's input folder, and creates the database file there if it does not exist. |
 | **Nova SQL Dump 🛢️** | Logs every run to a **local** MariaDB/MySQL, as temporary logging storage. **No authentication, local only:** it writes as a password-less account that can only add rows to one table. Moving the data to your own database and protecting it is your responsibility; the [help page](web/docs/NovaSQLDump/en.md) shows how. One-time setup: `utilities/nova_sql_dump_setup.sql`. |
 
 ![Nova Load Audio](docs/images/nodes/NovaLoadAudio.png)
@@ -104,7 +114,7 @@ the rest are being filled in.
 |---|---|
 | **Nova Player 🔊** | The player: thirteen live visualisers, a whole-file measurement panel, a theme system, and a `panel_info` output for logging every take. |
 | **Nova Track Inspector 🔬** | Analyses the whole track over time and tells you where to listen, against a baseline. |
-| **Nova Final Master Validator** | Answers one question: did the file you saved still reproduce the master you approved? |
+| **Nova Final Master Validator ✅** | Answers one question: did the file you saved still reproduce the master you approved? |
 
 ![Nova Player](docs/images/nodes/NovaPlayerNode-waveform.png)
 
@@ -143,16 +153,18 @@ redrawn a second time.
 
 | Node | What it does |
 |---|---|
-| **Save Audio FLAC 24-bit ⬇️** | Writes an `AUDIO` input to FLAC at 24-bit or 16-bit. |
-| **Save Audio WAV PCM16\|PCM24\|FLOAT32 ⬇️** | Writes RIFF/WAVE at 16-bit PCM, 24-bit PCM or 32-bit float. |
+| **Nova Save Audio FLAC 24/16-bit ⬇️** | Writes an `AUDIO` input to FLAC at 24-bit or 16-bit. |
+| **Nova Save Audio WAV PCM16\|PCM24\|FLOAT32 ⬇️** | Writes RIFF/WAVE at 16-bit PCM, 24-bit PCM or 32-bit float. |
 | **Nova Tag Writer 🏷️** | Writes a table of metadata onto files, with column mapping, skip rules and a dry-run mode that reports without touching anything. |
 | **Nova Tag Reader 🔖** | Reads tags off a file list into a console report and `tags_json`. |
-| **Nova SQLite Reader 🗃️ [DEPRECATED]** | Reads a table out of a SQLite database — columns, `where`, and the option to create a new database. |
-| **Nova Dynamic SQLite Browser 📁** | Pick a database, table and columns. Outputs the rows. |
+| **Nova Dynamic SQLite Browser 📁** | Pick a SQLite database in ComfyUI's input folder, a table and its columns. Outputs the rows. |
+| **Nova SQLite Data Table & Filter 🔎** | Shows rows in a grid, filters them with conditions you build in the node (no SQL), and outputs the matching or the selected rows. New in 2.7.0. |
 | **Nova SQLite Row Iterator & Splitter 📦** | Loops through the rows and outputs each column of the current row. |
 | **Nova SQLite Single Row Filter 🔍** | Outputs each column of one selected row, with no loop. |
 
-# Nova SQLite Nodes for ComfyUI
+The four SQLite nodes chain together: Browser → Data Table & Filter → Row
+Iterator or Single Row Filter. Nova Master Identity reads the Single Row
+Filter's `single_row_json` directly and maps the column names itself.
 
 ![Nova Dynamic SQLite Browser](docs/images/nodes/NovaSQLiteBrowserNode.png)
 
@@ -180,6 +192,9 @@ ACE-Step install; this pack installs and downloads nothing at runtime.
 ## The player
 
 Drop **Nova Player 🔊** into a workflow and connect any `AUDIO` output.
+
+**New to it? Read the [Nova Player User Guide](docs/NOVA_PLAYER_USER_GUIDE.md)**:
+step by step, with pictures, and a section for when you get stuck.
 
 ### Thirteen views, one button
 
@@ -248,7 +263,7 @@ There is deliberately no MP3, M4A, Opus or WebM, and there will not be.
 This node measures. Its own SAT row reads `0.0000%` on a 320k MP3 — the figure
 does not fail, it quietly stops meaning anything — so a lossy download from the
 measurement node would be a file its own panel cannot honestly read. Delivery
-formats also have their own home: **Save Audio FLAC 24-bit** and **Save Audio
+formats also have their own home: **Nova Save Audio FLAC 24/16-bit** and **Nova Save Audio
 WAV PCM16|PCM24|FLOAT32** under Delivery & Metadata. The download arrow is for
 auditioning what you are measuring, not for shipping it.
 
@@ -302,6 +317,66 @@ what you have.
 display preferences rather than theme content, so switching theme does not
 change them.
 
+### Sequences: record a show, then sit back
+
+Some views are made to be watched rather than read. **Halo** is the first. These
+views have a **Sequences** section in the drawer that works like recording a
+macro:
+
+1. Click **● Record new…** and type a name, for example *Spinning Fury Master*.
+2. Click **Start**, then play with the settings: speeds, tilt, sizes, whatever
+   you like. Colour changes are not recorded. The pauses between changes are recorded too. The recording clock
+   **follows the song**, so if you need to think, pause the music: time spent
+   paused isn't recorded, and you won't come back to long dead gaps.
+3. Click **■ Stop & save**. The sequence is saved under the name you chose and
+   appears in the list.
+
+Pick one from the list and click **▶ Play**. It plays once, a number of times,
+or in a loop, with the same timing you used while the music plays. Your own
+settings are never touched: when the sequence stops, the view is exactly as you
+left it. Changing any setting yourself during playback hands control back to you.
+
+The files live in **`ComfyUI/user/nova_player/sequences/<view>/`**, one plain
+JSON file per sequence and one folder per view. Back the folder up, share
+sequences, or drop other people's into it. The list re-reads the folder every
+time you choose the view. A file made for a different view or an older version
+still plays: any setting it names that this view does not have, or whose value
+is the wrong type or out of range, is skipped, and the rest plays through to the
+end. **🗑** deletes a sequence after an "Are you sure?".
+
+Measurement views deliberately do not have this: a meter whose settings change
+by themselves is a meter you cannot trust.
+
+---
+
+## Renderers, themes and tested versions
+
+**Tested on ComfyUI 0.37.0 with frontend 1.53.6.** Older versions are not
+tested, so no minimum is claimed.
+
+The pack works with both of ComfyUI's node renderers, **Nodes 2.0** and
+**Classic**. A few things differ between them:
+
+- **The mouse wheel inside a panel (Nodes 2.0).** ComfyUI sends the wheel to the
+  canvas unless a panel has been clicked. Click once inside a report, the
+  FlowPulse dashboard, a SQLite grid or Theme Studio, and the wheel scrolls or
+  zooms that panel. Click outside the node and the wheel zooms the canvas
+  again. In Classic the wheel works on hover.
+- **Minimum sizes.** Nodes with a panel of their own cannot be dragged smaller
+  than the panel needs, in either renderer.
+- **Report export.** Right-click a report viewer and choose **Export views →
+  images**. In Nodes 2.0 a line above the report says so; in Classic the same
+  hint is in the title bar.
+- **Folding (Nodes 2.0 only).** With Theme Studio's **Top panel** set to
+  *Collapsible*, a button in a node's title bar folds the slots and standard
+  widgets away and gives the room to the node's own panel.
+
+**Nova Theme Studio** changes the look of everything, not only this pack's
+nodes, and keeps doing so on every page load until you switch it off. Set its
+**Enabled / Disabled** switch to *Disabled* to get ComfyUI's own look back; your
+theme is kept for when you enable it again. The pack sets no colours on its own
+nodes: without Theme Studio they look like any other node.
+
 ---
 
 ## Tips
@@ -314,6 +389,13 @@ change them.
   MP3. Lossy encoding smooths away the flat tops it detects.
 - **Comparing takes with the APG meter?** Keep `fft_size` the same between them.
   The bin count shifts flatness and centroid.
+- **Dropping a link opens the search box, not the Nova suggestions?** Set
+  **Settings > LiteGraph > LinkRelease > Action on link release** to **context
+  menu**, or hold **Shift** as you drop. See [Install](#install). If you stay
+  with the search box, type `nova` in it. Do not rely on the **▶️ Nova Audio**
+  category on the left: after dropping a text link it can show "No Results",
+  because ComfyUI lists only the first 64 matching nodes before it applies
+  the category.
 - **Node too small?** Opening the bench strip raises the minimum height. Drag the
   node bigger, or close the strip.
 - **Measuring loudness for a release?** Check `scipy` is installed. Without it

@@ -55,9 +55,12 @@ that already holds that colour makes them fail for no reason:
 | `tooltiptest.mjs` | Control hints: wording, the rest delay, and that they never escape the node |
 | `test_panel_info.py` | The `panel_info` output mirrors the bench strip, in all three formats |
 | `doccheck.mjs` | Every documented visualiser count matches `registry.js` (no browser needed) |
-| `halotest.mjs` | Halo renderer drawn with node-canvas: roles resolve, frame-rate independence, silence decay, batching; writes preview PNGs (`npm i --no-save canvas` first) |
+| `halotest.mjs` | Halo renderer in Chromium: roles resolve, no magenta, frame-rate independence, silence decay, stroke batching; optional outDir writes preview PNGs |
+| `seqtest.mjs` | Recorded sequences through the real drawer: record → save → list → play once / loop → hand-back on manual edit → hostile file → delete with confirm → refresh on view change |
+| `vuenodetest.mjs` | Player inside a Nodes 2.0 (Vue node) layout at four zooms, with and without a page rule overriding canvas size: fills the node, render scale follows zoom, clicks land |
 | `tiertest.mjs` | Hint precedence: a level fault suppresses generation-stage hypotheses |
 | `invariants.mjs` | Cross-path inequalities between the meter and the Python bench |
+| `test_sequences.py` | Sequence store: safe names, no path escape, no overwrite, broken files listed, per-renderer folders |
 | `test_madow.py` | Madow: parameter table, validation, hashing, presets, and the Inputs/Unpack split |
 
 ## calibrate.mjs

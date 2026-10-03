@@ -16,21 +16,19 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
 
-try:
-    from .nova_ace_common import (
-        ACE_VERSION, DATASET_TYPE, INSTRUMENTAL, TRAINING_CATEGORY, normalise_sample,
-    )
-    from ..authoring.nova_authoring_common import FILES_TYPE, banner, file_paths
-except ImportError:  # direct execution / test harness
-    from nova_ace_common import (
-        ACE_VERSION, DATASET_TYPE, INSTRUMENTAL, TRAINING_CATEGORY, normalise_sample,
-    )
-    from nova_authoring_common import FILES_TYPE, banner, file_paths
 
+# Relative inside ComfyUI, where the pack is a package. Absolute under
+# dev/tests, which put the pack root on the path themselves.
+try:
+    from ..nova_definitions import INSTRUMENTAL, DATASET_TYPE, FILES_TYPE, normalise_sample, banner, file_paths
+    from ..nova_categories import TRAINING
+except ImportError:
+    from nova_definitions import INSTRUMENTAL, DATASET_TYPE, FILES_TYPE, normalise_sample, banner, file_paths
+    from nova_categories import TRAINING
 
 def _read_tags(path: str) -> Tuple[Dict[str, str], float, int, int]:
     """(lowercased tags, duration seconds, sample rate, channels)."""
-    import mutagen
+    import mutagen # type: ignore
 
     handle = mutagen.File(path)
     if handle is None:
@@ -75,7 +73,7 @@ def _to_bpm(text: str):
 
 
 class NovaACEDatasetBuilder:
-    CATEGORY = TRAINING_CATEGORY
+    CATEGORY = TRAINING
     FUNCTION = "build"
     RETURN_TYPES = ("STRING", DATASET_TYPE, "INT", "STRING")
     RETURN_NAMES = ("dataset_json", "dataset", "sample_count", "console")
@@ -87,7 +85,7 @@ class NovaACEDatasetBuilder:
         "Run log — wire into Nova Console.",
     )
     DESCRIPTION = (
-        f"Nova ACE Dataset Builder v{ACE_VERSION} — turns a batch of tagged audio "
+        f"Nova ACE Dataset Builder — turns a batch of tagged audio "
         "into the dataset JSON ACE-Step's preprocessor reads."
     )
 
@@ -105,7 +103,7 @@ class NovaACEDatasetBuilder:
                 "trigger_word": ("STRING", {
                     "default": "",
                     "multiline": False,
-                    "placeholder": "crazygecko",
+                    "placeholder": "myartistlora",
                     "tooltip": "The LoRA trigger, written to every sample as custom_tag. Use a rare token you can type at inference.",
                 }),
                 "tag_position": (["prepend", "append", "replace"], {
@@ -140,7 +138,7 @@ class NovaACEDatasetBuilder:
     def build(self, files, dataset_json_path, trigger_word, tag_position,
               prompt_source, caption_tags, lyrics_tags, write_sidecars, **kwargs):
         paths = file_paths(files)
-        log: List[str] = [banner(f"NOVA ACE DATASET BUILDER v{ACE_VERSION}")]
+        log: List[str] = [banner(f"NOVA ACE DATASET BUILDER")]
 
         target = (dataset_json_path or "").strip().strip('"').strip("'")
         if not target:
@@ -212,7 +210,6 @@ class NovaACEDatasetBuilder:
         payload = {
             "schema": "nova.ace.dataset",
             "schema_version": 1,
-            "node_version": ACE_VERSION,
             "created_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "trigger_word": trigger,
             "tag_position": tag_position,
@@ -239,7 +236,7 @@ class NovaACEDatasetBuilder:
 
 
 class NovaACEDatasetReview:
-    CATEGORY = TRAINING_CATEGORY
+    CATEGORY = TRAINING
     FUNCTION = "review"
     RETURN_TYPES = ("STRING", "BOOLEAN", "INT", "INT")
     RETURN_NAMES = ("console", "ready", "sample_count", "problem_count")
@@ -251,7 +248,7 @@ class NovaACEDatasetReview:
         "Problems found.",
     )
     DESCRIPTION = (
-        f"Nova ACE Dataset Review v{ACE_VERSION} — checks a dataset before you spend "
+        f"Nova ACE Dataset Review — checks a dataset before you spend "
         "GPU hours on it. ACE-Step's own docs make manual review mandatory; this is that pass."
     )
 
@@ -281,7 +278,7 @@ class NovaACEDatasetReview:
 
     def review(self, dataset, max_duration, min_duration, require_caption, **kwargs):
         samples: List[Dict[str, Any]] = list((dataset or {}).get("samples") or [])
-        log: List[str] = [banner(f"NOVA ACE DATASET REVIEW v{ACE_VERSION}")]
+        log: List[str] = [banner(f"NOVA ACE DATASET REVIEW")]
         problems: List[str] = []
         notes: List[str] = []
 

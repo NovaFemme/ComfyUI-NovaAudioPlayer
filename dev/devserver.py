@@ -31,6 +31,7 @@ sys.path.insert(0, str(ROOT))             # so `import nova_player` resolves
 
 try:
     from nova_player.config_manager import NovaConfigManager
+    from nova_player.sequences import SequenceStore
 except ModuleNotFoundError as e:
     sys.exit(
         f"Could not import nova_player from {ROOT}\n"
@@ -47,6 +48,21 @@ args = parser.parse_args()
 manager = NovaConfigManager(ROOT)
 manager.ensure_files_exist()
 
+# Recorded sequences go to a throwaway folder by default, so a dev session
+# never writes into a real ComfyUI user folder. NOVA_SEQUENCES_DIR overrides.
+import tempfile
+from urllib.parse import unquote
+SEQ_ROOT = os.environ.get("NOVA_SEQUENCES_DIR") or os.path.join(
+    tempfile.gettempdir(), "nova_dev_sequences")
+sequences = SequenceStore(SEQ_ROOT)
+
+
+def _seq_parts(path):
+    """/nova_player/sequences/<renderer>[/<name>] -> (renderer, name or None)."""
+    rest = path.split("?", 1)[0][len("/nova_player/sequences/"):]
+    parts = [unquote(p) for p in rest.split("/") if p]
+    return (parts[0] if parts else ""), (parts[1] if len(parts) > 1 else None)
+
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *a, **k):
@@ -56,6 +72,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         pass
 
     def do_GET(self):
+        if self.path.startswith("/nova_player/sequences/"):
+            rid, name = _seq_parts(self.path)
+            if name is None:
+                ok, res = sequences.list(rid)
+                return self._json({"status": "success", **res} if ok
+                                  else {"status": "error", "message": res}, 200 if ok else 400)
+            ok, res = sequences.read(rid, name)
+            return self._json({"status": "success", "sequence": res} if ok
+                              else {"status": "error", "message": res},
+                              200 if ok else (404 if res == "Not found" else 400))
         if self.path.startswith("/nova_player/config/version"):
             return self._json({"version": manager.version})
         if self.path.startswith("/nova_player/config"):
@@ -69,6 +95,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             payload = json.loads(raw or b"{}")
         except ValueError:
             return self._json({"status": "error", "message": "Invalid JSON body"}, 400)
+
+        if self.path.startswith("/nova_player/sequences/"):
+            rid, _ = _seq_parts(self.path)
+            ok, res = sequences.save(rid, payload.get("name"), payload.get("sequence"))
+            return self._json({"status": "success", **res} if ok
+                              else {"status": "error", "message": res}, 200 if ok else 400)
 
         if self.path.startswith("/nova_player/config/reload"):
             manager.reload_all()
@@ -100,6 +132,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_error(404)
 
     def do_DELETE(self):
+        if self.path.startswith("/nova_player/sequences/"):
+            rid, name = _seq_parts(self.path)
+            ok, res = sequences.delete(rid, name or "")
+            return self._json({"status": "success" if ok else "error", "message": res},
+                              200 if ok else (404 if res == "Not found" else 400))
         if self.path.startswith("/nova_player/config/theme/"):
             name = self.path.rsplit("/", 1)[-1]
             ok, msg = manager.delete_theme(name)

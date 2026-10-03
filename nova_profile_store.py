@@ -33,7 +33,9 @@ NONE_LABEL = "— none —"
 
 
 def profile_dir() -> str:
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # This file sits in the pack's root folder, so its own folder is the pack.
+    # (In utilities/ it would need two dirname() calls; here, one.)
+    root = os.path.dirname(os.path.realpath(__file__))
     path = os.path.join(root, PROFILE_DIRNAME)
     os.makedirs(path, exist_ok=True)
     return path
