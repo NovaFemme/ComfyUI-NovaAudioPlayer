@@ -106,6 +106,14 @@ To retest: apply Midnight / Glass with a wallpaper, click Disabled, compare with
   file with no extension. The tooltip now says so; the behaviour is unchanged.
 - `web/nova_lyric_report_viewer.js` still loads for anyone who installs by `git clone` (handover §3). Undecided.
 
+## Owner sign-off, 3 Oct (branch at `52b6373`, pushed)
+
+- R-1, R-2 fixed and confirmed by the test agent. R-3 confirmed. R-4 switch passed; the owner confirmed its state and fold states persist after save, close and reopen.
+- R-6: answer to the tester's open question. A fix was deployed between the two checks (`2f0cf24`, then `52b6373` for the bottom edge); the reload picked it up. The reload alone did not fix it.
+- R-5: the owner's note says "stays as it is; no change requested". `aa0d679` had already shipped by then: under Nodes 2.0 the node opacity slider now fades a solid body colour the palette stores. With the slider at 1 nothing changes. To be reverted only if the owner asks.
+
+**Shelved by the owner for a release after 2.7.0:** everything else still open in the test report, including output tooltips (74 of 130), Theme Studio not overriding colours other packs set on their node classes, the session-long fold retest (fold, switch renderer live twice, toggle the switch, fold again), the fold button in Classic, B-07 (not reproduced), S-01 (frontend), and the theme copy in a workflow overriding an unsaved slider change on reload.
+
 ## Still to do before release
 
 1. Done 3 Oct: the live folder was already clean, and every changed file was copied into it. It matches the branch.
