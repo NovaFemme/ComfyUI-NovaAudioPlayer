@@ -535,6 +535,26 @@ function markTarget(node, card) {
 const isFolded = (node, card) =>
     !!markTarget(node, card)?.classList.contains(FOLD_MARK);
 
+/**
+ * THE BOTTOM EDGE STAYS WHERE IT IS WHEN THE TOP FOLDS (owner, 3 Oct).
+ *
+ * A card is as tall as its node's height OR its content, whichever is more.
+ * A node whose rows and panel need more room than its stored height is drawn
+ * taller than that height says; fold the rows away and the card drops back to
+ * the stored height, so the bottom edge jumps up. Before folding, the stored
+ * height is raised to what is on screen. Nothing visible changes at that
+ * moment, and afterwards the fold has no slack to give back.
+ */
+function anchorBottom(node, card) {
+    try {
+        const stored = parseFloat(card.style.getPropertyValue("--node-height"));
+        const shown = card.offsetHeight;
+        if (!(stored > 0) || !(shown > stored + 0.5) || !Array.isArray(node?.size) && !node?.size) return;
+        const size = [node.size[0], node.size[1] + (shown - stored)];
+        if (typeof node.setSize === "function") node.setSize(size); else node.size = size;
+    } catch { /* a node that will not be resized simply folds as before */ }
+}
+
 function saveFold(node, folded) {
     if (!node || node.id == null) return;
     try {
@@ -873,6 +893,7 @@ function ensureButton(card, node, on) {
         // aimed at the old one lands nowhere (R-6).
         const live = b.closest("[data-node-id]") || cardById(node) || card;
         const now = !isFolded(node, live);
+        if (now) anchorBottom(node, live);
         setFolded(node, live, now);
         // The links are still drawn on the canvas and their ends have just
         // moved; without this they stay where the slots used to be.
@@ -1356,6 +1377,10 @@ function apply(palette, ctx) {
         widgetElements(node).some((el) => el !== card && card.contains(el))).slice(0, 4);
     const panelPairs = withPanel.length ? withPanel : pairs;
     const host = findHosts(panelPairs);
+    // Kept apart from `host.selector`, which a rolled-back stretch sets to
+    // null further down. The fold only needs to know where the panel sits; it
+    // must not stop working because stretching was judged not worth it.
+    const foldHostSel = host.selector;
 
     // MEASURED ONCE, WITH OUR OWN WORK SWITCHED OFF — and then remembered.
     //
@@ -1389,7 +1414,7 @@ function apply(palette, ctx) {
             if (host.selector) css += "\n" + fitRules(described.selector, host.selector, bang);
             if (pinned.found) css += "\n" + pinnedRule();
         }
-        if (collapsible) css += "\n" + collapseRules(described.selector, host.selector, levels);
+        if (collapsible) css += "\n" + collapseRules(described.selector, foldHostSel, levels);
         sheet().textContent = css;
     };
 
@@ -1428,7 +1453,7 @@ function apply(palette, ctx) {
 
     // The button and the folded state, after the rules that make them mean
     // something. A card the renderer rebuilds later is caught by the observer.
-    foldPlan = { hostSel: host.selector, levels, canvas };
+    foldPlan = { hostSel: foldHostSel, levels, canvas };
     let buttons = 0;
     if (collapsible) {
         buttons = decorate(allPairs, true);
