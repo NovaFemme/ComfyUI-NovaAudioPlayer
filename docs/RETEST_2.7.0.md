@@ -138,10 +138,24 @@ Observation, not changed: Nova Final Master Validator's `sample_rate` output has
 
 **Report viewers overflow the node in Classic until resized (owner, 17:33), fixed for the Track Inspector Report, same change applied to the Master Report Viewer:** after a reload in Nodes 2.0 and a live switch to Classic, the reports hung out of the bottom of their nodes until the node was dragged. The report's height was only worked out in `onResize`; under Nodes 2.0 that is skipped since B-18, so the node arrived in Classic with a height from another moment. In Classic the report is now fitted again whenever the node's height or the report's position has changed since the last fit, from `onDrawForeground`. Reproduced for the Track Inspector Report (6 px over the edge at a node height of 500) and checked after the fix: 8 px inside the edge with no resize, and the Classic resize figures are the same as before. Not reproduced for the Master Report Viewer: it needs a real mastering report, which the test page does not have. Owner to confirm both.
 
+## Release preparation, 3 Oct evening (development agent; the documentation agent could not connect)
+
+**README.** Added the three nodes it did not describe (FlowPulse, Theme Studio, Data Table & Filter); a section "Renderers, themes and tested versions" (tested on ComfyUI 0.37.0 / frontend 1.53.6, no minimum claimed; wheel-after-click under Nodes 2.0; minimum sizes; export hint; folding; Theme Studio is global and has an Enabled / Disabled switch); the deprecated Reader moved to Utility & IO, where the menu has it, with the note that it creates the database file if absent; the stray "# Nova SQLite Nodes for ComfyUI" heading removed; `example_workflows/README.md` now lists eight workflows. The test agent's Documentation Brief (D-01 to D-14) was not available to me, so this was done from the handover's summary of it and from the code. Not done: D8 (one product name, owner decision), D12 (screenshots).
+
+**Browser suites** (`dev/tests/*.mjs`, 25 runnable files, against `dev/devserver.py`, on `856d053`): 21 pass with no failure. `zoomtest` prints four FAIL lines by design in its "before the fix" half; its "after the fix" half passes 5 of 5. Two suites fail, and one cannot run here:
+
+| Suite | Result | Same at `086a1c3` (before the development agent's work)? |
+|---|---|---|
+| `scopetest` | 9 pass, 3 fail: a "This node" colour edit is not in the serialised workflow state; a second player on the same theme shows the edited colour; a "Theme" scope edit did not reach the theme on disk | yes, identical |
+| `paneltest` | 11 pass, 1 fail: expects only the view's sections and the player chrome in the drawer; a "Display" section is there too | yes, identical |
+| `realtake` | cannot run: needs the owner's audio file ("Unable to decode audio data") | yes |
+
+Neither failing suite touches code changed since `086a1c3`. `paneltest` looks like a test that predates the Display section. `scopetest` may be a real fault in the player's colour scope or a stale harness; not determined. `vuenodetest.mjs` is still missing.
+
+**Shipped tree (step 5.8), read file by file:** 663 files, 5.4 MB. No `dev/`, `docs/`, installers, transcribe nodes or workflow PNGs. No home-folder paths, e-mail addresses or credentials in any shipped file. `examples/nova_album_example.db` holds three placeholder rows ("Example Artist"). For the owner (D15): 492 presets ship. 480 are key and sampler presets with a 19-character placeholder prompt. Twelve carry the owner's own material: seven `High_Water_Sessions_TellTheRiver_*` (full prompt), `SFT XL Default`, `Southern blues rock`, `Southern blues rock - A Minor`, `Southern Blues Rock Variant - A` (full prompt and full lyrics), and `Eb minor 14 gradient_estimation beta aggressive` (full lyrics of "Tell the River I'm Coming"). That last file is listed in `.gitignore` but is tracked, so it ships.
+
 ## Still to do before release
 
-1. Done 3 Oct: the live folder was already clean, and every changed file was copied into it. It matches the branch.
-2. The test agent's regression pass on `a2c3317`.
-3. The browser suites under `dev/tests/*.mjs` were not run.
-4. §5.8 file-by-file read of the shipped tree; §5.9 version bump and merge, after the retest passes.
-5. `vuenodetest.mjs` is still missing; `halotest.mjs` was recovered from `backup/repo-2026-10-02`.
+1. Owner decisions: D15 (the twelve presets above), D8 (product name), D3 (version number), D12, D13.
+2. `scopetest`: decide whether the three failures are a player fault or a stale test.
+3. Step 5.9: set `version = "2.7.0"` in `pyproject.toml` as the last commit, merge `release/2.7.0` into `main` and push. The push publishes.
