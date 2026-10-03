@@ -124,6 +124,14 @@ Observation, not changed: Nova Final Master Validator's `sample_rate` output has
 
 **B-20, owner decision D16 = (a), 3 Oct:** the pack keeps not changing the setting. The README (Install, and a line under Tips) and the Nova Console help page now say to set Settings > LiteGraph > LinkRelease > Action on link release to "context menu", or hold Shift. No code change. Checked on the developer's test server that with "context menu" the Nova suggestions lead the menu in Nodes 2.0 and Classic, and that "search box" opens the search. Option (c), a one-time prompt, is a candidate for a later release.
 
+## Handover Revision 4, later items, 3 Oct
+
+**B-21, fixed:** under Nodes 2.0 the wheel never reached anything inside a Nova panel; the canvas zoomed. Reproduced in a real browser for the Track Inspector waveform, the report body and the Theme Studio list. Fix in `web/core/vue-size.js`, so it covers every panel that uses it (both report viewers, FlowPulse, the SQLite nodes, Theme Studio): the host is marked `data-capture-wheel` and takes the focus when clicked, which is the frontend's own rule for letting the wheel through. One click in a panel gives it the wheel; a click outside gives the wheel back to the canvas. The waveform legend now reads "Click, then wheel to zoom". After the fix, Nodes 2.0: click then wheel zooms the waveform (visible range 1:16 to 2:21 of 3:37), drag pans, the slider moves the view, double-click resets, the report body and the Theme Studio list scroll, and the canvas scale stays at 1; after a click outside, the wheel zooms the canvas again. Classic: unchanged, the wheel works on hover as before and nothing is focused. Not exercised: FlowPulse and the SQLite grid had nothing to scroll in the test; they use the same host.
+
+**B-22, fixed:** Nova Load Audio's preview kept the first file in the list after a workflow was restored. Reproduced on the old code (field `bbb_second.wav`, player `aaa_first.wav`). The preview is now refreshed in `onConfigure`, and checked again on the player's `play` event. After the fix, both renderers: restored workflow, player matches the field; value changed with no callback and no configure, then Play: the player switches to the field's file and plays it (duration 3.0 s for the 3 s file); loading a different workflow follows too. Not tested: after an upload (that path already called the callback).
+
+**Search box wording:** the README tip and the Nova Console help page now say to type `nova` in the search box and not to rely on the category list.
+
 ## Still to do before release
 
 1. Done 3 Oct: the live folder was already clean, and every changed file was copied into it. It matches the branch.

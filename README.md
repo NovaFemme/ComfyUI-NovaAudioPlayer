@@ -356,7 +356,11 @@ by themselves is a meter you cannot trust.
   The bin count shifts flatness and centroid.
 - **Dropping a link opens the search box, not the Nova suggestions?** Set
   **Settings > LiteGraph > LinkRelease > Action on link release** to **context
-  menu**, or hold **Shift** as you drop. See [Install](#install).
+  menu**, or hold **Shift** as you drop. See [Install](#install). If you stay
+  with the search box, type `nova` in it. Do not rely on the **▶️ Nova Audio**
+  category on the left: after dropping a text link it can show "No Results",
+  because ComfyUI lists only the first 64 matching nodes before it applies
+  the category.
 - **Node too small?** Opening the bench strip raises the minimum height. Drag the
   node bigger, or close the strip.
 - **Measuring loudness for a release?** Check `scipy` is installed. Without it

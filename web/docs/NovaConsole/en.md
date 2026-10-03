@@ -54,6 +54,10 @@ on link release** setting is on its default. Set **Settings > LiteGraph >
 LinkRelease > Action on link release** to **context menu**, or hold **Shift**
 as you drop. The pack does not change that setting for you.
 
+If you keep the search box, type `nova` in it. The **▶️ Nova Audio** category on
+the left can show "No Results" after a text link is dropped: ComfyUI lists only
+the first 64 matching nodes before it applies the category.
+
 ## Notes
 
 - The text survives a page reload: it is stashed on the node and restored from

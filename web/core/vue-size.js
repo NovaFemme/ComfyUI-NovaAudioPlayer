@@ -125,6 +125,7 @@ function install() {
     // ordinary rule outranks an inline one.
     style.textContent = `
 [data-node-id] .${HOST} { min-height: var(--nova-min-h, 0px) !important; }
+.${HOST}:focus { outline: none; }
 [data-node-id] .${HOST} > .${PANEL} {
     position: absolute !important; inset: 0 !important;
     width: auto !important; height: auto !important;
@@ -157,7 +158,39 @@ export function vueSize(host, panel, { minWidth = 0, minHeight = 0 } = {}) {
     panel.classList.add(PANEL);
     if (minHeight > 0) host.style.setProperty("--nova-min-h", `${Math.round(minHeight)}px`);
     if (minWidth > 0) host.dataset.novaMinW = String(Math.round(minWidth));
+    takeWheelWhenClicked(host);
     return host;
+}
+
+/**
+ * THE WHEEL, UNDER NODES 2.0 (handover Revision 4, B-21).
+ *
+ * Every node card sits inside a pane whose capture-phase wheel handler sends
+ * the wheel to the canvas before anything inside the node hears it. A list in
+ * a panel could not be scrolled and the Track Inspector's waveform could not
+ * be zoomed: the canvas zoomed instead. The frontend leaves one way through
+ * (v1.53.6, `useCanvasInteractions.ts`): the wheel is left alone when it
+ * happens inside an element marked `data-capture-wheel="true"` that holds the
+ * focused element. Its own 3D viewer uses exactly this.
+ *
+ * So the host is marked, made focusable, and focused when it is clicked. One
+ * click in a panel hands it the wheel; a click anywhere else gives the wheel
+ * back to the canvas. On the classic renderer the wheel already reaches the
+ * panel, and nothing is focused there.
+ */
+function takeWheelWhenClicked(host) {
+    if (host.dataset.captureWheel === "true") return;
+    host.dataset.captureWheel = "true";
+    host.addEventListener("pointerdown", () => {
+        if (!host.closest("[data-node-id]")) return;
+        // Made focusable here and not before, so that on the classic renderer
+        // a click in a panel still leaves the focus where it always was.
+        if (!host.hasAttribute("tabindex")) host.tabIndex = -1;
+        // A field that takes the focus itself does so after this, on its own
+        // mousedown, and it is inside the host, which serves just as well.
+        if (host.contains(document.activeElement) && document.activeElement !== document.body) return;
+        host.focus({ preventScroll: true });
+    }, true);
 }
 
 /**
