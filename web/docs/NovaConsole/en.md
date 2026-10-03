@@ -49,6 +49,11 @@ so nothing else in ComfyUI changes behaviour. Dropping a link directly onto a
 named slot uses a different code path and is untouched, so you can still wire
 something into `label` deliberately.
 
+If releasing a link opens the node search and not this menu, ComfyUI's **Action
+on link release** setting is on its default. Set **Settings > LiteGraph >
+LinkRelease > Action on link release** to **context menu**, or hold **Shift**
+as you drop. The pack does not change that setting for you.
+
 ## Notes
 
 - The text survives a page reload: it is stashed on the node and restored from

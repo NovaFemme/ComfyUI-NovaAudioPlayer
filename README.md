@@ -29,6 +29,13 @@ git clone https://github.com/NovaFemme/ComfyUI-NovaAudioPlayer.git
 
 Restart ComfyUI. Everything lands under **▶️ Nova Audio** in the node menu.
 
+**One ComfyUI setting worth changing.** When you drag a link from an output and
+drop it on empty canvas, the pack puts the Nova nodes that fit at the top of
+the suggestion menu. ComfyUI's default opens the node search instead, and the
+menu is behind **Shift**. To get the menu on a plain drop, set **Settings >
+LiteGraph > LinkRelease > Action on link release** to **context menu**. The
+pack does not change this setting for you.
+
 ### Requirements
 
 Two packages are declared and installed with the pack:
@@ -347,6 +354,9 @@ by themselves is a meter you cannot trust.
   MP3. Lossy encoding smooths away the flat tops it detects.
 - **Comparing takes with the APG meter?** Keep `fft_size` the same between them.
   The bin count shifts flatness and centroid.
+- **Dropping a link opens the search box, not the Nova suggestions?** Set
+  **Settings > LiteGraph > LinkRelease > Action on link release** to **context
+  menu**, or hold **Shift** as you drop. See [Install](#install).
 - **Node too small?** Opening the bench strip raises the minimum height. Drag the
   node bigger, or close the strip.
 - **Measuring loudness for a release?** Check `scipy` is installed. Without it

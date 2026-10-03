@@ -122,7 +122,7 @@ To retest: apply Midnight / Glass with a wallpaper, click Disabled, compare with
 
 Observation, not changed: Nova Final Master Validator's `sample_rate` output has type `SAMPLE_RATE`, which nothing in this pack accepts (Nova Save Audio WAV takes an INT).
 
-**B-20:** waiting on owner decision D16.
+**B-20, owner decision D16 = (a), 3 Oct:** the pack keeps not changing the setting. The README (Install, and a line under Tips) and the Nova Console help page now say to set Settings > LiteGraph > LinkRelease > Action on link release to "context menu", or hold Shift. No code change. Checked on the developer's test server that with "context menu" the Nova suggestions lead the menu in Nodes 2.0 and Classic, and that "search box" opens the search. Option (c), a one-time prompt, is a candidate for a later release.
 
 ## Still to do before release
 
