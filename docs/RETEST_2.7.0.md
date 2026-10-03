@@ -132,6 +132,8 @@ Observation, not changed: Nova Final Master Validator's `sample_rate` output has
 
 **Search box wording:** the README tip and the Nova Console help page now say to type `nova` in the search box and not to rely on the category list.
 
+**Export hint on the report viewers (owner, 3 Oct 17:19), fixed:** the "Right-click → Export N views" line was missing under Nodes 2.0. It is painted on the canvas title bar in `onDrawForeground`, which Nodes 2.0 never calls, so it has only ever shown in Classic. Under Nodes 2.0 both viewers now carry the same hint as a 20 px line above the report, blue once a report is rendered and muted before. Classic keeps the painted hint. Found on the way and fixed: since B-18 the export would have captured the report's empty host, not the report; it now captures the report. Checked in a real browser in both renderers: the hint shows, and Export saves 3 images for the Track Inspector Report.
+
 ## Still to do before release
 
 1. Done 3 Oct: the live folder was already clean, and every changed file was copied into it. It matches the branch.

@@ -52,8 +52,72 @@ const DEFAULTS = {
 
 /** The DOM element a viewer rendered into, via ComfyUI's addDOMWidget contract. */
 function viewerElement(node) {
+    // The report itself, not the host it sits in since B-18: the host is an
+    // empty frame, and a picture of it would be a picture of nothing.
+    const root = node?.__ntiRoot || node?.__novaReportRoot;
+    if (root instanceof HTMLElement) return root;
     const w = node?.widgets?.find?.((x) => x && x.element instanceof HTMLElement);
-    return w?.element || node?.__novaReportRoot || null;
+    return w?.element || null;
+}
+
+/** The host a viewer's report sits in (web/core/vue-size.js), if it has one. */
+function viewerHost(node) {
+    return node?.__ntiHost || node?.__novaReportHost || null;
+}
+
+/**
+ * THE SAME HINT UNDER NODES 2.0.
+ *
+ * The title-bar hint further down is painted on the canvas in
+ * onDrawForeground, and Nodes 2.0 never calls that: its nodes are DOM, so the
+ * hint was simply absent there and nothing on the node said the export exists.
+ * Here it is a line of its own above the report. It is shown only inside a
+ * Nodes 2.0 card; on the classic renderer the painted hint is still the one.
+ */
+const HINT = "nova-report-hint";
+const HINTED = "nova-report-hinted";
+const HINT_H = 20;
+
+function installHintStyle() {
+    const id = "nova-report-hint-css";
+    if (document.getElementById(id)) return;
+    const style = document.createElement("style");
+    style.id = id;
+    style.textContent = `
+.${HINT} { display: none; }
+[data-node-id] .${HINT} {
+    display: block; position: absolute; top: 0; left: 0; right: 0;
+    height: ${HINT_H}px; line-height: ${HINT_H}px; padding: 0 8px;
+    box-sizing: border-box; text-align: right; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+    font: bold 10px/${HINT_H}px system-ui, sans-serif; color: #7fb0ff;
+}
+[data-node-id] .${HINT}.waiting { color: inherit; opacity: 0.55; }
+[data-node-id] .${HINTED} > .nova-dom-panel { top: ${HINT_H}px !important; }
+[data-node-id] .${HINTED} { padding-top: 0; }`;
+    document.head.appendChild(style);
+}
+
+function refreshHint(node) {
+    const host = viewerHost(node);
+    if (!host) return;
+    installHintStyle();
+    const count = exportableViews(node).length;
+    let hint = host.querySelector(`:scope > .${HINT}`);
+    if (!count) { hint?.remove(); host.classList.remove(HINTED); return; }
+    if (!hint) {
+        hint = document.createElement("div");
+        hint.className = HINT;
+        host.appendChild(hint);
+        host.classList.add(HINTED);
+    }
+    hint.textContent = `Right-click the node \u2192 Export ${count} views`;
+    hint.classList.toggle("waiting", !hasReport(node));
+}
+
+/** Has a report been rendered into this viewer yet? */
+function hasReport(node) {
+    return !!(node?.__ntiLastBlock?.payload || node?.__novaReportBlock);
 }
 
 function widgetByName(node, name) {
@@ -814,6 +878,19 @@ app.registerExtension({
                              this.size[0] - 12, -titleHeight / 2);
                 ctx.restore();
             } catch { /* a hint must never break drawing the node */ }
+            return r;
+        };
+
+        const originalCreated = nodeType.prototype.onNodeCreated;
+        nodeType.prototype.onNodeCreated = function () {
+            const r = originalCreated?.apply(this, arguments);
+            try { refreshHint(this); requestAnimationFrame(() => refreshHint(this)); } catch { }
+            return r;
+        };
+        const originalExecuted = nodeType.prototype.onExecuted;
+        nodeType.prototype.onExecuted = function () {
+            const r = originalExecuted?.apply(this, arguments);
+            try { refreshHint(this); } catch { }
             return r;
         };
 
