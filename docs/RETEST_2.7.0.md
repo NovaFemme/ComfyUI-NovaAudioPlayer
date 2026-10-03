@@ -156,6 +156,7 @@ Neither failing suite touches code changed since `086a1c3`. `paneltest` looks li
 
 ## Still to do before release
 
-1. Owner decisions: D15 (the twelve presets above), D8 (product name), D3 (version number), D12, D13.
-2. `scopetest`: decide whether the three failures are a player fault or a stale test.
-3. Step 5.9: set `version = "2.7.0"` in `pyproject.toml` as the last commit, merge `release/2.7.0` into `main` and push. The push publishes.
+1. Owner decisions: D8 (product name), D3 (version number), D12, D13.
+2. D15 decided by the owner, 3 Oct: the twelve presets keep their names and sampler settings; prompt, lyrics, seed and file fields were set to the same placeholder values the other 480 use. Done in the repo only. **The live install keeps the owner's own versions on purpose; do not sync `presets/` from live to the repo.**
+3. `scopetest`: the owner reports the colour scope works and saves in ComfyUI, so the three failures are treated as a stale test. The test itself is not updated.
+4. Step 5.9: set `version = "2.7.0"` in `pyproject.toml` as the last commit, merge `release/2.7.0` into `main` and push. The push publishes.

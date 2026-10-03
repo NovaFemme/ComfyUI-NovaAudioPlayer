@@ -14,7 +14,7 @@
     "ksampler.scheduler": "ddim_uniform",
     "ksampler.denoise": 1,
     "ksampler.seed": 0,
-    "caption.prompt": "Six minute southern blues rock album closer with a heavy swaggering half time groove, opening with a clean chiming descending guitar figure on a bright single coil bridge pickup through a spring reverb tank with no drums, then the full trio crashing in, foreground electric guitar through a rocking wah pedal and a germanium fuzz into a cranked hundred watt stack with natural power tube breakup and controlled feedback, heavy finger vibrato, wide whole step bends, percussive sixteenth note rhythm scratching behind the beat, verses rolling on a single dominant seventh chord with a country rock lilt, choruses lifting on a five six one movement with a borrowed flat seventh, warm round bass playing melodic countermelody instead of roots, loose powerful live drums with a deep tuned floor tom, splashy hand hammered cymbals and a fat backbeat snare, tambourine, warm plainspoken male baritone lead vocal, slightly nasal, drawling and conversational, close miked with short slap echo, shouted double tracked chorus, long extended guitar jam outro with feedback and a slow fade, humid and unhurried turning triumphant, E Mixolydian with blues thirds, vintage analog tape production with real room bleed.",
+    "caption.prompt": "Southern blues rock",
     "music.bpm": 96,
     "music.duration": 365,
     "music.timesignature": "4",
@@ -26,9 +26,9 @@
     "lm.top_k": 0,
     "lm.min_p": 0,
     "lm.generate_audio_codes": true,
-    "file.prefix": "High_Water_Sessions",
-    "file.name": "High_Water_Sessions_TellTheRiver_08_airy_unipc",
-    "file.folder": "High Water Sessions",
+    "file.prefix": "gen",
+    "file.name": "audio_file_generated",
+    "file.folder": "Audio Generations",
     "file.separator": "_"
   },
   "excludes": [
