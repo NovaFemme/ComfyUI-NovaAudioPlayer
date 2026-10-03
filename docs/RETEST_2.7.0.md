@@ -134,6 +134,10 @@ Observation, not changed: Nova Final Master Validator's `sample_rate` output has
 
 **Export hint on the report viewers (owner, 3 Oct 17:19), fixed:** the "Right-click → Export N views" line was missing under Nodes 2.0. It is painted on the canvas title bar in `onDrawForeground`, which Nodes 2.0 never calls, so it has only ever shown in Classic. Under Nodes 2.0 both viewers now carry the same hint as a 20 px line above the report, blue once a report is rendered and muted before. Classic keeps the painted hint. Found on the way and fixed: since B-18 the export would have captured the report's empty host, not the report; it now captures the report. Checked in a real browser in both renderers: the hint shows, and Export saves 3 images for the Track Inspector Report.
 
+**Owner's checks, 3 Oct 17:25 to 17:33:** B-21 confirmed (waveform zoom, pan and range under Nodes 2.0). B-22 confirmed after a reload. The export hint shows and the export works in both renderers.
+
+**Report viewers overflow the node in Classic until resized (owner, 17:33), fixed for the Track Inspector Report, same change applied to the Master Report Viewer:** after a reload in Nodes 2.0 and a live switch to Classic, the reports hung out of the bottom of their nodes until the node was dragged. The report's height was only worked out in `onResize`; under Nodes 2.0 that is skipped since B-18, so the node arrived in Classic with a height from another moment. In Classic the report is now fitted again whenever the node's height or the report's position has changed since the last fit, from `onDrawForeground`. Reproduced for the Track Inspector Report (6 px over the edge at a node height of 500) and checked after the fix: 8 px inside the edge with no resize, and the Classic resize figures are the same as before. Not reproduced for the Master Report Viewer: it needs a real mastering report, which the test page does not have. Owner to confirm both.
+
 ## Still to do before release
 
 1. Done 3 Oct: the live folder was already clean, and every changed file was copied into it. It matches the branch.

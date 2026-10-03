@@ -766,6 +766,27 @@ app.registerExtension({
             return r;
         };
 
+        // CLASSIC: THE REPORT FOLLOWS THE NODE WITHOUT WAITING FOR A RESIZE.
+        // See the same note in nova_track_inspector.js. The classic renderer
+        // paints every node; when the node's height, the report's position or
+        // whether a report is shown has changed since the last fit, the
+        // report is fitted again. Nodes 2.0 never calls this.
+        const originalDraw = nodeType.prototype.onDrawForeground;
+        nodeType.prototype.onDrawForeground = function () {
+            const r = originalDraw?.apply(this, arguments);
+            try {
+                const widget = this.__novaReportWidget;
+                if (widget && !this.flags?.collapsed) {
+                    const key = `${Math.round(this.size?.[1] || 0)}|${Math.round(Number(widget.y) || 0)}|${this.__novaReportActive ? 1 : 0}`;
+                    if (key !== this.__novaFitKey) {
+                        this.__novaFitKey = key;
+                        this.onResize?.(this.size);
+                    }
+                }
+            } catch { /* a fit must never break drawing the node */ }
+            return r;
+        };
+
         const originalExecuted = nodeType.prototype.onExecuted;
         nodeType.prototype.onExecuted = function (message) {
             const r = originalExecuted?.apply(this, arguments);

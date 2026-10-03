@@ -134,6 +134,29 @@ app.registerExtension({
       return r;
     };
 
+    // CLASSIC: THE REPORT FOLLOWS THE NODE WITHOUT WAITING FOR A RESIZE.
+    //
+    // The height used to be worked out in onResize only. A node that arrives
+    // in Classic without being resized there (the renderer switched from
+    // Nodes 2.0, a workflow restored, the rows above the report laid out
+    // late) kept a height from another moment and hung out of the node until
+    // it was dragged. The classic renderer paints every node; when the node's
+    // height or the report's position has changed since the last fit, it is
+    // fitted again. Nodes 2.0 never calls this, and the report fills its host
+    // there.
+    const drawn=nodeType.prototype.onDrawForeground;
+    nodeType.prototype.onDrawForeground=function(){
+      const r=drawn?.apply(this,arguments);
+      try{
+        const w=this.__ntiWidget;
+        if(w&&!this.flags?.collapsed){
+          const key=`${Math.round(this.size?.[1]||0)}|${Math.round(Number(w.y)||0)}`;
+          if(key!==this.__ntiFitKey){this.__ntiFitKey=key;this.onResize?.(this.size);}
+        }
+      }catch{}
+      return r;
+    };
+
     const configured=nodeType.prototype.onConfigure;
     nodeType.prototype.onConfigure=function(info){
       const r=configured?.apply(this,arguments);
